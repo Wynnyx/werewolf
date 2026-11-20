@@ -425,28 +425,10 @@ function preloadImage(src) {
   });
 }
 
-const ART_KEY = 'nightfall.cardart.v1';
-let customArt = (() => {
-  try { const v = JSON.parse(localStorage.getItem(ART_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; }
-  catch (e) { return {}; }
-})();
-const artListeners = new Set();
-const subscribeArt = (fn) => { artListeners.add(fn); return () => artListeners.delete(fn); };
-const getArt = () => customArt;
-function setCustomArt(id, dataUrl) {
-  const next = { ...customArt };
-  const old = customArt[id];
-  if (old && old !== dataUrl) imageCache.delete(old);
-  if (dataUrl) { next[id] = dataUrl; preloadImage(dataUrl); } else delete next[id];
-  customArt = next;
-  artListeners.forEach((fn) => fn());
-  try { localStorage.setItem(ART_KEY, JSON.stringify(next)); return true; } catch (e) { return false; }
-}
-function useCustomArt() { return React.useSyncExternalStore(subscribeArt, getArt); }
+try { localStorage.removeItem('nightfall.cardart.v1'); } catch (e) { /* custom art no longer exists */ }
 const DEFAULT_BACK = 'images/card-back.jpg';
 function useCardImage(role) {
-  const art = useCustomArt();
-  return art[role] || ROLES_DATA[role].imageUrl || '';
+  return ROLES_DATA[role].imageUrl || '';
 }
 function DefaultBackDesign() {
   const Diamond = ({ className }) => (
@@ -476,40 +458,13 @@ function DefaultBackDesign() {
   );
 }
 function CardBackFace() {
-  const art = useCustomArt();
-  const src = art.back || DEFAULT_BACK;
+  const src = DEFAULT_BACK;
   const [bad, setBad] = useState('');
   if (src && bad !== src) {
     return <img src={src} alt="" draggable={false} onError={() => setBad(src)} className="h-full w-full rounded-2xl object-cover" />;
   }
   return <DefaultBackDesign />;
 }
-// Downscale to max 600px wide (and 900px tall), WebP where the browser can encode it, else JPEG.
-function processImage(file, maxW = 600, maxH = 900) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      try {
-        const k = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
-        const w = Math.max(1, Math.round(img.naturalWidth * k));
-        const h = Math.max(1, Math.round(img.naturalHeight * k));
-        const c = document.createElement('canvas');
-        c.width = w; c.height = h;
-        const ctx = c.getContext('2d');
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-        let out = c.toDataURL('image/webp', 0.85);
-        if (!out.startsWith('data:image/webp')) out = c.toDataURL('image/jpeg', 0.85);
-        resolve(out);
-      } catch (e) { reject(e); } finally { URL.revokeObjectURL(url); }
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable image')); };
-    img.src = url;
-  });
-}
-
 /* ------------------------------------------------------------------ */
 /* PlayingCard: art + vertical title (right edge) + ability banner     */
 /* Sizes use container units, so it scales from the grid to the reveal */
@@ -726,89 +681,7 @@ function Screen({ children, className = '', wide = false }) {
 /* ------------------------------------------------------------------ */
 /* Role Guide modal                                                    */
 /* ------------------------------------------------------------------ */
-function CardArtPanel() {
-  const art = useCustomArt();
-  const [msg, setMsg] = useState({});
-  const pick = async (id, e) => {
-    const f = e.target.files && e.target.files[0];
-    e.target.value = '';
-    if (!f) return;
-    setMsg((m) => ({ ...m, [id]: 'Processing…' }));
-    try {
-      const data = await processImage(f);
-      const saved = setCustomArt(id, data);
-      setMsg((m) => ({ ...m, [id]: saved ? 'Saved on this device.' : 'Applied, but storage is full or blocked, so it resets on reload.' }));
-    } catch (err) {
-      setMsg((m) => ({ ...m, [id]: 'Could not read that image. Try a JPEG or PNG.' }));
-    }
-  };
-  return (
-    <div className="overflow-y-auto px-5 pb-6">
-      <p className="mb-3 text-sm leading-snug text-slate-400">
-        Set the face-down card back, or pick a finished card image for any role. Portrait 3:4 images fit best.
-      </p>
-      <ul className="flex flex-col gap-3">
-        <li className="flex gap-3 rounded-2xl p-3" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>
-          <div className="flex aspect-[3/4] w-[64px] shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ background: '#05070B', border: '1px solid rgba(203,213,225,0.3)' }}>
-            <img src={art.back || DEFAULT_BACK} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="font-display text-base font-bold leading-tight">Card Back</h3>
-            <p className="text-xs text-slate-500">{art.back ? 'Using your image' : 'Using bundled card back'}</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <label htmlFor="art-back"
-                className="inline-flex min-h-[44px] cursor-pointer items-center rounded-lg px-3 text-sm font-semibold text-slate-100 focus-within:outline focus-within:outline-2 focus-within:outline-slate-300"
-                style={{ background: 'var(--card)', border: '1px solid rgba(203,213,225,0.35)' }}>
-                Choose photo
-                <input id="art-back" type="file" accept="image/*" className="sr-only" onChange={(e) => pick('back', e)} />
-              </label>
-              {art.back && (
-                <button onClick={() => { setCustomArt('back', null); setMsg((m) => ({ ...m, back: 'Reset to default.' })); }}
-                  className="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-red-300 hover:bg-white/5"
-                  style={{ border: '1px solid #DC262666' }}>Reset to Default</button>
-              )}
-            </div>
-            {msg.back && <p role="status" className="mt-1.5 text-xs text-slate-400">{msg.back}</p>}
-          </div>
-        </li>
-        {ROLE_IDS.map((id) => {
-          const r = ROLES_DATA[id];
-          const custom = art[id];
-          const src = custom || r.imageUrl;
-          return (
-            <li key={id} className="flex gap-3 rounded-2xl p-3" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>
-              <div className="flex aspect-[3/4] w-[64px] shrink-0 items-center justify-center overflow-hidden rounded-lg"
-                style={{ background: r.color + '1A', border: `1px solid ${r.color}40` }}>
-                {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : <RoleEmblem role={id} size={30} />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="font-display text-base font-bold leading-tight">{r.name}</h3>
-                <p className="text-xs text-slate-500">{custom ? 'Using your image' : r.imageUrl ? 'Using bundled card image' : 'Using built-in art'}</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <label htmlFor={`art-${id}`}
-                    className="inline-flex min-h-[44px] cursor-pointer items-center rounded-lg px-3 text-sm font-semibold text-slate-100 focus-within:outline focus-within:outline-2 focus-within:outline-slate-300"
-                    style={{ background: 'var(--card)', border: '1px solid rgba(203,213,225,0.35)' }}>
-                    Choose photo
-                    <input id={`art-${id}`} type="file" accept="image/*" className="sr-only" onChange={(e) => pick(id, e)} />
-                  </label>
-                  {custom && (
-                    <button onClick={() => { setCustomArt(id, null); setMsg((m) => ({ ...m, [id]: 'Reset to default.' })); }}
-                      className="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-red-300 hover:bg-white/5"
-                      style={{ border: '1px solid #DC262666' }}>Reset to Default</button>
-                  )}
-                </div>
-                {msg[id] && <p role="status" className="mt-1.5 text-xs text-slate-400">{msg[id]}</p>}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
 function RoleGuide({ onClose }) {
-  const [view, setView] = useState('guide'); // guide | art
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -820,21 +693,13 @@ function RoleGuide({ onClose }) {
       <div className="screen-in relative flex max-h-[88%] w-full max-w-md flex-col rounded-t-3xl sm:rounded-3xl md:max-w-xl"
         style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between px-5 pb-3 pt-5">
-          <h2 className="font-display text-2xl font-bold tracking-wide">{view === 'art' ? 'Custom Card Art' : 'Role Guide'}</h2>
+          <h2 className="font-display text-2xl font-bold tracking-wide">Role Guide</h2>
           <button onClick={onClose} aria-label="Close role guide"
             className="flex h-11 w-11 items-center justify-center rounded-full text-slate-300 hover:bg-white/10">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 5 L19 19 M19 5 L5 19" /></svg>
           </button>
         </div>
-        <div className="px-5 pb-3">
-          <button onClick={() => setView(view === 'art' ? 'guide' : 'art')}
-            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-slate-200 hover:bg-white/5"
-            style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="2" /><path d="M21 16 L15 11 L5 20" /></svg>
-            {view === 'art' ? 'Back to roles' : 'Custom Card Art'}
-          </button>
-        </div>
-        {view === 'art' ? <CardArtPanel /> : (
+        {(
           <ul className="flex flex-col gap-3 overflow-y-auto px-5 pb-6">
             {ROLE_IDS.map((id) => {
               const r = ROLES_DATA[id];
@@ -925,7 +790,7 @@ function DotBurst({ b }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Settings: tap effect toggle, custom card art, clear saved games     */
+/* Settings: sound, music, tap effect, server URL, clear saved games   */
 /* ------------------------------------------------------------------ */
 const SET_KEY = 'nightfall.settings.v1';
 let settings = (() => {
@@ -1420,7 +1285,6 @@ function ServerUrlRow({ rowStyle }) {
 
 function SettingsModal({ onClose, gameCount, onClearGames }) {
   const st = useSettings();
-  const [view, setView] = useState('main'); // main | art
   const [confirm, setConfirm] = useState(false);
   const [note, setNote] = useState('');
   useEffect(() => {
@@ -1435,20 +1299,13 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
       <div className="screen-in relative flex max-h-[88%] w-full max-w-md flex-col rounded-t-3xl sm:rounded-3xl md:max-w-xl"
         style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between px-5 pb-3 pt-5">
-          <h2 className="font-display text-2xl font-bold tracking-wide">{view === 'art' ? 'Custom Card Art' : 'Settings'}</h2>
+          <h2 className="font-display text-2xl font-bold tracking-wide">Settings</h2>
           <button onClick={onClose} aria-label="Close settings" className="flex h-11 w-11 items-center justify-center rounded-full text-slate-300 hover:bg-white/10">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 5 L19 19 M19 5 L5 19" /></svg>
           </button>
         </div>
 
-        {view === 'art' ? (
-          <>
-            <div className="px-5 pb-3">
-              <button onClick={() => setView('main')} className="flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm font-semibold text-slate-200 hover:bg-white/5" style={rowStyle}>Back to settings</button>
-            </div>
-            <CardArtPanel />
-          </>
-        ) : (
+        {(
           <div className="flex flex-col gap-3 overflow-y-auto px-5 pb-6">
             <div className="flex items-center justify-between gap-4 rounded-2xl p-4" style={rowStyle}>
               <div>
@@ -1485,14 +1342,6 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
             </div>
 
             <ServerUrlRow rowStyle={rowStyle} />
-
-            <button onClick={() => setView('art')} className="flex min-h-[60px] items-center justify-between rounded-2xl px-4 text-left hover:bg-white/5" style={rowStyle}>
-              <span>
-                <span className="block text-[15px] font-semibold">Custom Card Art</span>
-                <span className="block text-xs text-slate-400">Upload or reset role card images</span>
-              </span>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="M9 5 L16 12 L9 19" /></svg>
-            </button>
 
             <div className="rounded-2xl p-4" style={rowStyle}>
               <div className="text-[15px] font-semibold">Saved Games</div>
@@ -1601,7 +1450,9 @@ function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
               className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-200 hover:bg-white/10" style={glassBtn}>
               <SpeakerIcon on={st.sound} />
             </button>
-            <button onClick={() => setGuide(true)} className="min-h-[44px] rounded-xl px-3.5 text-sm font-semibold text-slate-100 hover:bg-white/10" style={glassBtn}>Role Guide</button>
+            <button onClick={() => setGuide(true)} aria-label="Role guide" className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-100 hover:bg-white/10" style={glassBtn}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5" /><path d="M9.2 9.3 C9.4 7.8 10.5 7 12 7 C13.6 7 14.8 8 14.8 9.4 C14.8 11.4 12 11.5 12 13.6" /><path d="M12 16.9 V17" /></svg>
+            </button>
           </div>
         </header>
 
@@ -1720,12 +1571,11 @@ function GameCard({ game, confirming, onOpen, onAskDelete, onCancelDelete, onDel
 
 const POPULAR_COUNTS = [4, 5, 6, 7, 8];
 function PresetCard({ count, deck, onPick }) {
-  const art = useCustomArt();
   return (
     <button onClick={() => { Sfx.enter(); onPick(); }} aria-label={`Popular ${count} player setup`}
       className="relative flex aspect-[3/4] w-full flex-col items-start overflow-hidden rounded-2xl p-3.5 text-left transition active:scale-[0.98]"
       style={{ background: 'linear-gradient(160deg, #1B2230, #121722)', border: '1px solid var(--line)' }}>
-      <img src={art.werewolf || ROLES_DATA.werewolf.imageUrl} alt="" draggable="false" onError={(e) => { e.currentTarget.style.display = 'none'; }}
+      <img src={ROLES_DATA.werewolf.imageUrl} alt="" draggable="false" onError={(e) => { e.currentTarget.style.display = 'none'; }}
         className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '50% 30%', opacity: 0.55 }} />
       <span className="pointer-events-none absolute inset-0"
         style={{ background: 'linear-gradient(180deg, rgba(11,14,20,0.55) 0%, rgba(11,14,20,0.05) 38%, rgba(11,14,20,0.55) 68%, rgba(11,14,20,0.92) 100%)' }} />
@@ -1758,9 +1608,11 @@ function Home({ games, onBack, onCreate, onPreset, onResume, onRedeal, onEdit, o
           </button>
           <h1 className="font-display text-lg font-bold tracking-wide text-slate-100">WEREWOLF</h1>
         </div>
-        <button onClick={() => setGuide(true)}
-          className="min-h-[44px] rounded-xl px-3.5 text-sm font-semibold text-slate-200 hover:bg-white/5"
-          style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>Role Guide</button>
+        <button onClick={() => setGuide(true)} aria-label="Role guide"
+          className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-200 hover:bg-white/5"
+          style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5" /><path d="M9.2 9.3 C9.4 7.8 10.5 7 12 7 C13.6 7 14.8 8 14.8 9.4 C14.8 11.4 12 11.5 12 13.6" /><path d="M12 16.9 V17" /></svg>
+        </button>
       </header>
 
       <button onClick={() => { Sfx.enter(); onCreate(); }}
@@ -2426,7 +2278,7 @@ const STORE_KEY = 'nightfall.games.v1';
 /* Multi-Device: Firebase Realtime Database over plain REST + room logic */
 /* ------------------------------------------------------------------ */
 // Room shape (kept tiny so it syncs fast on mobile data):
-//  { v, host, hp, ph, k, lk, w, an, pl }
+//  { v, host, hp, rn room name, hn host label, ph, k, lk, w, an, pl }
 //  ph: lobby | reveal | night | day | over     k: night number     lk: 1 while the host picks cards
 //  w: winner ('village' | 'werewolf')          hp: 1 when the host also plays
 //  an: { k, l:{0:'text'}, sv, si, x:{ts:'text'} }   morning announcement
@@ -2448,12 +2300,54 @@ function getDbUrl() {
   return normalizeDbUrl(getSettings().fbUrl) || normalizeDbUrl(DEFAULT_FIREBASE_URL);
 }
 
+// Local stand-in for Firebase, used when the browser blocks the network (for example the Claude preview sandbox).
+// It keeps the same path / PATCH / null-deletes rules, and lives in localStorage so tabs on one device can talk.
+const LOCAL_KEY = 'nightfall.mp.local.v1';
+let memDb = {};
+const localRead = () => { try { const v = localStorage.getItem(LOCAL_KEY); if (v !== null) return JSON.parse(v) || {}; } catch (e) { /* fall back to memory */ } return memDb; };
+const localWrite = (db) => { memDb = db; try { localStorage.setItem(LOCAL_KEY, JSON.stringify(db)); } catch (e) { /* memory only */ } };
+const localPrune = (o) => {
+  if (o && typeof o === 'object') {
+    Object.keys(o).forEach((k) => { o[k] = localPrune(o[k]); if (o[k] === null || o[k] === undefined) delete o[k]; });
+    if (!Object.keys(o).length) return null;
+  }
+  return o;
+};
+function localReq(method, path, body) {
+  const parts = path.split('/').filter(Boolean);
+  const db = localRead();
+  const setAt = (ps, val) => {
+    let n = db;
+    ps.slice(0, -1).forEach((x) => { if (n[x] == null || typeof n[x] !== 'object') n[x] = {}; n = n[x]; });
+    if (val === undefined) delete n[ps[ps.length - 1]]; else n[ps[ps.length - 1]] = val;
+  };
+  if (method === 'GET') {
+    let n = db;
+    for (const x of parts) { if (n == null || typeof n !== 'object') return null; n = n[x]; }
+    return n === undefined ? null : JSON.parse(JSON.stringify(n));
+  }
+  const clone = (v) => (v === null || v === undefined ? undefined : localPrune(JSON.parse(JSON.stringify(v))));
+  if (method === 'PUT') setAt(parts, clone(body));
+  else if (method === 'PATCH') Object.keys(body).forEach((k) => setAt(parts.concat(k.split('/').filter(Boolean)), clone(body[k])));
+  else if (method === 'DELETE') setAt(parts, undefined);
+  localPrune(db);
+  localWrite(db);
+  return method === 'DELETE' ? null : body;
+}
+
 const Mp = {
+  local: false,
   async req(method, path, body) {
+    if (Mp.local) return localReq(method, path, body);
     const base = getDbUrl();
     if (!base) throw new Error('no-url');
     // No custom headers: a plain request avoids a CORS preflight and Firebase reads the JSON body anyway.
-    const res = await fetch(`${base}/${path}.json`, { method, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' });
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), 10000) : 0;
+    let res;
+    try { res = await fetch(`${base}/${path}.json`, { method, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store', signal: ctl ? ctl.signal : undefined }); }
+    catch (e) { throw new Error('network'); } // Failed to fetch / Load failed / blocked by the page's CSP
+    finally { clearTimeout(timer); }
     if (!res.ok) throw new Error(res.status === 401 || res.status === 403 ? 'denied' : `http-${res.status}`);
     return res.status === 204 ? null : res.json();
   },
@@ -2474,7 +2368,18 @@ const randId = () => 'p' + Math.random().toString(36).slice(2, 8);
 const randLetters = () => Array.from({ length: 4 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
 const cleanCode = (s) => String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
 
-async function mpCreateRoom(name, hostPlays) {
+// Try the real server first; if the browser blocks the network, redo the same step against the local stand-in.
+async function mpWithFallback(fn) {
+  try { return await fn(); }
+  catch (e) {
+    if (e && e.message === 'network' && !Mp.local) { Mp.local = true; return fn(); }
+    throw e;
+  }
+}
+const mpCreateRoom = (name, hostPlays, roomName) => mpWithFallback(() => mpCreateRoomImpl(name, hostPlays, roomName));
+const mpJoinRoom = (codeIn, name) => mpWithFallback(() => mpJoinRoomImpl(codeIn, name));
+
+async function mpCreateRoomImpl(name, hostPlays, roomName) {
   const pid = randId();
   let code = '';
   const words = shuffle(CODE_WORDS);
@@ -2484,13 +2389,13 @@ async function mpCreateRoom(name, hostPlays) {
     if (!existing) { code = c; break; }
   }
   if (!code) throw new Error('no-code');
-  const room = { v: 1, host: pid, hp: hostPlays ? 1 : 0, ph: 'lobby', k: 0, lk: 0, w: '', ts: Date.now() };
+  const room = { v: 1, host: pid, hp: hostPlays ? 1 : 0, rn: (roomName || '').trim() || 'Nightfall Village', hn: hostPlays ? name : 'Moderator', ph: 'lobby', k: 0, lk: 0, w: '', ts: Date.now() };
   if (hostPlays) room.pl = { [pid]: { n: name, o: 1, a: 1, d: 0 } };
   await Mp.put(`rooms/${code}`, room);
-  return { code, pid, host: true };
+  return { code, pid, host: true, local: Mp.local };
 }
 
-async function mpJoinRoom(codeIn, name) {
+async function mpJoinRoomImpl(codeIn, name) {
   const code = cleanCode(codeIn);
   if (code.length !== 4) throw new Error('bad-code');
   const room = await Mp.get(`rooms/${code}`);
@@ -2503,7 +2408,7 @@ async function mpJoinRoom(codeIn, name) {
   const pid = randId();
   const o = pl.reduce((m, p) => Math.max(m, p.o || 0), 0) + 1;
   await Mp.patch(`rooms/${code}/pl/${pid}`, { n: name, o, a: 1, d: 0 });
-  return { code, pid, host: false };
+  return { code, pid, host: false, local: Mp.local };
 }
 function mpJoinErrorText(e) {
   const m = e && e.message;
@@ -2665,14 +2570,15 @@ function Panel({ children, className = '', style }) {
   return <section className={`rounded-2xl p-4 ${className}`} style={{ background: 'var(--card)', border: '1px solid var(--line)', ...style }}>{children}</section>;
 }
 
-function MpHeader({ code, onLeave, leaveLabel }) {
+function MpHeader({ code, roomName, onLeave, leaveLabel }) {
   const [copied, setCopied] = useState(false);
   const copy = () => { copyText(code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1600); }, () => {}); };
   return (
     <header className="relative flex items-center justify-between gap-2 pb-3">
       <ExitButton onClick={onLeave} aria-label={leaveLabel} />
-      <div className="text-center">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-400">Room Code</div>
+      <div className="min-w-0 text-center">
+        <div className="font-display mx-auto max-w-[11rem] truncate text-base font-bold leading-tight text-violet-100">{roomName || 'Nightfall Village'}</div>
+        <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-400">Room Code</div>
         <div className="font-display text-4xl font-black leading-none tracking-[0.28em] text-white" style={{ paddingLeft: '0.28em', textShadow: '0 0 24px rgba(167,139,250,0.45)' }} aria-label={`Room code ${code.split('').join(' ')}`}>{code}</div>
       </div>
       <button onClick={copy} className="min-h-[40px] rounded-xl px-3 text-xs font-bold text-violet-100 transition active:scale-95"
@@ -2681,9 +2587,16 @@ function MpHeader({ code, onLeave, leaveLabel }) {
   );
 }
 
-function PlayerList({ players, meId, hostId, onRemove, ready }) {
+function PlayerList({ players, meId, hostId, onRemove, ready, modRow }) {
   return (
     <ul className="flex flex-col gap-2">
+      {modRow && (
+        <li className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>
+          <WolfBadge tint="#A78BFA" size={30} />
+          <span className="truncate text-[15px] font-semibold text-slate-100">Moderator</span>
+          <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-200" style={{ background: 'rgba(109,40,217,0.35)' }}>Host</span>
+        </li>
+      )}
       {players.map((p) => (
         <li key={p.id} className="flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>
           <span className="flex min-w-0 items-center gap-2.5">
@@ -2767,14 +2680,15 @@ function MpEntry({ onHost, onJoin, onBack }) {
 
 function MpHostForm({ onBack, onCreated }) {
   const [name, setName] = useState(loadName);
+  const [roomName, setRoomName] = useState('');
   const [plays, setPlays] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const go = async () => {
     const n = name.trim();
-    if (!n) { setErr('Enter your name first.'); return; }
+    if (plays && !n) { setErr('Enter your name first.'); return; }
     setBusy(true); setErr('');
-    try { saveName(n); onCreated(await mpCreateRoom(n, plays), n); }
+    try { if (plays) saveName(n); onCreated(await mpCreateRoom(plays ? n : 'Moderator', plays, roomName), n); }
     catch (e) { setErr(e.message === 'no-code' ? 'Could not find a free room code. Try again.' : mpErrorText(e)); setBusy(false); }
   };
   const opt = (val, title, sub) => (
@@ -2786,14 +2700,20 @@ function MpHostForm({ onBack, onCreated }) {
   return (
     <div className="flex flex-col gap-4">
       <h2 className="font-display text-2xl font-bold">Host a Room</h2>
-      <MpField label="Your name">
-        <input value={name} maxLength={14} onChange={(e) => setName(e.target.value)} placeholder="Enter your name..." autoComplete="off"
+      <MpField label="Room name">
+        <input value={roomName} maxLength={28} onChange={(e) => setRoomName(e.target.value)} placeholder="e.g., Blood Moon Village" autoComplete="off"
           className="h-14 w-full rounded-xl px-4 text-lg text-slate-100 placeholder-slate-500" style={mpInputStyle} />
       </MpField>
       <div role="radiogroup" aria-label="Host role" className="flex gap-2.5">
         {opt(true, 'Playing + Hosting', 'You get a card and run the game.')}
         {opt(false, 'Moderator Only', 'You run the game without a card.')}
       </div>
+      {plays && (
+        <MpField label="Your name">
+          <input value={name} maxLength={14} onChange={(e) => setName(e.target.value)} placeholder="Enter your name..." autoComplete="off"
+            className="h-14 w-full rounded-xl px-4 text-lg text-slate-100 placeholder-slate-500" style={mpInputStyle} />
+        </MpField>
+      )}
       {err && <p role="alert" className="text-sm text-amber-300">{err}</p>}
       <Btn disabled={busy} onClick={go}>{busy ? 'Creating room...' : 'Create Room'}</Btn>
       <Btn variant="ghost" disabled={busy} onClick={onBack}>Back</Btn>
@@ -3286,7 +3206,7 @@ function MpRoom({ session, onExit, onPhase }) {
           <span className="rounded-full px-3 py-1 text-xs font-semibold tabular-nums text-slate-300" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>{players.length} / {MP_MAX} players</span>
         </div>
         {players.length === 0 && <Panel className="text-center text-sm text-slate-400">No players yet. Share the room code.</Panel>}
-        <PlayerList players={players} meId={pid} hostId={room.host} onRemove={isHost ? (id) => write({ [`pl/${id}`]: null }) : null} />
+        <PlayerList players={players} meId={pid} hostId={room.host} modRow={!room.hp} onRemove={isHost ? (id) => write({ [`pl/${id}`]: null }) : null} />
         {isHost ? (
           <div className="mt-auto flex flex-col gap-2">
             {players.length < MP_MIN && <p className="text-center text-xs text-slate-400">Need at least {MP_MIN} players to start. Ask friends to join with the code above.</p>}
@@ -3309,7 +3229,8 @@ function MpRoom({ session, onExit, onPhase }) {
 
   return (
     <Screen>
-      <MpHeader code={code} onLeave={() => setConfirmLeave(true)} leaveLabel="Leave room" />
+      <MpHeader code={code} roomName={room.rn} onLeave={() => setConfirmLeave(true)} leaveLabel="Leave room" />
+      {session.local && <p className="mb-3 text-center text-[11px] font-semibold tracking-wide text-slate-500">Preview Mode &mdash; deploy to Vercel for live multi-phone sync</p>}
       {isHost && me && ph !== 'lobby' && (
         <div role="tablist" className="mb-3 flex gap-1 rounded-xl p-1" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
           {[['mod', 'Moderator'], ['player', 'My Role']].map(([k, label]) => (
@@ -3343,6 +3264,7 @@ function MultiScreen({ onBack, onPhase, gameCount, onClearGames }) {
     const s = loadSession();
     if (!s || !hasUrl) { setChecking(false); return; }
     let live = true;
+    Mp.local = !!s.local;
     Mp.get(`rooms/${s.code}`).then((r) => {
       if (!live) return;
       if (r && (r.host === s.pid || (r.pl && r.pl[s.pid]))) { setSession(s); setView('room'); }
@@ -3353,7 +3275,7 @@ function MultiScreen({ onBack, onPhase, gameCount, onClearGames }) {
   }, []);
 
   const enter = (s) => { saveSession(s); setSession(s); setView('room'); };
-  const exitRoom = () => { setSession(null); setView('entry'); };
+  const exitRoom = () => { Mp.local = false; setSession(null); setView('entry'); };
 
   if (view === 'room' && session) return <MpRoom session={session} onExit={exitRoom} onPhase={onPhase} />;
 
@@ -3536,9 +3458,9 @@ function AppInner() {
 /* Startup: preload and decode images, then fade into the start screen */
 /* ------------------------------------------------------------------ */
 function activeImageSources() {
-  const list = [DEFAULT_BG, LOADING_BG, customArt.back || DEFAULT_BACK];
+  const list = [DEFAULT_BG, LOADING_BG, DEFAULT_BACK];
   ROLE_IDS.forEach((id) => {
-    const src = customArt[id] || ROLES_DATA[id].imageUrl;
+    const src = ROLES_DATA[id].imageUrl;
     if (src) list.push(src);
   });
   return Array.from(new Set(list));

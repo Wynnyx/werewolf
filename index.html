@@ -638,11 +638,14 @@ function bestVillageFill(count, wolves) {
   return best;
 }
 function autoFill(count) {
-  // Always 1 Werewolf. Only when the table is too big to fill with one of each Village role (8 players) use 2.
-  const best = bestVillageFill(count, 1) || bestVillageFill(count, 2);
+  // 1 Werewolf (2 only when the table is too big to fill with one of each Village role),
+  // then Village roles strictly by priority: Seer first, Villager last.
+  const village = FILL_PRIORITY.filter((id) => ROLES_DATA[id] && ROLES_DATA[id].team === 'village');
+  const wolves = count - 1 <= village.reduce((n, id) => n + ROLES_DATA[id].max, 0) ? 1 : 2;
   const deck = emptyDeck();
-  deck.werewolf = best.wolves;
-  Object.keys(best.counts).forEach((id) => { deck[id] = best.counts[id]; });
+  deck.werewolf = wolves;
+  let left = count - wolves;
+  village.forEach((id) => { const n = Math.min(ROLES_DATA[id].max, left); deck[id] = n; left -= n; });
   return deck;
 }
 
@@ -1807,13 +1810,25 @@ function Reveal({ players, onName, onDone, onExit }) {
           className={`${phase === 'idle' ? 'cursor-pointer' : ''} ${nudge ? 'nudge' : ''}`}>
           <RoleCard role={p.role} phase={phase} />
         </div>
-        <div className="relative min-h-[84px] text-center" style={{ width: 'min(19rem, 86vw)' }}>
+        <div className="relative w-full" style={{ minHeight: '9.5rem' }}>
           {phase === 'idle' && (
-            <p className={`hint-pulse absolute inset-x-0 top-1 text-sm font-semibold tracking-wide ${nudge ? 'text-amber-300' : 'text-slate-300'}`}>
-              {name === '' ? 'Enter your name, then tap the card' : 'Tap the card to reveal'}
-            </p>
+            <div className="w-full text-center">
+              <p className={`hint-pulse mb-2.5 text-sm font-semibold tracking-wide ${nudge ? 'text-amber-300' : 'text-slate-300'}`}>
+                {name === '' ? 'Enter your name, then tap the card' : 'Tap the card to reveal'}
+              </p>
+              <label htmlFor="player-name" className="sr-only">Your name</label>
+              <input id="player-name" type="text" value={input} maxLength={18} autoComplete="off" placeholder="Enter your name..."
+                onChange={(e) => { setInput(e.target.value); setNudge(false); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                className="h-14 w-full rounded-xl px-4 text-center text-lg text-slate-100 placeholder-slate-500"
+                style={{ background: 'var(--card)', border: `1px solid ${taken || nudge ? '#F59E0B' : 'rgba(203,213,225,0.3)'}` }} />
+              <p role="alert" className="mt-2 min-h-[18px] text-center text-xs text-amber-300">
+                {taken ? 'An earlier player already used that name. Add an initial.' : ''}
+              </p>
+            </div>
           )}
-          <div className={`transition-opacity duration-500 ${phase === 'open' ? 'opacity-100' : 'opacity-0'}`} aria-hidden={phase !== 'open'}>
+          <div className={`absolute inset-x-0 top-0 mx-auto text-center transition-opacity duration-500 ${phase === 'open' ? 'opacity-100' : 'opacity-0'}`}
+            style={{ width: 'min(19rem, 86vw)' }} aria-hidden={phase !== 'open'}>
             <TeamBadge team={ROLES_DATA[p.role].team} />
             {!hasImg && <p className="mt-2 text-xs leading-snug text-slate-300">{ROLES_DATA[p.role].ability}</p>}
           </div>
@@ -1821,25 +1836,11 @@ function Reveal({ players, onName, onDone, onExit }) {
       </div>
 
       <div className="w-full pt-2">
-        {flipped ? (
-          <div className={phase === 'open' ? '' : 'invisible'} aria-hidden={phase !== 'open'}>
-            <Btn variant="secondary" disabled={busy || phase !== 'open'} onClick={hideAndPass}>
-              {last ? 'Hide & Finish' : 'Hide & Pass to Next Player'}
-            </Btn>
-          </div>
-        ) : (
-          <>
-            <label htmlFor="player-name" className="sr-only">Your name</label>
-            <input id="player-name" type="text" value={input} maxLength={18} autoComplete="off" placeholder="Enter your name..."
-              onChange={(e) => { setInput(e.target.value); setNudge(false); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-              className="h-14 w-full rounded-xl px-4 text-center text-lg text-slate-100 placeholder-slate-500"
-              style={{ background: 'var(--card)', border: `1px solid ${taken || nudge ? '#F59E0B' : 'rgba(203,213,225,0.3)'}` }} />
-            <p role="alert" className="mb-2 mt-2 min-h-[18px] text-center text-xs text-amber-300">
-              {taken ? 'An earlier player already used that name. Add an initial.' : ''}
-            </p>
-          </>
-        )}
+        <div className={phase === 'open' ? '' : 'invisible'} aria-hidden={phase !== 'open'}>
+          <Btn variant="secondary" disabled={busy || phase !== 'open'} onClick={hideAndPass}>
+            {last ? 'Hide & Finish' : 'Hide & Pass to Next Player'}
+          </Btn>
+        </div>
       </div>
       {confirmExit && (
         <ConfirmExit body="The cards dealt so far will be discarded. You can deal again any time from My Games."

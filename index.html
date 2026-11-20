@@ -1176,9 +1176,7 @@ const Tension = (() => {
     const a = getEl();
     if (running || !a.paused) return;
     a.muted = true;
-    const p = a.play();
-    const done = () => { if (!running) { a.pause(); a.currentTime = 0; } a.muted = false; };
-    if (p && p.then) p.then(done, () => { a.muted = false; }); else done();
+    try { const p = a.play(); a.pause(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ }
   }
   function start() {
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* unsupported */ }
@@ -1189,9 +1187,8 @@ const Tension = (() => {
     if (p && p.catch) p.catch(() => { running = false; });
   }
   function stop() {
-    if (!running) return;
     running = false;
-    if (!el) return;
+    if (!el || el.paused) return;
     let v = 1; clearInterval(fadeT);
     fadeT = setInterval(() => {
       v -= 0.1;
@@ -1659,18 +1656,22 @@ function GameCard({ game, confirming, onOpen, onAskDelete, onCancelDelete, onDel
 
 const POPULAR_COUNTS = [4, 5, 6, 7, 8];
 function PresetCard({ count, deck, onPick }) {
+  const art = useCustomArt();
   return (
     <button onClick={onPick} aria-label={`Popular ${count} player setup`}
       className="relative flex aspect-[3/4] w-full flex-col items-start overflow-hidden rounded-2xl p-3.5 text-left transition active:scale-[0.98]"
       style={{ background: 'linear-gradient(160deg, #1B2230, #121722)', border: '1px solid var(--line)' }}>
-      <span className="pointer-events-none absolute -bottom-6 -right-6 opacity-[0.07]"><MoonIcon width="120" height="120" className="text-slate-200" /></span>
-      <span className="flex w-full items-center justify-between">
+      <img src={art.werewolf || ROLES_DATA.werewolf.imageUrl} alt="" draggable="false" onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '50% 30%', opacity: 0.55 }} />
+      <span className="pointer-events-none absolute inset-0"
+        style={{ background: 'linear-gradient(180deg, rgba(11,14,20,0.55) 0%, rgba(11,14,20,0.05) 38%, rgba(11,14,20,0.55) 68%, rgba(11,14,20,0.92) 100%)' }} />
+      <span className="relative flex w-full items-center justify-between">
         <WolfBadge tint="#FBBF24" />
         <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: '#FBBF24', background: '#FBBF241F', border: '1px solid #FBBF2455' }}>Popular</span>
       </span>
-      <span className="font-display mt-2.5 text-5xl font-black leading-none tabular-nums">{count}</span>
-      <span className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Players</span>
-      <span className="mt-auto line-clamp-4 text-xs leading-snug text-slate-400">{summarizeDeck(deck)}</span>
+      <span className="font-display relative mt-2.5 text-5xl font-black leading-none tabular-nums" style={{ textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}>{count}</span>
+      <span className="relative mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">Players</span>
+      <span className="relative mt-auto line-clamp-4 text-xs font-medium leading-snug text-slate-200" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>{summarizeDeck(deck)}</span>
     </button>
   );
 }

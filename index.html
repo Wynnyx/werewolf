@@ -1140,10 +1140,11 @@ const Ambience = (() => {
       if (e && e.name === 'NotSupportedError') { fileState = 'failed'; startSynthMode(); } else { running = false; }
     });
   }
-  function stop() {
+  function stop(now) {
     if (!running) return;
     running = false; clearTimers();
-    if (el) {
+    if (el && now) { clearInterval(fadeT); el.pause(); el.volume = 1; }
+    else if (el) {
       let v = 1; clearInterval(fadeT);
       fadeT = setInterval(() => {
         v -= 0.1;
@@ -1183,6 +1184,7 @@ const Tension = (() => {
     const a = getEl(); clearInterval(fadeT); a.muted = false; a.volume = 1;
     if (running && !a.paused) return;
     running = true;
+    try { a.currentTime = 0; } catch (e) { /* not ready yet */ }
     const p = a.play();
     if (p && p.catch) p.catch(() => { running = false; });
   }
@@ -2432,7 +2434,7 @@ function AppInner() {
     const tense = screen === 'setup' || screen === 'cards' || screen === 'reveal';
     tensionScreen = tense;
     if (!soundOn) { Ambience.stop(); Tension.stop(); return; }
-    if (tense) { Ambience.stop(); Tension.start(); return; }
+    if (tense) { Ambience.stop(true); Tension.start(); return; }
     Tension.stop();
     if (screen !== 'start' && Ambience.unlocked()) Ambience.start();
   }, [screen, soundOn]);

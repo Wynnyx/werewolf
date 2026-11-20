@@ -1163,6 +1163,49 @@ const Ambience = (() => {
   return { start, stop, preload: () => { getEl(); return Promise.resolve(); }, unlocked: () => unlockedFlag, isRunning: () => running };
 })();
 
+// Tension music: plays while a game is being set up and the cards are being revealed.
+const Tension = (() => {
+  const FILE = 'audio/tension.mp3';
+  let el = null, running = false, fadeT = null;
+  function getEl() {
+    if (!el) { el = new Audio(FILE); el.loop = true; el.preload = 'auto'; el.setAttribute('playsinline', ''); }
+    return el;
+  }
+  // On iOS each audio element has to be allowed by a tap once; do it quietly on the first tap.
+  function prime() {
+    const a = getEl();
+    if (running || !a.paused) return;
+    a.muted = true;
+    const p = a.play();
+    const done = () => { if (!running) { a.pause(); a.currentTime = 0; } a.muted = false; };
+    if (p && p.then) p.then(done, () => { a.muted = false; }); else done();
+  }
+  function start() {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* unsupported */ }
+    const a = getEl(); clearInterval(fadeT); a.muted = false; a.volume = 1;
+    if (running && !a.paused) return;
+    running = true;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => { running = false; });
+  }
+  function stop() {
+    if (!running) return;
+    running = false;
+    if (!el) return;
+    let v = 1; clearInterval(fadeT);
+    fadeT = setInterval(() => {
+      v -= 0.1;
+      if (v <= 0) { clearInterval(fadeT); el.pause(); el.currentTime = 0; el.volume = 1; } else { el.volume = v; }
+    }, 40);
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!el) return;
+    if (document.hidden) el.pause();
+    else if (running) { const p = el.play(); if (p && p.catch) p.catch(() => {}); }
+  });
+  return { start, stop, prime, preload: () => { getEl(); }, isRunning: () => running };
+})();
+
 const Sfx = (() => {
   let a = null;
   const get = () => {
@@ -1306,11 +1349,13 @@ function ConfirmExit({ body, confirmLabel = 'Exit game', onCancel, onConfirm }) 
 
 // Browsers only allow sound after a tap: the first tap anywhere on the home screen starts it,
 // and the speaker button mutes / unmutes.
+// Screens where the tension music plays instead of the forest ambience (set by AppInner).
+let tensionScreen = false;
 function toggleSound() {
   const cur = getSettings().sound;
-  if (cur && !Ambience.isRunning()) { Ambience.start(); return; }
+  if (cur && !Ambience.isRunning() && !Tension.isRunning()) { if (tensionScreen) Tension.start(); else Ambience.start(); return; }
   updateSettings({ sound: !cur });
-  if (!cur) Ambience.start(); else Ambience.stop();
+  if (!cur) { if (tensionScreen) Tension.start(); else Ambience.start(); } else { Ambience.stop(); Tension.stop(); }
 }
 
 function SpeakerIcon({ on }) {
@@ -1429,13 +1474,13 @@ function StartScreen({ onPlay, gameCount, onClearGames }) {
   const [lobby, setLobby] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => setImgOk(true), [src]);
-  useEffect(() => { Ambience.preload(); }, []);
+  useEffect(() => { Ambience.preload(); Tension.preload(); }, []);
   useEffect(() => {
     if (!st.sound) { Ambience.stop(); return; }
     if (Ambience.unlocked()) Ambience.start();
     const go = (e) => {
       if (e.target && e.target.closest && e.target.closest('[data-sound-toggle]')) return;
-      if (getSettings().sound) Ambience.start();
+      if (getSettings().sound) { Ambience.start(); Tension.prime(); }
     };
     const evs = ['touchend', 'click', 'keydown'];
     evs.forEach((n) => window.addEventListener(n, go, { passive: true }));
@@ -2381,7 +2426,15 @@ function AppInner() {
   };
   const finishGame = () => updateGame(curId, { players: null, status: 'saved' });
 
-  useEffect(() => { if (screen !== 'start' && screen !== 'home') Ambience.stop(); }, [screen]);
+  const soundOn = useSettings().sound;
+  useEffect(() => {
+    const tense = screen === 'setup' || screen === 'cards' || screen === 'reveal';
+    tensionScreen = tense;
+    if (!soundOn) { Ambience.stop(); Tension.stop(); return; }
+    if (tense) { Ambience.stop(); Tension.start(); return; }
+    Tension.stop();
+    if (screen !== 'start' && Ambience.unlocked()) Ambience.start();
+  }, [screen, soundOn]);
   if (screen === 'start') {
     return <StartScreen onPlay={() => setScreen('home')} gameCount={games.length} onClearGames={() => setGames([])} />;
   }

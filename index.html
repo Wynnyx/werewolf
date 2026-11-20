@@ -952,8 +952,8 @@ function DotBurst({ b }) {
 /* ------------------------------------------------------------------ */
 const SET_KEY = 'nightfall.settings.v1';
 let settings = (() => {
-  try { const v = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); return { blood: !(v && v.blood === false), sound: !(v && v.sound === false) }; }
-  catch (e) { return { blood: true, sound: true }; }
+  try { const v = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); return { blood: !(v && v.blood === false), sound: !(v && v.sound === false), music: !(v && v.music === false) }; }
+  catch (e) { return { blood: true, sound: true, music: true }; }
 })();
 const setListeners = new Set();
 const subscribeSet = (fn) => { setListeners.add(fn); return () => setListeners.delete(fn); };
@@ -1157,10 +1157,17 @@ const Ambience = (() => {
       suspendT = setTimeout(() => { if (!running && ctx) ctx.suspend(); }, 1200);
     }
   }
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { if (el) el.pause(); if (ctx) ctx.suspend(); }
-    else if (running) { if (el && fileState !== 'failed') { const p = el.play(); if (p && p.catch) p.catch(() => {}); } if (ctx) ctx.resume(); }
-  });
+  // Silence everything the moment the page is hidden or closed; pick up again when it returns.
+  const hide = () => { if (el) el.pause(); if (ctx) ctx.suspend(); };
+  const show = () => {
+    if (document.hidden || !running) return;
+    if (el && fileState !== 'failed') { const p = el.play(); if (p && p.catch) p.catch(() => {}); }
+    if (ctx) ctx.resume();
+  };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) hide(); else show(); });
+  window.addEventListener('pagehide', hide);
+  window.addEventListener('pageshow', show);
+  document.addEventListener('freeze', hide);
   return { start, stop, preload: () => { getEl(); return Promise.resolve(); }, unlocked: () => unlockedFlag, isRunning: () => running };
 })();
 
@@ -1197,11 +1204,12 @@ const Tension = (() => {
       if (v <= 0) { clearInterval(fadeT); el.pause(); el.currentTime = 0; el.volume = 1; } else { el.volume = v; }
     }, 40);
   }
-  document.addEventListener('visibilitychange', () => {
-    if (!el) return;
-    if (document.hidden) el.pause();
-    else if (running) { const p = el.play(); if (p && p.catch) p.catch(() => {}); }
-  });
+  const hide = () => { if (el) el.pause(); };
+  const show = () => { if (el && running && !document.hidden) { const p = el.play(); if (p && p.catch) p.catch(() => {}); } };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) hide(); else show(); });
+  window.addEventListener('pagehide', hide);
+  window.addEventListener('pageshow', show);
+  document.addEventListener('freeze', hide);
   return { start, stop, prime, preload: () => { getEl(); }, isRunning: () => running };
 })();
 
@@ -1226,6 +1234,9 @@ const Sfx = (() => {
     }
   };
 })();
+
+['pagehide', 'freeze'].forEach((n) => window.addEventListener(n, () => { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }));
+document.addEventListener('visibilitychange', () => { if (document.hidden) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } } });
 
 const NARRATION = {
   bodyguard: { wake: 'Bodyguard, wake up. Choose one player to protect tonight.', sleep: 'Bodyguard, close your eyes.' },
@@ -1359,9 +1370,9 @@ function ConfirmExit({ body, confirmLabel = 'Exit game', onCancel, onConfirm }) 
 let tensionScreen = false;
 function toggleSound() {
   const cur = getSettings().sound;
-  if (cur && !Ambience.isRunning() && !Tension.isRunning()) { if (tensionScreen) Tension.start(); else Ambience.start(); return; }
+  if (cur && !Ambience.isRunning() && !Tension.isRunning()) { if (tensionScreen && getSettings().music) Tension.start(); else Ambience.start(); return; }
   updateSettings({ sound: !cur });
-  if (!cur) { if (tensionScreen) Tension.start(); else Ambience.start(); } else { Ambience.stop(); Tension.stop(); }
+  if (!cur) { if (tensionScreen && getSettings().music) Tension.start(); else Ambience.start(); } else { Ambience.stop(); Tension.stop(); }
 }
 
 function SpeakerIcon({ on }) {
@@ -1408,12 +1419,23 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
             <div className="flex items-center justify-between gap-4 rounded-2xl p-4" style={rowStyle}>
               <div>
                 <div className="text-[15px] font-semibold" id="sound-label">Sound</div>
-                <p className="mt-0.5 text-xs leading-snug text-slate-400">Forest ambience on the home screen and the card flip sound. Starts on your first tap.</p>
+                <p className="mt-0.5 text-xs leading-snug text-slate-400">Forest ambience and sound effects. Starts on your first tap.</p>
               </div>
               <button role="switch" aria-checked={st.sound} aria-labelledby="sound-label" onClick={toggleSound}
                 className="relative h-8 w-14 shrink-0 rounded-full transition-colors"
                 style={{ background: st.sound ? '#B91C1C' : '#2E3646', border: '1px solid rgba(203,213,225,0.3)' }}>
                 <span className="absolute top-0.5 h-6 w-6 rounded-full bg-white transition-all" style={{ left: st.sound ? 'calc(100% - 1.625rem)' : '0.125rem' }} />
+              </button>
+            </div>
+            <div className="flex items-center justify-between gap-4 rounded-2xl p-4" style={rowStyle}>
+              <div>
+                <div className="text-[15px] font-semibold" id="music-label">Game Music</div>
+                <p className="mt-0.5 text-xs leading-snug text-slate-400">Tense music while you set up a game and reveal cards.</p>
+              </div>
+              <button role="switch" aria-checked={st.music} aria-labelledby="music-label" onClick={() => updateSettings({ music: !st.music })}
+                className="relative h-8 w-14 shrink-0 rounded-full transition-colors"
+                style={{ background: st.music ? '#B91C1C' : '#2E3646', border: '1px solid rgba(203,213,225,0.3)' }}>
+                <span className="absolute top-0.5 h-6 w-6 rounded-full bg-white transition-all" style={{ left: st.music ? 'calc(100% - 1.625rem)' : '0.125rem' }} />
               </button>
             </div>
             <div className="flex items-center justify-between gap-4 rounded-2xl p-4" style={rowStyle}>
@@ -2437,15 +2459,15 @@ function AppInner() {
   };
   const finishGame = () => updateGame(curId, { players: null, status: 'saved' });
 
-  const soundOn = useSettings().sound;
+  const { sound: soundOn, music: musicOn } = useSettings();
   useEffect(() => {
-    const tense = screen === 'setup' || screen === 'cards' || screen === 'reveal';
-    tensionScreen = tense;
+    const tense = (screen === 'setup' || screen === 'cards' || screen === 'reveal') && musicOn;
+    tensionScreen = screen === 'setup' || screen === 'cards' || screen === 'reveal';
     if (!soundOn) { Ambience.stop(); Tension.stop(); return; }
     if (tense) { Ambience.stop(true); Tension.start(); return; }
     Tension.stop();
     if (screen !== 'start' && Ambience.unlocked()) Ambience.start();
-  }, [screen, soundOn]);
+  }, [screen, soundOn, musicOn]);
   if (screen === 'start') {
     return <StartScreen onPlay={() => setScreen('home')} gameCount={games.length} onClearGames={() => setGames([])} />;
   }

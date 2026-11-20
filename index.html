@@ -438,9 +438,46 @@ function setCustomArt(id, dataUrl) {
   try { localStorage.setItem(ART_KEY, JSON.stringify(next)); return true; } catch (e) { return false; }
 }
 function useCustomArt() { return React.useSyncExternalStore(subscribeArt, getArt); }
+const DEFAULT_BACK = 'images/card-back.jpg';
 function useCardImage(role) {
   const art = useCustomArt();
   return art[role] || ROLES_DATA[role].imageUrl || '';
+}
+function DefaultBackDesign() {
+  const Diamond = ({ className }) => (
+    <svg className={`absolute ${className}`} width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M8 1 L15 8 L8 15 L1 8Z" fill="#0B0E14" stroke="#CBD5E1" strokeWidth="1.2" />
+      <path d="M8 5 L11 8 L8 11 L5 8Z" fill="#94A3B8" />
+    </svg>
+  );
+  return (
+    <div className="pcard relative h-full w-full overflow-hidden rounded-[20px]"
+      style={{ background: 'linear-gradient(160deg, #1B2230, #0C1018 70%)', border: '1px solid rgba(203,213,225,0.28)' }}>
+      <div className="absolute inset-2.5 rounded-2xl" style={{ border: '1.5px solid rgba(203,213,225,0.4)' }} />
+      <div className="absolute inset-4 rounded-xl" style={{ border: '1px solid rgba(148,163,184,0.22)' }} />
+      <Diamond className="left-0.5 top-0.5" />
+      <Diamond className="right-0.5 top-0.5" />
+      <Diamond className="bottom-0.5 left-0.5" />
+      <Diamond className="bottom-0.5 right-0.5" />
+      <div className="absolute left-1/2 top-[44%] aspect-square w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-full"
+        style={{ background: 'radial-gradient(circle, rgba(185,28,28,0.42), rgba(127,29,29,0.16) 45%, transparent 70%)' }} />
+      <div className="relative flex h-full flex-col items-center justify-center gap-[7%]">
+        <div className="aspect-square w-[38%]" style={{ filter: 'drop-shadow(0 0 10px rgba(203,213,225,0.35))' }}>
+          <MoonIcon width="100%" height="100%" className="text-slate-200" />
+        </div>
+        <span className="font-display font-bold text-slate-300" style={{ fontSize: 'clamp(0.7rem, 6.4cqw, 1.35rem)', letterSpacing: '0.38em', paddingLeft: '0.38em' }}>WEREWOLF</span>
+      </div>
+    </div>
+  );
+}
+function CardBackFace() {
+  const art = useCustomArt();
+  const src = art.back || DEFAULT_BACK;
+  const [bad, setBad] = useState('');
+  if (src && bad !== src) {
+    return <img src={src} alt="" draggable={false} onError={() => setBad(src)} className="h-full w-full rounded-2xl object-cover" />;
+  }
+  return <DefaultBackDesign />;
 }
 // Downscale to max 600px wide (and 900px tall), WebP where the browser can encode it, else JPEG.
 function processImage(file, maxW = 600, maxH = 900) {
@@ -601,9 +638,8 @@ function bestVillageFill(count, wolves) {
   return best;
 }
 function autoFill(count) {
-  // Try 1 Werewolf first; use 2 only when 1 cannot land inside the balance window.
-  const options = [1, 2].map((w) => bestVillageFill(count, w)).filter(Boolean);
-  const best = options.reduce((a, b) => (b.dist < a.dist ? b : a));
+  // Always 1 Werewolf. Only when the table is too big to fill with one of each Village role (8 players) use 2.
+  const best = bestVillageFill(count, 1) || bestVillageFill(count, 2);
   const deck = emptyDeck();
   deck.werewolf = best.wolves;
   Object.keys(best.counts).forEach((id) => { deck[id] = best.counts[id]; });
@@ -701,9 +737,32 @@ function CardArtPanel() {
   return (
     <div className="overflow-y-auto px-5 pb-6">
       <p className="mb-3 text-sm leading-snug text-slate-400">
-        Pick a finished card image for any role. It replaces the whole card face everywhere. Portrait 3:4 images fit best.
+        Set the face-down card back, or pick a finished card image for any role. Portrait 3:4 images fit best.
       </p>
       <ul className="flex flex-col gap-3">
+        <li className="flex gap-3 rounded-2xl p-3" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>
+          <div className="flex aspect-[3/4] w-[64px] shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ background: '#05070B', border: '1px solid rgba(203,213,225,0.3)' }}>
+            <img src={art.back || DEFAULT_BACK} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-display text-base font-bold leading-tight">Card Back</h3>
+            <p className="text-xs text-slate-500">{art.back ? 'Using your image' : 'Using bundled card back'}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <label htmlFor="art-back"
+                className="inline-flex min-h-[44px] cursor-pointer items-center rounded-lg px-3 text-sm font-semibold text-slate-100 focus-within:outline focus-within:outline-2 focus-within:outline-slate-300"
+                style={{ background: 'var(--card)', border: '1px solid rgba(203,213,225,0.35)' }}>
+                Choose photo
+                <input id="art-back" type="file" accept="image/*" className="sr-only" onChange={(e) => pick('back', e)} />
+              </label>
+              {art.back && (
+                <button onClick={() => { setCustomArt('back', null); setMsg((m) => ({ ...m, back: 'Reset to default.' })); }}
+                  className="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-red-300 hover:bg-white/5"
+                  style={{ border: '1px solid #DC262666' }}>Reset to Default</button>
+              )}
+            </div>
+            {msg.back && <p role="status" className="mt-1.5 text-xs text-slate-400">{msg.back}</p>}
+          </div>
+        </li>
         {ROLE_IDS.map((id) => {
           const r = ROLES_DATA[id];
           const custom = art[id];
@@ -1650,15 +1709,8 @@ function RoleCard({ role, phase }) {
   return (
     <div className={`flip-scene aspect-[3/4] ${lifted ? 'is-lifted' : ''}`}>
       <div className={`flip-card ${flipped ? 'is-flipped' : ''}`}>
-        <div className="face" style={{ background: 'linear-gradient(160deg, #1B2230, #10141D)', border: '1px solid rgba(203,213,225,0.28)' }}>
-          <div className="absolute inset-3 rounded-2xl" style={{ border: '1px solid rgba(203,213,225,0.16)' }} />
-          <div className="flex h-full flex-col items-center justify-center gap-5">
-            <div className="relative flex h-28 w-28 items-center justify-center">
-              <div className="absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle, rgba(203,213,225,0.22), transparent 70%)' }} />
-              <MoonIcon width="96" height="96" className="relative text-slate-300" />
-            </div>
-            <span className="font-display text-sm font-bold tracking-[0.4em] text-slate-400">WEREWOLF</span>
-          </div>
+        <div className="face" style={{ background: '#05070B' }}>
+          <CardBackFace />
         </div>
         <div className="face face-front" style={hasImg ? { boxShadow: glow } : { border: `2px solid ${edge}`, boxShadow: glow }}>
           <PlayingCard role={role} />
@@ -2170,7 +2222,7 @@ function AppInner() {
 /* Startup: preload and decode images, then fade into the start screen */
 /* ------------------------------------------------------------------ */
 function activeImageSources() {
-  const list = [DEFAULT_BG, LOADING_BG];
+  const list = [DEFAULT_BG, LOADING_BG, customArt.back || DEFAULT_BACK];
   ROLE_IDS.forEach((id) => {
     const src = customArt[id] || ROLES_DATA[id].imageUrl;
     if (src) list.push(src);

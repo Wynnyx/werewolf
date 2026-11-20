@@ -44,6 +44,8 @@
   }
   html, body, #root { height: 100%; }
   html, body { overscroll-behavior: none; }
+  .hscroll { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .hscroll::-webkit-scrollbar { display: none; }
   @keyframes hintPulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
   .hint-pulse { animation: hintPulse 2s ease-in-out infinite; }
   @keyframes nudgeShake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
@@ -1176,6 +1178,76 @@ const Sfx = (() => {
   };
 })();
 
+const NARRATION = {
+  bodyguard: { wake: 'Bodyguard, wake up. Choose one player to protect tonight.', sleep: 'Bodyguard, close your eyes.' },
+  werewolf: { wake: 'Werewolves, wake up. Silently agree on your victim.', sleep: 'Werewolves, close your eyes.' },
+  seer: { wake: 'Seer, wake up. Point at one player, and I will show you if they are a villager or a werewolf.', sleep: 'Seer, close your eyes.' },
+  witch: { wake: 'Witch, wake up. I will show you tonight\u2019s victim. You may save them, or eliminate another player.', sleep: 'Witch, close your eyes.' },
+  spellcaster: { wake: 'Spellcaster, wake up. Choose one player to silence for tomorrow.', sleep: 'Spellcaster, close your eyes.' }
+};
+const narrationFor = (id) => NARRATION[id] || { wake: `${ROLES_DATA[id].name}, wake up.`, sleep: `${ROLES_DATA[id].name}, close your eyes.` };
+const Narrator = (() => {
+  const ok = () => typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+  const pickVoice = () => {
+    const vs = window.speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
+    return vs.find((v) => /daniel|alex|fred|google uk english male|male/i.test(v.name)) || vs[0] || null;
+  };
+  return {
+    ok,
+    speak: (text) => {
+      if (!ok()) return;
+      const synth = window.speechSynthesis;
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      const v = pickVoice(); if (v) u.voice = v;
+      u.rate = 0.82; u.pitch = 0.65; u.volume = 1;
+      synth.speak(u);
+    },
+    stop: () => { if (ok()) window.speechSynthesis.cancel(); }
+  };
+})();
+
+function NarratorPanel({ roles }) {
+  const [step, setStep] = useState(-1);
+  const [line, setLine] = useState('');
+  const supported = Narrator.ok();
+  useEffect(() => () => Narrator.stop(), []);
+  const steps = useMemo(() => {
+    const out = [{ label: 'Night falls', text: 'Night falls. Everyone, close your eyes.' }];
+    roles.forEach((id, i) => {
+      const prev = i > 0 ? narrationFor(roles[i - 1]).sleep + ' ' : '';
+      out.push({ label: id === 'werewolf' ? 'Werewolves' : ROLES_DATA[id].name, text: prev + narrationFor(id).wake });
+    });
+    const last = roles.length ? narrationFor(roles[roles.length - 1]).sleep + ' ' : '';
+    out.push({ label: 'Day breaks', text: last + 'Day breaks. Everyone, open your eyes.' });
+    return out;
+  }, [roles]);
+  const say = (i) => { setStep(i); setLine(steps[i].text); Narrator.speak(steps[i].text); };
+  const atEnd = step >= steps.length - 1;
+  const next = () => say(step < 0 || atEnd ? 0 : step + 1);
+  return (
+    <section className="mt-6 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Narrator</h2>
+        <span className="text-xs tabular-nums text-slate-500">{step >= 0 ? `Step ${step + 1} of ${steps.length}` : 'Ready'}</span>
+      </div>
+      <p className="mt-3 min-h-[3.25rem] text-sm italic leading-snug text-slate-300" aria-live="polite">
+        {line || 'Tap Begin Night and the narrator will guide the night out loud, one role at a time.'}
+      </p>
+      {!supported && <p className="mt-2 text-xs text-amber-300">Spoken narration is not available on this device. Use the Night Wake-Up Order below and read it aloud instead.</p>}
+      <div className="mt-3">
+        <Btn onClick={next}>{step < 0 ? 'Begin Night' : atEnd ? 'Start Another Night' : `Next: ${steps[step + 1].label}`}</Btn>
+      </div>
+      <div className="mt-2 flex gap-2">
+        <button onClick={() => line && Narrator.speak(line)} disabled={!line}
+          className="min-h-[44px] flex-1 rounded-xl text-sm font-semibold text-slate-200 disabled:opacity-40" style={{ border: '1px solid var(--line)' }}>Replay</button>
+        <button onClick={() => Narrator.stop()}
+          className="min-h-[44px] flex-1 rounded-xl text-sm font-semibold text-slate-200" style={{ border: '1px solid var(--line)' }}>Stop voice</button>
+      </div>
+    </section>
+  );
+}
+
 function ExitButton({ onClick, className = '', style }) {
   return (
     <button onClick={onClick} aria-label="Exit game"
@@ -1528,11 +1600,27 @@ function GameCard({ game, confirming, onOpen, onAskDelete, onCancelDelete, onDel
   );
 }
 
-function Home({ games, onBack, onCreate, onResume, onRedeal, onEdit, onDelete }) {
+const POPULAR_COUNTS = [4, 5, 6, 7, 8];
+function PresetCard({ count, deck, onPick }) {
+  return (
+    <button onClick={onPick} aria-label={`Popular ${count} player setup`}
+      className="relative flex aspect-[3/4] w-full flex-col items-start overflow-hidden rounded-2xl p-3.5 text-left transition active:scale-[0.98]"
+      style={{ background: 'linear-gradient(160deg, #1B2230, #121722)', border: '1px solid var(--line)' }}>
+      <span className="pointer-events-none absolute -bottom-6 -right-6 opacity-[0.07]"><MoonIcon width="120" height="120" className="text-slate-200" /></span>
+      <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: '#FBBF24', background: '#FBBF241F', border: '1px solid #FBBF2455' }}>Popular</span>
+      <span className="font-display mt-3 text-5xl font-black leading-none tabular-nums">{count}</span>
+      <span className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Players</span>
+      <span className="mt-auto line-clamp-4 text-xs leading-snug text-slate-400">{summarizeDeck(deck)}</span>
+    </button>
+  );
+}
+
+function Home({ games, onBack, onCreate, onPreset, onResume, onRedeal, onEdit, onDelete }) {
   const [guide, setGuide] = useState(false);
   const [confirmId, setConfirmId] = useState(null);
   const [sheetId, setSheetId] = useState(null);
   const sheetGame = games.find((g) => g.id === sheetId);
+  const presets = useMemo(() => POPULAR_COUNTS.map((c) => ({ count: c, deck: autoFill(c) })), []);
   return (
     <Screen wide>
       <header className="flex items-center justify-between pb-5">
@@ -1549,23 +1637,42 @@ function Home({ games, onBack, onCreate, onResume, onRedeal, onEdit, onDelete })
           style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>Role Guide</button>
       </header>
 
-      <div className="grid grid-cols-2 gap-3.5 md:grid-cols-3 md:gap-5 lg:grid-cols-4">
-        <button onClick={onCreate}
-          className="flex aspect-[3/4] flex-col items-center justify-center gap-3 rounded-2xl p-3 text-center transition hover:brightness-125 active:scale-[0.98]"
-          style={{ background: '#181D27', border: '2px dashed #2E3646' }}>
-          <span className="flex h-14 w-14 items-center justify-center rounded-full" style={{ border: '1px solid #2E3646' }}>
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="2" strokeLinecap="round"><path d="M12 4 V20 M4 12 H20" /></svg>
-          </span>
-          <span className="text-sm font-semibold leading-tight text-slate-300">Create a new game</span>
-        </button>
-        {games.map((g) => (
-          <GameCard key={g.id} game={g} confirming={confirmId === g.id}
-            onOpen={() => setSheetId(g.id)}
-            onAskDelete={() => setConfirmId(g.id)}
-            onCancelDelete={() => setConfirmId(null)}
-            onDelete={() => { onDelete(g.id); setConfirmId(null); }} />
-        ))}
-      </div>
+      <section>
+        <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Recently Played</h2>
+        <div className="hscroll -mx-4 flex snap-x gap-3.5 overflow-x-auto px-4 pb-3 md:-mx-8 md:gap-5 md:px-8">
+          <div className="w-[42vw] max-w-[12rem] shrink-0 snap-start md:w-48">
+            <button onClick={onCreate}
+              className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-3 rounded-2xl p-3 text-center transition hover:brightness-125 active:scale-[0.98]"
+              style={{ background: '#181D27', border: '2px dashed #2E3646' }}>
+              <span className="flex h-14 w-14 items-center justify-center rounded-full" style={{ border: '1px solid #2E3646' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="2" strokeLinecap="round"><path d="M12 4 V20 M4 12 H20" /></svg>
+              </span>
+              <span className="text-sm font-semibold leading-tight text-slate-300">Create a new game</span>
+            </button>
+          </div>
+          {games.map((g) => (
+            <div key={g.id} className="w-[42vw] max-w-[12rem] shrink-0 snap-start md:w-48">
+              <GameCard game={g} confirming={confirmId === g.id}
+                onOpen={() => setSheetId(g.id)}
+                onAskDelete={() => setConfirmId(g.id)}
+                onCancelDelete={() => setConfirmId(null)}
+                onDelete={() => { onDelete(g.id); setConfirmId(null); }} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-3">
+        <h2 className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Popular Setups</h2>
+        <p className="mb-2.5 text-xs text-slate-500">Cards are picked for you. Tap one, then change any card you like.</p>
+        <div className="hscroll -mx-4 flex snap-x gap-3.5 overflow-x-auto px-4 pb-3 md:-mx-8 md:gap-5 md:px-8">
+          {presets.map((pr) => (
+            <div key={pr.count} className="w-[42vw] max-w-[12rem] shrink-0 snap-start md:w-48">
+              <PresetCard count={pr.count} deck={pr.deck} onPick={() => onPreset(pr.count, pr.deck)} />
+            </div>
+          ))}
+        </div>
+      </section>
 
       {guide && <RoleGuide onClose={() => setGuide(false)} />}
       {sheetGame && (
@@ -1581,7 +1688,7 @@ function Home({ games, onBack, onCreate, onResume, onRedeal, onEdit, onDelete })
 /* ------------------------------------------------------------------ */
 /* Screen 2: Setup                                                     */
 /* ------------------------------------------------------------------ */
-function Setup({ count, setCount, gameName, setGameName, defaultName, onBack, onNext }) {
+function Setup({ count, setCount, gameName, setGameName, narrator, setNarrator, defaultName, onBack, onNext }) {
   return (
     <Screen>
       <header className="flex items-center gap-2 pb-4">
@@ -1613,6 +1720,18 @@ function Setup({ count, setCount, gameName, setGameName, defaultName, onBack, on
             className="flex h-14 w-14 items-center justify-center rounded-xl text-3xl text-slate-200 disabled:opacity-30"
             style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>+</button>
         </div>
+      </section>
+
+      <section className="mt-4 flex items-center justify-between gap-4 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+        <div>
+          <div className="text-[15px] font-semibold" id="narrator-label">Narrator</div>
+          <p className="mt-0.5 text-xs leading-snug text-slate-400">A voice guides the night phase out loud for the moderator.</p>
+        </div>
+        <button role="switch" aria-checked={narrator} aria-labelledby="narrator-label" onClick={() => setNarrator(!narrator)}
+          className="relative h-8 w-14 shrink-0 rounded-full transition-colors"
+          style={{ background: narrator ? '#B91C1C' : '#2E3646', border: '1px solid rgba(203,213,225,0.3)' }}>
+          <span className="absolute top-0.5 h-6 w-6 rounded-full bg-white transition-all" style={{ left: narrator ? 'calc(100% - 1.625rem)' : '0.125rem' }} />
+        </button>
       </section>
 
       <div className="mt-auto pt-8">
@@ -1971,7 +2090,7 @@ function StatusChip({ active, onClick, color, children }) {
   );
 }
 
-function Moderator({ players, setPlayers, onAgain, onNew, onHome }) {
+function Moderator({ players, setPlayers, narrator, onAgain, onNew, onHome }) {
   const [checked, setChecked] = useState({});
   const [confirmExit, setConfirmExit] = useState(false);
   const [confirm, setConfirm] = useState(null); // 'again' | 'new' | null
@@ -2070,6 +2189,8 @@ function Moderator({ players, setPlayers, onAgain, onNew, onHome }) {
         </ul>
       </section>
 
+      {narrator && <NarratorPanel roles={nightRoles} />}
+
       {/* Night guide */}
       <section className="mt-6 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between">
@@ -2146,6 +2267,7 @@ function AppInner() {
   const [count, setCount] = useState(6);
   const [names, setNames] = useState(Array(MAX_PLAYERS).fill(''));
   const [deck, setDeck] = useState(emptyDeck);
+  const [narrator, setNarrator] = useState(true);
   const [gameName, setGameName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [curId, setCurId] = useState(null);
@@ -2169,6 +2291,16 @@ function AppInner() {
     setCount(6);
     setNames(Array(MAX_PLAYERS).fill(''));
     setDeck(emptyDeck());
+    setNarrator(true);
+    setScreen('setup');
+  };
+  const openPreset = (c, d) => {
+    setEditingId(null);
+    setGameName('');
+    setCount(c);
+    setNames(Array(MAX_PLAYERS).fill(''));
+    setDeck(d);
+    setNarrator(true);
     setScreen('setup');
   };
   const openEditSetup = (g) => {
@@ -2177,6 +2309,7 @@ function AppInner() {
     setCount(g.count);
     setNames(g.names);
     setDeck(g.deck);
+    setNarrator(g.narrator !== false);
     setScreen('setup');
   };
   const toCards = () => {
@@ -2195,11 +2328,11 @@ function AppInner() {
     const dealt = deal(deck, names, count);
     const name = gameName.trim() || defaultName;
     if (editingId) {
-      updateGame(editingId, { name, count, names, deck, players: dealt, status: 'active' });
+      updateGame(editingId, { name, count, names, deck, narrator, players: dealt, status: 'active' });
       begin(editingId, dealt);
     } else {
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      setGames((gs) => [{ id, name, count, names, deck, players: dealt, status: 'active', createdAt: Date.now() }, ...gs]);
+      setGames((gs) => [{ id, name, count, names, deck, narrator, players: dealt, status: 'active', createdAt: Date.now() }, ...gs]);
       begin(id, dealt);
     }
   };
@@ -2232,13 +2365,13 @@ function AppInner() {
   }
   if (screen === 'home') {
     return (
-      <Home games={games} onBack={() => setScreen('start')} onCreate={openNewSetup} onResume={resume} onRedeal={redeal}
+      <Home games={games} onBack={() => setScreen('start')} onCreate={openNewSetup} onPreset={openPreset} onResume={resume} onRedeal={redeal}
         onEdit={openEditSetup} onDelete={(id) => setGames((gs) => gs.filter((g) => g.id !== id))} />
     );
   }
   if (screen === 'setup') {
     return (
-      <Setup count={count} setCount={setCount} gameName={gameName} setGameName={setGameName}
+      <Setup count={count} setCount={setCount} gameName={gameName} setGameName={setGameName} narrator={narrator} setNarrator={setNarrator}
         defaultName={defaultName} onBack={() => setScreen('home')} onNext={toCards} />
     );
   }
@@ -2249,6 +2382,7 @@ function AppInner() {
   if (screen === 'shield') return <Shield onUnlock={() => setScreen('moderator')} onExit={() => setScreen('home')} />;
   return (
     <Moderator key={round} players={players} setPlayers={savePlayers}
+      narrator={(games.find((g) => g.id === curId) || {}).narrator !== false}
       onAgain={() => redeal(games.find((g) => g.id === curId))}
       onNew={() => { finishGame(); openNewSetup(); }}
       onHome={() => setScreen('home')} />

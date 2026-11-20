@@ -51,6 +51,25 @@
   @keyframes nudgeShake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
   .nudge { animation: nudgeShake 0.4s ease-in-out; }
   @media (prefers-reduced-motion: reduce) { .hint-pulse, .nudge { animation: none; } }
+  /* Automated night */
+  @keyframes dawnShake { 0%,100% { transform: translate(0,0); } 10% { transform: translate(-9px,4px); } 20% { transform: translate(8px,-5px); } 30% { transform: translate(-7px,-3px); } 40% { transform: translate(6px,5px); } 50% { transform: translate(-5px,2px); } 60% { transform: translate(4px,-3px); } 80% { transform: translate(-2px,1px); } }
+  .dawn-shake { animation: dawnShake 1.1s ease-out 1; }
+  @keyframes dawnFlash { 0% { opacity: 0; } 16% { opacity: 0.9; } 100% { opacity: 0; } }
+  .dawn-flash { background: radial-gradient(circle at 50% 30%, rgba(239,68,68,0.95), rgba(127,29,29,0.75) 55%, rgba(20,0,0,0) 100%); animation: dawnFlash 2.6s ease-out 1 forwards; }
+  @keyframes moonFade { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.5) translateY(-24px); } }
+  .moon-fade { animation: moonFade 2.4s ease-in forwards; }
+  @keyframes capIn { from { opacity: 0; transform: translateY(10px); letter-spacing: 0.12em; } to { opacity: 1; transform: none; letter-spacing: 0.02em; } }
+  .cap-in { animation: capIn 1.8s ease both; }
+  @keyframes lidClose { to { transform: scaleY(1.02); } }
+  .eye-lid { transform-box: fill-box; transform-origin: 50% 0; transform: scaleY(0); animation: lidClose 1.8s ease-in-out 0.4s forwards; }
+  .ghost-scene { perspective: 1000px; }
+  .ghost-card { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; -webkit-transform-style: preserve-3d; transition: transform 2.8s cubic-bezier(0.22, 1, 0.36, 1); }
+  .ghost-card.is-flipped { transform: rotateY(180deg); }
+  .ghost-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 16px; }
+  .ghost-back { transform: rotateY(180deg); }
+  @keyframes ghostGlow { 0%,100% { box-shadow: 0 0 24px 2px rgba(167,139,250,0.35); } 50% { box-shadow: 0 0 52px 8px rgba(167,139,250,0.6); } }
+  .ghost-glow { animation: ghostGlow 3s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .dawn-shake, .dawn-flash, .moon-fade, .cap-in, .eye-lid, .ghost-glow { animation: none; } .eye-lid { transform: scaleY(1); } .ghost-card, .ghost-card.is-flipped { transition-duration: 0.01s; } }
   body.lock { position: fixed; inset: 0; width: 100%; overflow: hidden; }
   body {
     margin: 0;
@@ -794,8 +813,8 @@ function DotBurst({ b }) {
 /* ------------------------------------------------------------------ */
 const SET_KEY = 'nightfall.settings.v1';
 let settings = (() => {
-  try { const v = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); return { blood: !(v && v.blood === false), sound: !(v && v.sound === false), music: !(v && v.music === false), fbUrl: v && typeof v.fbUrl === 'string' ? v.fbUrl : '' }; }
-  catch (e) { return { blood: true, sound: true, music: true, fbUrl: '' }; }
+  try { const v = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); return { blood: !(v && v.blood === false), sound: !(v && v.sound === false), music: !(v && v.music === false), revealDead: !(v && v.revealDead === false), fbUrl: v && typeof v.fbUrl === 'string' ? v.fbUrl : '' }; }
+  catch (e) { return { blood: true, sound: true, music: true, revealDead: true, fbUrl: '' }; }
 })();
 const setListeners = new Set();
 const subscribeSet = (fn) => { setListeners.add(fn); return () => setListeners.delete(fn); };
@@ -1104,14 +1123,6 @@ const Sfx = (() => {
 ['pagehide', 'freeze'].forEach((n) => window.addEventListener(n, () => { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }));
 document.addEventListener('visibilitychange', () => { if (document.hidden) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } } });
 
-const NARRATION = {
-  bodyguard: { wake: 'Bodyguard, wake up. Choose one player to protect tonight.', sleep: 'Bodyguard, close your eyes.' },
-  werewolf: { wake: 'Werewolves, wake up. Silently agree on your victim.', sleep: 'Werewolves, close your eyes.' },
-  seer: { wake: 'Seer, wake up. Point at one player, and I will show you if they are a villager or a werewolf.', sleep: 'Seer, close your eyes.' },
-  witch: { wake: 'Witch, wake up. I will show you tonight\u2019s victim. You may save them, or eliminate another player.', sleep: 'Witch, close your eyes.' },
-  spellcaster: { wake: 'Spellcaster, wake up. Choose one player to silence for tomorrow.', sleep: 'Spellcaster, close your eyes.' }
-};
-const narrationFor = (id) => NARRATION[id] || { wake: `${ROLES_DATA[id].name}, wake up.`, sleep: `${ROLES_DATA[id].name}, close your eyes.` };
 const Narrator = (() => {
   const ok = () => typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
   const pickVoice = () => {
@@ -1129,50 +1140,26 @@ const Narrator = (() => {
       u.rate = 0.82; u.pitch = 0.65; u.volume = 1;
       synth.speak(u);
     },
+    // Speaks a line and resolves when it ends. A timer guards against engines that never fire "end" (or have no voice).
+    say: (text) => new Promise((resolve) => {
+      let done = false, t = 0;
+      const fin = () => { if (!done) { done = true; clearTimeout(t); resolve(); } };
+      const est = 1300 + text.split(/\s+/).length * 430;
+      if (!ok()) { t = setTimeout(fin, est); return; }
+      t = setTimeout(fin, est + 5000);
+      try {
+        const synth = window.speechSynthesis;
+        synth.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        const v = pickVoice(); if (v) u.voice = v;
+        u.rate = 0.82; u.pitch = 0.65; u.volume = 1;
+        u.onend = fin; u.onerror = fin;
+        synth.speak(u);
+      } catch (e) { fin(); }
+    }),
     stop: () => { if (ok()) window.speechSynthesis.cancel(); }
   };
 })();
-
-function NarratorPanel({ roles }) {
-  const [step, setStep] = useState(-1);
-  const [line, setLine] = useState('');
-  const supported = Narrator.ok();
-  useEffect(() => () => Narrator.stop(), []);
-  const steps = useMemo(() => {
-    const out = [{ label: 'Night falls', text: 'Night falls. Everyone, close your eyes.' }];
-    roles.forEach((id, i) => {
-      const prev = i > 0 ? narrationFor(roles[i - 1]).sleep + ' ' : '';
-      out.push({ label: id === 'werewolf' ? 'Werewolves' : ROLES_DATA[id].name, text: prev + narrationFor(id).wake });
-    });
-    const last = roles.length ? narrationFor(roles[roles.length - 1]).sleep + ' ' : '';
-    out.push({ label: 'Day breaks', text: last + 'Day breaks. Everyone, open your eyes.' });
-    return out;
-  }, [roles]);
-  const say = (i) => { setStep(i); setLine(steps[i].text); Narrator.speak(steps[i].text); };
-  const atEnd = step >= steps.length - 1;
-  const next = () => say(step < 0 || atEnd ? 0 : step + 1);
-  return (
-    <section className="mt-6 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Narrator</h2>
-        <span className="text-xs tabular-nums text-slate-500">{step >= 0 ? `Step ${step + 1} of ${steps.length}` : 'Ready'}</span>
-      </div>
-      <p className="mt-3 min-h-[3.25rem] text-sm italic leading-snug text-slate-300" aria-live="polite">
-        {line || 'Tap Begin Night and the narrator speaks for you, calling each role out loud in turn.'}
-      </p>
-      {!supported && <p className="mt-2 text-xs text-amber-300">Spoken narration is not available on this device. Use the Night Wake-Up Order below and read it aloud instead.</p>}
-      <div className="mt-3">
-        <Btn onClick={next}>{step < 0 ? 'Begin Night' : atEnd ? 'Start Another Night' : `Next: ${steps[step + 1].label}`}</Btn>
-      </div>
-      <div className="mt-2 flex gap-2">
-        <button onClick={() => line && Narrator.speak(line)} disabled={!line}
-          className="min-h-[44px] flex-1 rounded-xl text-sm font-semibold text-slate-200 disabled:opacity-40" style={{ border: '1px solid var(--line)' }}>Replay</button>
-        <button onClick={() => Narrator.stop()}
-          className="min-h-[44px] flex-1 rounded-xl text-sm font-semibold text-slate-200" style={{ border: '1px solid var(--line)' }}>Stop voice</button>
-      </div>
-    </section>
-  );
-}
 
 function ExitButton({ onClick, className = '', style }) {
   return (
@@ -1338,6 +1325,18 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
                 className="relative h-8 w-14 shrink-0 rounded-full transition-colors"
                 style={{ background: st.blood ? '#B91C1C' : '#2E3646', border: '1px solid rgba(203,213,225,0.3)' }}>
                 <span className="absolute top-0.5 h-6 w-6 rounded-full bg-white transition-all" style={{ left: st.blood ? 'calc(100% - 1.625rem)' : '0.125rem' }} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 rounded-2xl p-4" style={rowStyle}>
+              <div>
+                <div className="text-[15px] font-semibold" id="reveal-label">Reveal Fallen Cards</div>
+                <p className="mt-0.5 text-xs leading-snug text-slate-400">Show a player&rsquo;s role card when they are eliminated at dawn or by the village.</p>
+              </div>
+              <button role="switch" aria-checked={st.revealDead} aria-labelledby="reveal-label" onClick={() => updateSettings({ revealDead: !st.revealDead })}
+                className="relative h-8 w-14 shrink-0 rounded-full transition-colors"
+                style={{ background: st.revealDead ? '#B91C1C' : '#2E3646', border: '1px solid rgba(203,213,225,0.3)' }}>
+                <span className="absolute top-0.5 h-6 w-6 rounded-full bg-white transition-all" style={{ left: st.revealDead ? 'calc(100% - 1.625rem)' : '0.125rem' }} />
               </button>
             </div>
 
@@ -2113,7 +2112,393 @@ function StatusChip({ active, onClick, color, children }) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Automated night: shared pieces, Pass & Play loop, day trial        */
+/* ------------------------------------------------------------------ */
+const NIGHT_ORDER = ['werewolf', 'seer', 'bodyguard', 'witch', 'spellcaster'];
+const NIGHT_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
+const nightWord = (n) => NIGHT_WORDS[n] || String(n);
+const roleLabel = (id) => (id === 'werewolf' ? 'Werewolves' : ROLES_DATA[id].name);
+const NIGHT_PROMPT = {
+  werewolf: 'Werewolves, choose who to hunt.',
+  seer: 'Seer, choose who to inspect.',
+  bodyguard: 'Bodyguard, choose someone to protect.',
+  witch: 'Witch, you hold one save and one poison. Who do you wish to save or kill?',
+  spellcaster: 'Spellcaster, choose who to silence.'
+};
+const PROTECTED_LINE = 'The Werewolves attacked overnight, but the victim was protected!';
+function dawnLines(saved, deadNames) {
+  const out = [];
+  if (saved) out.push(deadNames.length ? PROTECTED_LINE : PROTECTED_LINE + ' No one was eliminated.');
+  deadNames.forEach((n) => out.push(`${n} was found dead this morning.`));
+  if (!out.length) out.push('The night passed quietly. No one was eliminated.');
+  return out;
+}
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function NightStage({ children, dawn = false, shake = false, flash = false, onExit, fixed = true, pitch = false }) {
+  return (
+    <div className={`${fixed ? 'fixed inset-0 z-40' : 'relative min-h-[70vh] rounded-3xl'} overflow-hidden ${shake ? 'dawn-shake' : ''}`} style={{ background: pitch ? '#000' : '#03050A' }}>
+      {!pitch && <img src={DEFAULT_BG} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+        style={{ opacity: dawn ? 0.5 : 0.3, filter: 'brightness(0.6) saturate(0.85)', transition: 'opacity 2.5s ease' }} />}
+      {!pitch && <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(3,5,10,0) 0%, rgba(3,5,10,0.88) 78%)' }} />}
+      {flash && <div className="dawn-flash pointer-events-none absolute inset-0 z-20" />}
+      {onExit && <ExitButton onClick={onExit} className="absolute left-4 z-30" style={{ top: 'max(16px, env(safe-area-inset-top))' }} />}
+      <div className={`relative z-10 flex w-full overflow-y-auto px-5 ${fixed ? 'h-full' : 'min-h-[70vh]'}`} style={{ paddingTop: fixed ? 'max(64px, calc(env(safe-area-inset-top) + 48px))' : '24px', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+        <div className="mx-auto flex min-h-full w-full max-w-md flex-col">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function ClosingEye() {
+  return (
+    <svg width="112" height="112" viewBox="0 0 120 120" aria-hidden="true" className="relative">
+      <defs><clipPath id="nf-eye"><path d="M8 60 Q60 14 112 60 Q60 106 8 60Z" /></clipPath></defs>
+      <g clipPath="url(#nf-eye)">
+        <rect width="120" height="120" fill="#E5E7EB" opacity="0.92" />
+        <circle cx="60" cy="60" r="22" fill="#B91C1C" />
+        <circle cx="60" cy="60" r="9" fill="#0B0E14" />
+        <rect className="eye-lid" x="0" y="0" width="120" height="120" fill="#06080D" />
+      </g>
+      <path d="M8 60 Q60 14 112 60 Q60 106 8 60Z" fill="none" stroke="#CBD5E1" strokeWidth="2.5" />
+    </svg>
+  );
+}
+
+// Dark "eyes closed" panel: glowing moon (or a closing eye), a title, and an optional countdown.
+function LockView({ title, sub, count, eye = false, fadeMoon = false }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-7 text-center">
+      <div className="relative flex h-44 w-44 items-center justify-center">
+        <div className="hint-pulse absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle, rgba(203,213,225,0.38), rgba(203,213,225,0) 68%)' }} />
+        {eye ? <ClosingEye /> : <MoonIcon width="104" height="104" className={`relative text-slate-200 ${fadeMoon ? 'moon-fade' : ''}`} />}
+      </div>
+      <div>
+        <h2 className="font-display cap-in text-3xl font-bold text-slate-50" style={{ textShadow: '0 2px 20px rgba(0,0,0,0.9)' }}>{title}</h2>
+        {sub && <p className="cap-in mx-auto mt-3 max-w-xs text-sm leading-relaxed text-slate-400">{sub}</p>}
+      </div>
+      {count != null && <div className="font-display text-6xl font-black tabular-nums text-slate-200" style={{ textShadow: '0 0 30px rgba(203,213,225,0.35)' }}>{count}</div>}
+    </div>
+  );
+}
+
+function GhostFlip({ name, wolf }) {
+  const [on, setOn] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setOn(true), 500); return () => clearTimeout(t); }, []);
+  return (
+    <div className="ghost-scene mx-auto mt-5 h-60 w-full max-w-[17rem]" role="status" aria-live="polite">
+      <div className={`ghost-card ghost-glow ${on ? 'is-flipped' : ''}`} style={{ borderRadius: 20 }}>
+        <div className="ghost-face" style={{ background: 'linear-gradient(160deg, #1B1B33, #0D0D1C)', border: '1px solid rgba(167,139,250,0.55)' }}>
+          <RoleEmblem role="seer" size={64} />
+          <p className="mt-3 text-sm font-semibold tracking-wide text-violet-200">The spirits are answering...</p>
+        </div>
+        <div className="ghost-face ghost-back" style={{ background: wolf ? 'linear-gradient(160deg, #3B0B0B, #12060A)' : 'linear-gradient(160deg, #0B2B2A, #060F14)', border: `1px solid ${wolf ? '#EF4444' : '#34D399'}` }}>
+          <p className="font-display text-2xl font-black leading-snug" style={{ color: wolf ? '#FCA5A5' : '#6EE7B7' }}>
+            {name}<br />{wolf ? 'is a WEREWOLF!' : 'is NOT a WEREWOLF!'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActHeader({ role, sub }) {
+  return (
+    <div className="mb-4 text-center">
+      <RoleChip role={role} />
+      <h2 className="font-display cap-in mt-3 text-2xl font-bold leading-snug text-slate-50">{NIGHT_PROMPT[role]}</h2>
+      {sub && <p className="mt-2 text-sm text-slate-400">{sub}</p>}
+    </div>
+  );
+}
+
+function NightCard({ player, line }) {
+  const r = ROLES_DATA[player.role];
+  return (
+    <div className="mx-auto w-36 text-center">
+      <div className="relative aspect-[3/4] overflow-hidden rounded-2xl" style={{ border: `1px solid ${r.color}88`, boxShadow: `0 0 24px -6px ${r.color}` }}><PlayingCard role={player.role} /></div>
+      <p className="mt-2 text-xs font-semibold text-slate-300">{line}</p>
+    </div>
+  );
+}
+
+// One role's secret choice screen on a single shared device. Names only, never anyone's role.
+function NightActPP({ role, players, actor, choices, onDone }) {
+  const alive = players.filter((p) => p.alive);
+  const opts = (list) => list.map((p) => ({ id: p.id, n: p.name }));
+  const nm = (id) => (players.find((p) => p.id === id) || {}).name || '?';
+  const [pick, setPick] = useState(null);
+  const [save, setSave] = useState(false);
+  const val = pick === null ? '' : pick;
+  const choose = (v) => setPick(v === '' ? null : v);
+
+  if (role === 'werewolf') {
+    return (
+      <div className="flex flex-1 flex-col">
+        <ActHeader role={role} sub="Agree silently, then one of you taps the name." />
+        <PickList players={opts(alive.filter((p) => p.role !== 'werewolf'))} value={val} onChange={choose} />
+        <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ werewolf: pick })}>Confirm</Btn>
+      </div>
+    );
+  }
+  if (role === 'seer') {
+    const target = pick === null ? null : players.find((p) => p.id === pick);
+    return (
+      <div className="flex flex-1 flex-col">
+        <ActHeader role={role} sub={target ? '' : 'Choose carefully. You only get one look.'} />
+        <PickList players={opts(alive.filter((p) => p.id !== actor.id))} value={val} onChange={(v) => { if (pick === null && v !== '') choose(v); }} locked={pick !== null} />
+        {target && <GhostFlip key={target.id} name={target.name} wolf={target.role === 'werewolf'} />}
+        <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ seer: pick })}>Confirm</Btn>
+      </div>
+    );
+  }
+  if (role === 'bodyguard') {
+    const last = actor.lastGuard;
+    return (
+      <div className="flex flex-1 flex-col">
+        <ActHeader role={role} sub={last !== undefined && last !== null ? `You cannot protect ${nm(last)} two nights in a row.` : 'They cannot be eliminated tonight.'} />
+        <PickList players={opts(alive)} value={val} onChange={choose} disabled={last !== undefined && last !== null ? [last] : []} />
+        <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ bodyguard: pick })}>Confirm</Btn>
+      </div>
+    );
+  }
+  if (role === 'spellcaster') {
+    return (
+      <div className="flex flex-1 flex-col">
+        <ActHeader role={role} sub="They may not speak during tomorrow’s discussion." />
+        <PickList players={opts(alive.filter((p) => p.id !== actor.id))} value={val} onChange={choose} />
+        <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ spellcaster: pick })}>Confirm</Btn>
+      </div>
+    );
+  }
+  // witch
+  const victim = choices.werewolf !== undefined && choices.werewolf !== null ? choices.werewolf : null;
+  const canSave = !actor.saveUsed && victim !== null;
+  return (
+    <div className="flex flex-1 flex-col">
+      <ActHeader role={role} />
+      <Panel className="text-center" style={{ border: '1px solid rgba(239,68,68,0.6)', background: 'rgba(127,29,29,0.22)', boxShadow: '0 0 30px -8px rgba(239,68,68,0.7)' }}>
+        <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-red-300">The Werewolves chose</div>
+        <div className="font-display mt-1 text-2xl font-black text-slate-50">{victim !== null ? nm(victim) : 'No one'}</div>
+        {actor.saveUsed
+          ? <p className="mt-2 text-xs text-slate-500">Your save potion is already used.</p>
+          : <button disabled={!canSave} onClick={() => setSave(!save)} aria-pressed={save}
+              className="mt-3 flex min-h-[52px] w-full items-center justify-center rounded-xl text-[15px] font-bold transition disabled:opacity-40"
+              style={{ background: save ? 'rgba(16,185,129,0.28)' : 'var(--card-2)', border: `1px solid ${save ? '#34D399' : 'var(--line)'}`, color: '#E6EAF2' }}>
+              {save ? `Saving ${nm(victim)} ✓` : 'Save Target'}
+            </button>}
+      </Panel>
+      {actor.poisonUsed
+        ? <p className="mt-4 text-center text-xs text-slate-500">Your poison is already used.</p>
+        : <>
+            <div className="mb-2 mt-4 text-center text-xs font-semibold uppercase tracking-widest text-slate-400">Poison a player (optional)</div>
+            <PickList players={opts(alive.filter((p) => p.id !== actor.id))} value={val} onChange={choose} />
+          </>}
+      <Btn className="mt-5" onClick={() => onDone({ witchSave: save && canSave, witchPoison: pick })}>{pick !== null || (save && canSave) ? 'Confirm' : 'Do Nothing Tonight'}</Btn>
+    </div>
+  );
+}
+
+function resolveNightPP(players, c, night) {
+  const has = (v) => v !== null && v !== undefined;
+  const byId = new Map(players.map((p) => [p.id, p]));
+  const victim = has(c.werewolf) ? c.werewolf : null;
+  const guarded = has(c.bodyguard) ? c.bodyguard : null;
+  const poison = has(c.witchPoison) ? c.witchPoison : null;
+  const silenced = has(c.spellcaster) ? c.spellcaster : null;
+  const saved = victim !== null && (victim === guarded || !!c.witchSave);
+  const dead = [];
+  if (victim !== null && !saved) dead.push(victim);
+  if (poison !== null && poison !== guarded && !dead.includes(poison)) dead.push(poison);
+  const next = players.map((p) => {
+    const q = { ...p, nn: night, protectedTag: p.id === guarded, silencedTag: p.alive && p.id === silenced };
+    if (dead.includes(p.id)) { q.alive = false; q.protectedTag = false; q.silencedTag = false; }
+    if (p.role === 'bodyguard' && p.alive && guarded !== null) q.lastGuard = guarded;
+    if (p.role === 'witch') { if (c.witchSave && victim !== null) q.saveUsed = true; if (poison !== null) q.poisonUsed = true; }
+    return q;
+  });
+  return { next, dead, saved, victim, silenced, silencedName: silenced !== null && byId.get(silenced) ? byId.get(silenced).name : '', lines: dawnLines(saved, dead.map((id) => byId.get(id).name)) };
+}
+
+// Pass & Play: the narrator runs the whole night by voice. One device, passed to each role in turn.
+function NightLoopPP({ players, night, onFinish, onExit }) {
+  const roles = useMemo(() => NIGHT_ORDER.filter((r) => players.some((p) => p.alive && p.role === r)), []);
+  const [st, setSt] = useState({ k: 'title' });
+  const [count, setCount] = useState(5);
+  const [res, setRes] = useState(null);
+  const [spoken, setSpoken] = useState(false);
+  const [confirmExit, setConfirmExit] = useState(false);
+  const ch = useRef({});
+  const reveal = useSettings().revealDead;
+
+  useEffect(() => () => Narrator.stop(), []);
+  const after = (i) => (i + 1 < roles.length ? { k: 'call', i: i + 1 } : { k: 'dawnSay' });
+
+  useEffect(() => {
+    let off = false;
+    (async () => {
+      if (st.k === 'title') {
+        await Narrator.say('Night begins. Everyone, close your eyes.');
+        if (!off) setSt({ k: 'close' });
+      } else if (st.k === 'close') {
+        for (let n = 5; n > 0; n--) { setCount(n); await wait(1000); if (off) return; }
+        setSt(roles.length ? { k: 'call', i: 0 } : { k: 'dawnSay' });
+      } else if (st.k === 'call') {
+        await Narrator.say(`${roleLabel(roles[st.i])}, open your eyes.`);
+        if (!off) setSt({ k: 'unlock', i: st.i });
+      } else if (st.k === 'sleep') {
+        await Narrator.say(`${roleLabel(roles[st.i])}, close your eyes.`);
+        if (off) return;
+        setSt({ k: 'dark', i: st.i });
+      } else if (st.k === 'dark') {
+        await wait(2600);
+        if (!off) setSt(after(st.i));
+      } else if (st.k === 'dawnSay') {
+        await Narrator.say('Everyone, open your eyes. Morning has broken.');
+        if (off) return;
+        const r = resolveNightPP(players, ch.current, night);
+        setRes(r); setSpoken(false); setSt({ k: 'dawn' });
+      } else if (st.k === 'dawn') {
+        await wait(900);
+        for (const line of res.lines) { if (off) return; await Narrator.say(line); }
+        if (!off) setSpoken(true);
+      }
+    })();
+    return () => { off = true; };
+  }, [st]);
+
+  const actorOf = (role) => players.find((p) => p.alive && p.role === role);
+  let body = null, dawn = false, shake = false, flash = false;
+  if (st.k === 'title') body = <LockView key="t" title={`Night ${nightWord(night)} Begins...`} sub="The village falls silent." />;
+  else if (st.k === 'close') body = <LockView key="c" eye title="Close Your Eyes" sub="Keep them closed until the narrator says otherwise." count={count} />;
+  else if (st.k === 'call') body = <LockView key={'call' + st.i} title="Eyes closed" sub="Listen to the narrator." />;
+  else if (st.k === 'unlock') {
+    body = (
+      <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
+        <LockView key={'u' + st.i} title={roleLabel(roles[st.i])} sub="Only this role may look. Everyone else, eyes closed." />
+        <Btn className="max-w-xs" onClick={() => setSt({ k: 'act', i: st.i })}>Tap to Unlock Secretly</Btn>
+      </div>
+    );
+  } else if (st.k === 'act') {
+    const role = roles[st.i];
+    body = <NightActPP key={'a' + st.i} role={role} players={players} actor={actorOf(role)} choices={ch.current}
+      onDone={(c) => { Object.assign(ch.current, c); setSt({ k: 'sleep', i: st.i }); }} />;
+  } else if (st.k === 'sleep' || st.k === 'dark') body = <LockView key={'s' + st.i} title="Keep your eyes closed..." sub="The night is not over." />;
+  else if (st.k === 'dawnSay') { body = <LockView key="ds" fadeMoon title="Morning has broken" />; dawn = true; shake = true; flash = true; }
+  else if (st.k === 'dawn' && res) {
+    dawn = true;
+    body = (
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 py-6 text-center">
+        <p className="cap-in text-[11px] font-bold uppercase tracking-[0.3em] text-amber-300">Morning of day {night}</p>
+        {res.lines.map((t, i) => <p key={i} className="font-display cap-in text-2xl font-bold leading-snug text-slate-50" style={{ animationDelay: `${0.2 + i * 1.1}s` }}>{t}</p>)}
+        {res.dead.length > 0 && reveal && (
+          <div className="flex flex-wrap items-start justify-center gap-4">
+            {res.dead.map((id) => { const p = players.find((x) => x.id === id); return <NightCard key={id} player={p} line={`${p.name} was the ${ROLES_DATA[p.role].name}`} />; })}
+          </div>
+        )}
+        <Btn className="mt-2 max-w-xs" disabled={!spoken} onClick={() => onFinish(res)}>{spoken ? 'Continue to the Day' : 'The narrator speaks...'}</Btn>
+      </div>
+    );
+  }
+  return (
+    <NightStage dawn={dawn} shake={shake} flash={flash} onExit={() => setConfirmExit(true)}>
+      {body}
+      {confirmExit && (
+        <ConfirmExit confirmLabel="Leave night" body="The night's choices so far are discarded. You can start the night again from the Grimoire."
+          onCancel={() => setConfirmExit(false)} onConfirm={() => { Narrator.stop(); onExit(); }} />
+      )}
+    </NightStage>
+  );
+}
+
+function NightStartCard({ night, onStart, over }) {
+  return (
+    <section className="mt-6 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Narrator</h2>
+        <span className="text-xs tabular-nums text-slate-500">Night {night}</span>
+      </div>
+      <p className="mt-3 text-sm leading-snug text-slate-300">The narrator speaks the whole night aloud and passes the phone to each role in turn. You can hand it over and step away.</p>
+      {!Narrator.ok() && <p className="mt-2 text-xs text-amber-300">Spoken narration is not available on this device. The screens still guide each role, with timed pauses.</p>}
+      <div className="mt-3"><Btn disabled={over} onClick={onStart}>Start Night {night}</Btn></div>
+    </section>
+  );
+}
+
+// Pass & Play day: recap the dawn, then the village puts one player on trial.
+function DayTrial({ players, setPlayers, night, info, onNight, onGrimoire }) {
+  const reveal = useSettings().revealDead;
+  const [sel, setSel] = useState(null);
+  const [out, setOut] = useState(null);
+  const [hunter, setHunter] = useState(null);
+  const [shot, setShot] = useState(null);
+  const alive = players.filter((p) => p.alive);
+  const wolves = alive.filter((p) => ROLES_DATA[p.role].team === 'werewolf').length;
+  const village = alive.length - wolves;
+  const over = wolves === 0 ? { text: 'No Werewolves are left. The Village wins!', color: '#34D399' } : wolves >= village ? { text: 'The Werewolves match or outnumber the Village. The Werewolves win!', color: '#F87171' } : null;
+  const kill = (ids) => setPlayers(players.map((p) => (ids.includes(p.id) ? { ...p, alive: false, protectedTag: false, silencedTag: false } : p)));
+  const eliminate = () => {
+    const p = players.find((x) => x.id === sel);
+    if (!p) return;
+    kill([p.id]); setOut(p); setSel(null);
+    if (p.role === 'hunter') setHunter(p);
+  };
+  const fire = () => { const t = players.find((x) => x.id === shot); if (!t) return; kill([t.id]); setOut(t); setHunter(null); setShot(null); };
+  const pick = (v) => setSel(v === '' ? null : v);
+  const opts = (list) => list.map((p) => ({ id: p.id, n: p.name }));
+  const target = sel === null ? null : players.find((p) => p.id === sel);
+  const silenced = players.filter((p) => p.alive && p.silencedTag);
+  return (
+    <Screen>
+      <header className="pb-3">
+        <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-amber-300">Day {night}</p>
+        <h1 className="font-display text-3xl font-bold tracking-wide">The Village Wakes</h1>
+      </header>
+      {info && (
+        <Panel className="text-center" style={{ border: '1px solid rgba(251,191,36,0.4)', background: 'linear-gradient(160deg, rgba(251,191,36,0.1), rgba(21,26,36,0.95))' }}>
+          {info.lines.map((t, i) => <p key={i} className="font-display text-lg font-bold leading-snug text-slate-50">{t}</p>)}
+          {reveal && info.dead.length > 0 && <p className="mt-2 text-sm text-slate-300">{info.dead.map((id) => { const p = players.find((x) => x.id === id); return `${p.name}: ${ROLES_DATA[p.role].name}`; }).join(' · ')}</p>}
+        </Panel>
+      )}
+      {silenced.length > 0 && <p className="mt-3 rounded-xl px-4 py-2.5 text-center text-sm font-semibold text-violet-200" style={{ background: 'rgba(109,40,217,0.18)', border: '1px solid rgba(167,139,250,0.45)' }}>{silenced.map((p) => p.name).join(', ')} {silenced.length > 1 ? 'are' : 'is'} silenced today and may not speak.</p>}
+      {over && <p role="status" className="mt-3 rounded-xl px-4 py-3 text-center text-sm font-bold" style={{ color: over.color, background: over.color + '18', border: `1px solid ${over.color}66` }}>{over.text}</p>}
+      {out && (
+        <Panel className="mt-3 text-center">
+          <p className="text-sm font-semibold text-slate-100">{out.name} was eliminated.</p>
+          {reveal && <div className="mt-3"><NightCard player={out} line={`${out.name} was the ${ROLES_DATA[out.role].name}`} /></div>}
+        </Panel>
+      )}
+      {hunter && (
+        <Panel className="mt-3" style={{ border: '1px solid rgba(245,158,11,0.6)' }}>
+          <h3 className="font-display text-lg font-bold text-amber-300">{hunter.name}, take your last shot</h3>
+          <p className="mb-3 mt-1 text-xs text-slate-300">The Hunter chooses one player to take down.</p>
+          <PickList players={opts(players.filter((p) => p.alive))} value={shot === null ? '' : shot} onChange={(v) => setShot(v === '' ? null : v)} />
+          <Btn className="mt-3" disabled={shot === null} onClick={fire}>Fire</Btn>
+        </Panel>
+      )}
+      {!over && !hunter && (
+        <section className="mt-5">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Trial vote</h2>
+          <p className="mb-3 text-sm text-slate-400">Discuss, vote together, then choose the player the village condemns.</p>
+          <PickList players={opts(alive)} value={sel === null ? '' : sel} onChange={pick} />
+          <div className="mt-3 flex flex-col gap-2">
+            <Btn disabled={!target} onClick={eliminate}>{target ? `Eliminate ${target.name}` : 'Choose a player'}</Btn>
+          </div>
+        </section>
+      )}
+      <div className="mt-auto flex flex-col gap-2.5 pt-6">
+        <Btn disabled={!!over || !!hunter} onClick={onNight}>Start Night {night + 1}</Btn>
+        <Btn variant="ghost" onClick={onGrimoire}>Open Grimoire</Btn>
+      </div>
+    </Screen>
+  );
+}
+
 function Moderator({ players, setPlayers, narrator, onAgain, onNew, onHome }) {
+  const [mode, setMode] = useState('grimoire'); // grimoire | night | day
+  const [night, setNight] = useState(() => players.reduce((m, p) => Math.max(m, p.nn || 0), 0) + 1);
+  const [info, setInfo] = useState(null);
   const [checked, setChecked] = useState({});
   const [confirmExit, setConfirmExit] = useState(false);
   const [confirm, setConfirm] = useState(null); // 'again' | 'new' | null
@@ -2138,6 +2523,17 @@ function Moderator({ players, setPlayers, narrator, onAgain, onNew, onHome }) {
   let status = null;
   if (wolvesAlive === 0) status = { text: 'No Werewolves left. The Village wins.', color: '#34D399' };
   else if (wolvesAlive >= villageAlive) status = { text: 'Werewolves match or outnumber the Village.', color: '#F87171' };
+
+  if (mode === 'night') {
+    return <NightLoopPP key={night} players={players} night={night}
+      onExit={() => setMode('grimoire')}
+      onFinish={(r) => { setPlayers(r.next); setInfo(r); setMode('day'); }} />;
+  }
+  if (mode === 'day') {
+    return <DayTrial players={players} setPlayers={setPlayers} night={night} info={info}
+      onNight={() => { setNight(night + 1); setInfo(null); setMode('night'); }}
+      onGrimoire={() => { setNight(night + 1); setMode('grimoire'); }} />;
+  }
 
   return (
     <Screen wide>
@@ -2212,7 +2608,7 @@ function Moderator({ players, setPlayers, narrator, onAgain, onNew, onHome }) {
         </ul>
       </section>
 
-      {narrator && <NarratorPanel roles={nightRoles} />}
+      {narrator && <NightStartCard night={night} over={!!status && wolvesAlive === 0} onStart={() => { setInfo(null); setMode('night'); }} />}
 
       {/* Night guide */}
       <section className="mt-6 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
@@ -2451,24 +2847,24 @@ function mpDealPatch(room, deck) {
   const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0 };
   players.forEach((p, i) => {
     const b = `pl/${p.id}/`;
-    Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0 });
+    Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0, [b + 'v']: '' });
   });
   return patch;
 }
 function mpLobbyPatch(room) {
-  const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0 };
+  const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
-    ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'lf'].forEach((f) => { patch[b + f] = null; });
+    ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'lf', 'v'].forEach((f) => { patch[b + f] = null; });
     patch[b + 'a'] = 1; patch[b + 'd'] = 0;
   });
   return patch;
 }
 function mpNightPatch(room) {
-  const patch = { ph: 'night', k: (room.k || 0) + 1 };
+  const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1 };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
-    patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0;
+    patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0; patch[b + 'v'] = '';
   });
   return patch;
 }
@@ -2492,17 +2888,16 @@ function mpResolveNight(room) {
   if (victim) { if (victim === guarded || witchSaves) saved = true; else dead.push(victim); }
   if (poison && poison !== guarded && !dead.includes(poison)) dead.push(poison);
 
-  const lines = dead.map((id) => `${byId[id].n} was eliminated in the night.`);
-  if (saved) lines.push('The werewolves struck, but their victim was saved.');
-  if (!dead.length && !saved) lines.push('The night passed quietly. No one was eliminated.');
-  const an = { k: room.k || 0, l: Object.fromEntries(lines.map((t, i) => [i, t])), sv: saved ? 1 : 0, si: silenced };
-  const patch = { ph: 'day', an };
+  const lines = dawnLines(saved, dead.map((id) => byId[id].n));
+  const an = { k: room.k || 0, t: Date.now(), l: Object.fromEntries(lines.map((t, i) => [i, t])), sv: saved ? 1 : 0, si: silenced };
+  if (dead.length && getSettings().revealDead) an.rv = Object.fromEntries(dead.map((id) => [id, byId[id].r]));
+  const patch = { ph: 'day', an, ns: null, nk: null };
   ps.forEach((p) => { patch[`pl/${p.id}/s`] = p.id === silenced ? 1 : 0; });
   dead.forEach((id) => { patch[`pl/${id}/a`] = 0; });
   if (witch && witch.ws === 1 && victim && !witch.wsu) patch[`pl/${witch.id}/wsu`] = 1;
   if (poison) patch[`pl/${witch.id}/wpu`] = 1;
   if (bg) patch[`pl/${bg.id}/lp`] = guarded;
-  return { patch, dead, saved, victim, guarded, silenced };
+  return { patch, dead, saved, victim, guarded, silenced, lines };
 }
 
 /* ------------------------------------------------------------------ */
@@ -2844,7 +3239,7 @@ function SleepPanel({ me, text }) {
   );
 }
 
-function MpNight({ me, players, room, write }) {
+function MpNightManual({ me, players, room, write }) {
   const [pick, setPick] = useState('');
   const [save, setSave] = useState(false);
   const role = me.r;
@@ -2951,6 +3346,122 @@ function MpNight({ me, players, room, write }) {
   );
 }
 
+// Multi-Device automated night, phone side. The host's narrator sets room.ns; each phone shows only what its role may see.
+function MpNight(props) {
+  return props.room.ns ? <MpNightAuto {...props} /> : <MpNightManual me={props.me} players={props.players} room={props.room} write={props.write} />;
+}
+
+function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
+  const ns = room.ns || '';
+  const role = ns.indexOf('r:') === 0 ? ns.slice(2) : '';
+  const tag = `${ns}:${room.nk}`;
+  const [n, setN] = useState(5);
+  const [opened, setOpened] = useState('');
+  const [sent, setSent] = useState('');
+  useEffect(() => {
+    if (ns !== 'c') return;
+    let k = 5; setN(5);
+    const t = setInterval(() => { k -= 1; setN(Math.max(0, k)); if (k <= 0) clearInterval(t); }, 1000);
+    return () => clearInterval(t);
+  }, [ns, room.nk]);
+
+  const wrap = (body, pitch) => <NightStage fixed={!!immersive} pitch={pitch} onExit={immersive ? onLeave : undefined}>{body}</NightStage>;
+  const mine = me.a === 1 && !!role && me.r === role && me.nd !== 1 && sent !== tag;
+
+  if (ns === 'i') return wrap(<LockView key="i" title={`Night ${nightWord(room.k)} Begins...`} sub="The village falls silent." />);
+  if (ns === 'c') return wrap(<LockView key="c" eye title="Close Your Eyes" sub="Keep them closed until the narrator says otherwise." count={n} />);
+  if (mine && opened !== tag) {
+    return wrap(
+      <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
+        <LockView key={'u' + tag} title={roleLabel(role)} sub="Only your role may look now. Everyone else has their eyes closed." />
+        <Btn className="max-w-xs" onClick={() => setOpened(tag)}>Tap to Unlock Secretly</Btn>
+      </div>
+    );
+  }
+  if (mine) {
+    const adapted = players.map((p) => ({ id: p.id, name: p.n, role: p.r, alive: p.a === 1, saveUsed: p.wsu === 1, poisonUsed: p.wpu === 1, lastGuard: p.lp || null }));
+    const actor = adapted.find((p) => p.id === me.id);
+    const victim = mpWolfVictim(players);
+    const submit = (c) => {
+      setSent(tag);
+      if (role === 'witch') write({ [`pl/${me.id}/t`]: c.witchPoison === null || c.witchPoison === undefined ? '' : c.witchPoison, [`pl/${me.id}/ws`]: c.witchSave ? 1 : 0, [`pl/${me.id}/nd`]: 1 });
+      else write({ [`pl/${me.id}/t`]: c[role] || '', [`pl/${me.id}/nd`]: 1 });
+    };
+    return wrap(<NightActPP key={tag} role={role} players={adapted} actor={actor} choices={{ werewolf: victim || null }} onDone={submit} />);
+  }
+  const text = me.a !== 1 ? 'You have been eliminated. Stay silent and keep your eyes closed.' : 'The night is not over.';
+  return wrap(<LockView key={'z' + tag} title="Keep your eyes closed..." sub={text} />, true);
+}
+
+// Runs on the host's device: speaks each cue, wakes each role in order, waits for their choices, then breaks dawn.
+function useNightDirector({ room, players, write }) {
+  const latest = useRef({ room, players });
+  latest.current = { room, players };
+  const runId = useRef(0);
+  const skip = useRef(false);
+  const [dir, setDir] = useState({ on: false, label: '' });
+  useEffect(() => () => { runId.current += 1; Narrator.stop(); }, []);
+
+  const stop = () => { runId.current += 1; Narrator.stop(); setDir({ on: false, label: '' }); };
+  const skipRole = () => { skip.current = true; };
+  const start = async (opts) => {
+    const my = ++runId.current;
+    const live = () => runId.current === my;
+    const room0 = latest.current.room;
+    const roles = NIGHT_ORDER.filter((r) => latest.current.players.some((p) => p.a === 1 && p.r === r));
+    let nk = 1;
+    const step = async (ns, label) => { nk += 1; setDir({ on: true, label }); await write({ ns, nk }); };
+    try {
+      const base = mpNightPatch(room0);
+      if (opts && opts.again) base.k = room0.k || 1;
+      setDir({ on: true, label: 'Night begins' });
+      await write(base);
+      await Narrator.say('Night begins. Everyone, close your eyes.'); if (!live()) return;
+      await step('c', 'Everyone closes their eyes'); await wait(5200); if (!live()) return;
+      for (const r of roles) {
+        await step('z', `${roleLabel(r)} waking`);
+        await Narrator.say(`${roleLabel(r)}, open your eyes.`); if (!live()) return;
+        await step('r:' + r, `${roleLabel(r)} choosing`);
+        skip.current = false;
+        const t0 = Date.now();
+        while (live()) {
+          const holders = latest.current.players.filter((p) => p.a === 1 && p.r === r);
+          if (holders.every((p) => p.nd === 1) || skip.current || Date.now() - t0 > 90000) break;
+          await wait(500);
+        }
+        if (!live()) return;
+        await step('z', `${roleLabel(r)} sleeping`);
+        await Narrator.say(`${roleLabel(r)}, close your eyes.`); if (!live()) return;
+        await wait(2200); if (!live()) return;
+      }
+      setDir({ on: true, label: 'Dawn' });
+      await Narrator.say('Everyone, open your eyes. Morning has broken.'); if (!live()) return;
+      const result = mpResolveNight(latest.current.room);
+      await write(result.patch);
+      setDir({ on: false, label: '' });
+      for (const line of result.lines) { await wait(800); if (!live()) return; await Narrator.say(line); if (!live()) return; }
+    } catch (e) { setDir({ on: false, label: '' }); }
+  };
+  return { dir, start, stop, skipRole };
+}
+
+function MpVote({ me, players, write }) {
+  const alive = players.filter((p) => p.a === 1);
+  const [pick, setPick] = useState(me.v || '');
+  const voted = alive.filter((p) => p.v).length;
+  const nm = (id) => (players.find((p) => p.id === id) || {}).n || '?';
+  if (me.a !== 1) return <Panel className="text-center text-sm text-slate-400">The village is voting. {voted} of {alive.length} votes are in.</Panel>;
+  return (
+    <Panel>
+      <h3 className="font-display text-lg font-bold">Trial vote</h3>
+      <p className="mb-3 mt-1 text-xs text-slate-300">Discuss, then vote for the player you want eliminated. {voted} of {alive.length} votes are in.</p>
+      <PickList players={alive.filter((p) => p.id !== me.id)} value={pick} onChange={setPick} />
+      <Btn className="mt-3" disabled={!pick || pick === me.v} onClick={() => write({ [`pl/${me.id}/v`]: pick })}>{me.v ? 'Change Vote' : 'Cast Vote'}</Btn>
+      {me.v && <p className="mt-2 text-center text-xs text-emerald-300">Your vote: {nm(me.v)}</p>}
+    </Panel>
+  );
+}
+
 function AnnounceCard({ room, players }) {
   const an = room.an;
   if (!an) return null;
@@ -2962,6 +3473,11 @@ function AnnounceCard({ room, players }) {
       <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-amber-300">Morning of day {an.k}</div>
       <div className="mt-2 flex flex-col gap-1.5">
         {lines.map((t, i) => <p key={i} className="font-display text-lg font-bold leading-snug text-slate-50">{t}</p>)}
+        {an.rv && (
+          <div className="mt-1 flex flex-wrap items-start justify-center gap-3">
+            {Object.entries(an.rv).map(([id, role]) => { const dp = players.find((x) => x.id === id); return dp && ROLES_DATA[role] ? <NightCard key={id} player={{ role }} line={`${dp.n} was the ${ROLES_DATA[role].name}`} /> : null; })}
+          </div>
+        )}
         {si && <p className="text-sm text-violet-200">{si.n} has been silenced for today&rsquo;s discussion.</p>}
         {extra.map((t, i) => <p key={'x' + i} className="text-sm text-slate-300">{t}</p>)}
       </div>
@@ -2982,7 +3498,11 @@ function StatusBadges({ players, meId }) {
   );
 }
 
+const DAWN_SEEN = { key: '' };
 function MpDay({ me, players, room, write }) {
+  const fxKey = room.an && room.an.k === room.k && room.an.t ? String(room.an.t) : '';
+  const [fx, setFx] = useState(!!fxKey && fxKey !== DAWN_SEEN.key && Date.now() - Number(fxKey) < 20000);
+  useEffect(() => { if (!fx) return; DAWN_SEEN.key = fxKey; const t = setTimeout(() => setFx(false), 2700); return () => clearTimeout(t); }, [fx]);
   const alive = players.filter((p) => p.a === 1);
   const hunterShot = me.r === 'hunter' && me.a !== 1 && me.hs !== 1;
   const [target, setTarget] = useState('');
@@ -2992,7 +3512,13 @@ function MpDay({ me, players, room, write }) {
     write({ [`pl/${t.id}/a`]: 0, [`pl/${me.id}/hs`]: 1, [`an/x/${String(Date.now())}`]: `${me.n} fired a last shot and took ${t.n} down.` });
   };
   return (
-    <div className="flex flex-1 flex-col gap-4">
+    <div className={`flex flex-1 flex-col gap-4 ${fx ? 'dawn-shake' : ''}`}>
+      {fx && (
+        <div className="pointer-events-none fixed inset-0 z-40 flex items-start justify-center overflow-hidden" aria-hidden="true">
+          <div className="dawn-flash absolute inset-0" />
+          <MoonIcon width="120" height="120" className="moon-fade mt-24 text-slate-100" />
+        </div>
+      )}
       <AnnounceCard room={room} players={players} />
       {me.a !== 1
         ? <Panel className="text-center text-sm text-slate-300">You are eliminated. You can still watch, but keep quiet.</Panel>
@@ -3007,6 +3533,7 @@ function MpDay({ me, players, room, write }) {
           <Btn className="mt-3" disabled={!target} onClick={shoot}>Fire</Btn>
         </Panel>
       )}
+      {!hunterShot && <MpVote me={me} players={players} write={write} />}
       <div>
         <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Players</div>
         <StatusBadges players={players} meId={me.id} />
@@ -3036,7 +3563,7 @@ function MpOver({ room, players, meId }) {
 }
 
 /* ---------- host / moderator view ---------- */
-function MpMod({ room, players, me, write, narrator }) {
+function MpMod({ room, players, me, write, director }) {
   const ph = room.ph;
   const [confirmEnd, setConfirmEnd] = useState(false);
   const byId = Object.fromEntries(players.map((p) => [p.id, p]));
@@ -3049,8 +3576,24 @@ function MpMod({ room, players, me, write, narrator }) {
   const allReady = players.length > 0 && players.every((p) => p.d === 1);
   const victim = mpWolfVictim(players);
 
-  const startNight = () => write(mpNightPatch(room));
-  const dawn = () => { const r = mpResolveNight(room); write(r.patch); };
+  const startNight = () => director.start();
+  const dawn = () => { director.stop(); const r = mpResolveNight(room); write(r.patch); };
+  const tally = {};
+  alive.forEach((p) => { if (p.v && byId[p.v] && byId[p.v].a === 1) tally[p.v] = (tally[p.v] || 0) + 1; });
+  const ranked = Object.keys(tally).sort((x, y) => tally[y] - tally[x]);
+  const top = ranked[0];
+  const tie = ranked.length > 1 && tally[ranked[1]] === tally[top];
+  const closeVote = (id) => {
+    const patch = {};
+    players.forEach((p) => { patch[`pl/${p.id}/v`] = ''; });
+    if (id) {
+      const t = byId[id]; const ts = String(Date.now());
+      patch[`pl/${id}/a`] = 0;
+      patch[`an/x/${ts}a`] = `${t.n} was voted out by the village.`;
+      if (getSettings().revealDead && ROLES_DATA[t.r]) patch[`an/x/${ts}b`] = `${t.n} was the ${ROLES_DATA[t.r].name}.`;
+    }
+    write(patch);
+  };
   const toggleAlive = (p) => {
     const patch = { [`pl/${p.id}/a`]: p.a === 1 ? 0 : 1 };
     if (p.a === 1) patch[`an/x/${String(Date.now())}`] = `${p.n} was eliminated by the village.`;
@@ -3117,16 +3660,46 @@ function MpMod({ room, players, me, write, narrator }) {
               <span className="text-xs tabular-nums text-slate-400">{actors.length - pending.length} of {actors.length} acted</span></div>
             <p className="mt-2 text-sm text-slate-300">{victim ? `Wolves are targeting ${nm(victim)}.` : 'The wolves have not chosen yet.'}</p>
           </Panel>
-          {narrator && <div className="-mt-4"><NarratorPanel roles={nightRoles} /></div>}
+          <Panel>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">Narrator</span>
+              <span className="text-xs text-slate-500">{director.dir.on ? 'Speaking' : 'Idle'}</span>
+            </div>
+            <p className="mt-2 min-h-[2.5rem] text-sm italic text-slate-300" aria-live="polite">{director.dir.on ? director.dir.label : 'The narrator is not running. Resume it to continue the night by voice.'}</p>
+            <div className="mt-3 flex gap-2">
+              {director.dir.on
+                ? <>
+                    <Btn variant="secondary" onClick={director.skipRole}>Skip waiting</Btn>
+                    <Btn variant="ghost" onClick={director.stop}>Stop narrator</Btn>
+                  </>
+                : <Btn variant="secondary" onClick={() => director.start({ again: true })}>Restart narrated night</Btn>}
+            </div>
+          </Panel>
         </>
       )}
       {ph === 'day' && <AnnounceCard room={room} players={players} />}
+      {ph === 'day' && (
+        <Panel>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">Trial vote</span>
+            <span className="text-xs tabular-nums text-slate-400">{alive.filter((p) => p.v).length} of {alive.length} voted</span>
+          </div>
+          {ranked.length === 0
+            ? <p className="mt-2 text-sm text-slate-400">No votes yet. Players vote on their own phones.</p>
+            : <ul className="mt-2 flex flex-col gap-1 text-sm text-slate-200">{ranked.map((id) => <li key={id} className="flex justify-between"><span>{nm(id)}</span><span className="tabular-nums text-slate-400">{tally[id]}</span></li>)}</ul>}
+          <div className="mt-3 flex flex-col gap-2">
+            {top && !tie && <Btn onClick={() => closeVote(top)}>Eliminate {nm(top)}</Btn>}
+            {tie && <p className="text-xs text-amber-300">It is a tie. Use Eliminate below, or clear the votes and revote.</p>}
+            {ranked.length > 0 && <Btn variant="ghost" onClick={() => closeVote('')}>Clear votes, no one falls</Btn>}
+          </div>
+        </Panel>
+      )}
       {ph === 'day' && room.an && room.an.sv === 1 && <p className="-mt-2 text-xs text-slate-400">Grimoire note: the wolves&rsquo; victim was saved overnight.</p>}
       {winBanner}
       {grimoire}
       <div className="mt-auto flex flex-col gap-2.5 pt-2">
         {ph === 'reveal' && <Btn onClick={startNight}>{allReady ? 'Begin Night 1' : 'Begin Night 1 Anyway'}</Btn>}
-        {ph === 'night' && <Btn onClick={dawn}>{pending.length ? `Break Dawn (${pending.length} still waiting)` : 'Break Dawn'}</Btn>}
+        {ph === 'night' && <Btn variant={director.dir.on ? 'secondary' : 'primary'} onClick={dawn}>{pending.length ? `Break Dawn Now (${pending.length} still waiting)` : 'Break Dawn Now'}</Btn>}
         {ph === 'day' && <Btn onClick={startNight}>Start Night {(room.k || 0) + 1}</Btn>}
         {(ph === 'night' || ph === 'day') && (
           confirmEnd
@@ -3152,6 +3725,8 @@ function MpRoom({ session, onExit, onPhase }) {
   const me = players.find((p) => p.id === pid);
   const isHost = !!room && room.host === pid;
   const ph = room ? room.ph : '';
+  const director = useNightDirector({ room, players, write: (patch) => writeRef.current(patch) });
+  const writeRef = useRef(() => Promise.resolve());
 
   useEffect(() => { onPhase(cardsStep ? 'cards' : ph); }, [ph, cardsStep]);
   useEffect(() => () => onPhase(''), []);
@@ -3164,6 +3739,13 @@ function MpRoom({ session, onExit, onPhase }) {
     catch (e) { setWErr(mpErrorText(e)); }
     refresh();
   };
+  writeRef.current = write;
+  const nsNow = (room && room.ns) || '';
+  useEffect(() => {
+    if (!isHost || !me || ph !== 'night' || !nsNow) return;
+    const mineTurn = nsNow.indexOf('r:') === 0 && nsNow.slice(2) === me.r && me.a === 1 && me.nd !== 1;
+    setTab(mineTurn ? 'player' : 'mod');
+  }, [nsNow, room && room.nk, me && me.nd]);
   const leave = async () => {
     setBusy(true);
     try {
@@ -3195,7 +3777,6 @@ function MpRoom({ session, onExit, onPhase }) {
     return <ChooseCards count={players.length} deck={deck} setDeck={setDeck} onBack={closeCards} onStart={deal} startLabel="Deal Cards & Start" showBalance />;
   }
 
-  const narratorOn = true;
   const showPlayer = !!me && (!isHost || tab === 'player');
   let body = null;
   if (ph === 'lobby') {
@@ -3220,11 +3801,11 @@ function MpRoom({ session, onExit, onPhase }) {
     );
   } else if (showPlayer) {
     if (ph === 'reveal') body = <MpReveal me={me} ready={me.d === 1} readyCount={players.filter((p) => p.d === 1).length} total={players.length} onReady={() => write({ [`pl/${pid}/d`]: 1 })} />;
-    else if (ph === 'night') body = <MpNight key={`n${room.k}`} me={me} players={players} room={room} write={write} />;
+    else if (ph === 'night') body = <MpNight key={`n${room.k}`} me={me} players={players} room={room} write={write} immersive={!isHost} onLeave={() => setConfirmLeave(true)} />;
     else if (ph === 'day') body = <MpDay key={`d${room.k}`} me={me} players={players} room={room} write={write} />;
     else body = <MpOver room={room} players={players} meId={pid} />;
   } else {
-    body = <MpMod room={room} players={players} me={me} write={write} narrator={narratorOn} />;
+    body = <MpMod room={room} players={players} me={me} write={write} director={director} />;
   }
 
   return (

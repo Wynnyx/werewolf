@@ -43,6 +43,8 @@
     color-scheme: dark;
   }
   html, body, #root { height: 100%; }
+  html, body { overscroll-behavior: none; }
+  body.lock { position: fixed; inset: 0; width: 100%; overflow: hidden; }
   body {
     margin: 0;
     background: var(--bg);
@@ -881,8 +883,8 @@ function DotBurst({ b }) {
 /* ------------------------------------------------------------------ */
 const SET_KEY = 'nightfall.settings.v1';
 let settings = (() => {
-  try { const v = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); return { blood: !(v && v.blood === false), sound: false }; }
-  catch (e) { return { blood: true, sound: false }; }
+  try { const v = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); return { blood: !(v && v.blood === false), sound: !(v && v.sound === false) }; }
+  catch (e) { return { blood: true, sound: true }; }
 })();
 const setListeners = new Set();
 const subscribeSet = (fn) => { setListeners.add(fn); return () => setListeners.delete(fn); };
@@ -912,7 +914,7 @@ function GearIcon(p) {
 /* ------------------------------------------------------------------ */
 const Ambience = (() => {
   let ctx = null, master = null, bus = null, echoIn = null, noiseBuf = null, whiteBuf = null;
-  const FILE = 'audio/forest.mp3';
+  const FILE = 'audio/ambience.mp3';
   let synthGain = null, fileState = 'loading', el = null, fadeT = null, unlockedFlag = false;
   let running = false, timers = [], suspendT = null;
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -1092,11 +1094,13 @@ const Ambience = (() => {
   return { start, stop, preload: () => { getEl(); return Promise.resolve(); }, unlocked: () => unlockedFlag, isRunning: () => running };
 })();
 
-// Browsers only allow sound after a tap, so sound starts off and the speaker button turns it on.
+// Browsers only allow sound after a tap: the first tap anywhere on the home screen starts it,
+// and the speaker button mutes / unmutes.
 function toggleSound() {
-  const on = !getSettings().sound;
-  updateSettings({ sound: on });
-  if (on) Ambience.start(); else Ambience.stop();
+  const cur = getSettings().sound;
+  if (cur && !Ambience.isRunning()) { Ambience.start(); return; }
+  updateSettings({ sound: !cur });
+  if (!cur) Ambience.start(); else Ambience.stop();
 }
 
 function SpeakerIcon({ on }) {
@@ -1143,7 +1147,7 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
             <div className="flex items-center justify-between gap-4 rounded-2xl p-4" style={rowStyle}>
               <div>
                 <div className="text-[15px] font-semibold" id="sound-label">Ambient Sound</div>
-                <p className="mt-0.5 text-xs leading-snug text-slate-400">Night forest sounds on the home screen. Tap the speaker to start.</p>
+                <p className="mt-0.5 text-xs leading-snug text-slate-400">Night forest sounds on the home screen. Starts on your first tap.</p>
               </div>
               <button role="switch" aria-checked={st.sound} aria-labelledby="sound-label" onClick={toggleSound}
                 className="relative h-8 w-14 shrink-0 rounded-full transition-colors"
@@ -1219,8 +1223,18 @@ function StartScreen({ onPlay, gameCount, onClearGames }) {
   useEffect(() => {
     if (!st.sound) { Ambience.stop(); return; }
     if (Ambience.unlocked()) Ambience.start();
+    const go = (e) => {
+      if (e.target && e.target.closest && e.target.closest('[data-sound-toggle]')) return;
+      if (getSettings().sound) Ambience.start();
+    };
+    const evs = ['touchend', 'click', 'keydown'];
+    evs.forEach((n) => window.addEventListener(n, go, { passive: true }));
+    return () => evs.forEach((n) => window.removeEventListener(n, go));
   }, [st.sound]);
-  useEffect(() => () => Ambience.stop(), []);
+  useEffect(() => {
+    document.body.classList.add('lock');
+    return () => document.body.classList.remove('lock');
+  }, []);
   const [splats, setSplats] = useState([]);
   const timers = useRef([]);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
@@ -1264,7 +1278,7 @@ function StartScreen({ onPlay, gameCount, onClearGames }) {
             <GearIcon />
           </button>
           <div className="flex items-center gap-2">
-            <button onClick={toggleSound} aria-label={st.sound ? 'Mute ambient sound' : 'Turn on ambient sound'} aria-pressed={st.sound}
+            <button onClick={toggleSound} data-sound-toggle="1" aria-label={st.sound ? 'Mute ambient sound' : 'Turn on ambient sound'} aria-pressed={st.sound}
               className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-200 hover:bg-white/10" style={glassBtn}>
               <SpeakerIcon on={st.sound} />
             </button>
@@ -2034,6 +2048,7 @@ function AppInner() {
   };
   const finishGame = () => updateGame(curId, { players: null, status: 'saved' });
 
+  useEffect(() => { if (screen !== 'start' && screen !== 'home') Ambience.stop(); }, [screen]);
   if (screen === 'start') {
     return <StartScreen onPlay={() => setScreen('home')} gameCount={games.length} onClearGames={() => setGames([])} />;
   }

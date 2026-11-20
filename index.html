@@ -444,21 +444,32 @@ function preloadImage(src) {
   });
 }
 
-/* Night Phase background: bundled artwork by default, or the player's own photo (kept in localStorage). */
-const NIGHT_BG_KEY = 'nightfall.nightbg.v1';
-const NIGHT_BG_DEFAULT = 'images/night-bg.jpg';
-let nightBgCustom = (() => { try { return localStorage.getItem(NIGHT_BG_KEY) || ''; } catch (e) { return ''; } })();
-const nightBgListeners = new Set();
-const getNightBg = () => nightBgCustom || NIGHT_BG_DEFAULT;
-function setNightBg(dataUrl) {
-  nightBgCustom = dataUrl || '';
-  if (nightBgCustom) preloadImage(nightBgCustom);
-  nightBgListeners.forEach((fn) => fn());
-  try { if (nightBgCustom) localStorage.setItem(NIGHT_BG_KEY, nightBgCustom); else localStorage.removeItem(NIGHT_BG_KEY); return true; } catch (e) { return false; }
+/* Phase backgrounds: the player's own photo (kept in localStorage) or a built-in default. */
+function makeBgStore(key, fallback) {
+  let custom = (() => { try { return localStorage.getItem(key) || ''; } catch (e) { return ''; } })();
+  const listeners = new Set();
+  return {
+    fallback,
+    get: () => custom || fallback,
+    isCustom: () => !!custom,
+    set: (dataUrl) => {
+      custom = dataUrl || '';
+      if (custom) preloadImage(custom);
+      listeners.forEach((fn) => fn());
+      try { if (custom) localStorage.setItem(key, custom); else localStorage.removeItem(key); return true; } catch (e) { return false; }
+    },
+    use: function () { return React.useSyncExternalStore((fn) => { listeners.add(fn); return () => listeners.delete(fn); }, this.get); }
+  };
 }
-function useNightBg() { return React.useSyncExternalStore((fn) => { nightBgListeners.add(fn); return () => nightBgListeners.delete(fn); }, getNightBg); }
+const NIGHT_BG_DEFAULT = 'images/night-bg.jpg';
+const nightBgStore = makeBgStore('nightfall.nightbg.v1', NIGHT_BG_DEFAULT);
+const dayBgStore = makeBgStore('nightfall.daybg.v1', '');
+const getNightBg = () => nightBgStore.get();
+const useNightBg = () => nightBgStore.use();
+const useDayBg = () => dayBgStore.use();
+const DAY_GRADIENT = 'linear-gradient(180deg, #2B2140 0%, #6B2D3E 52%, #C2693F 100%)';
 // Downscale a chosen photo (max 1080 x 1920) to JPEG so it fits comfortably in localStorage.
-function fileToNightBg(file) {
+function fileToBg(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -1317,35 +1328,35 @@ function ServerUrlRow({ rowStyle }) {
   );
 }
 
-function NightBgRow({ rowStyle }) {
-  const src = useNightBg();
+function BgRow({ rowStyle, store, title, desc, savedMsg, resetMsg }) {
+  const src = store.use();
   const [msg, setMsg] = useState('');
-  const custom = src !== NIGHT_BG_DEFAULT;
+  const custom = store.isCustom();
   const pick = async (e) => {
     const f = e.target.files && e.target.files[0];
     e.target.value = '';
     if (!f) return;
     try {
-      const url = await fileToNightBg(f);
-      setMsg(setNightBg(url) ? 'Night background updated.' : 'Could not save. The photo is too large for this browser to keep.');
+      const url = await fileToBg(f);
+      setMsg(store.set(url) ? savedMsg : 'Could not save. The photo is too large for this browser to keep.');
     } catch (err) { setMsg('That file could not be read as an image.'); }
   };
   return (
     <div className="rounded-2xl p-4" style={rowStyle}>
       <div className="flex items-start gap-3">
-        <div className="aspect-[9/16] w-[54px] shrink-0 overflow-hidden rounded-lg" style={{ background: '#05070B', border: '1px solid var(--line)' }}>
-          <img src={src} alt="" className="h-full w-full object-cover" />
+        <div className="aspect-[9/16] w-[54px] shrink-0 overflow-hidden rounded-lg" style={{ background: src ? '#05070B' : DAY_GRADIENT, border: '1px solid var(--line)' }}>
+          {src && <img src={src} alt="" className="h-full w-full object-cover" />}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-semibold">Night Phase Background</div>
-          <p className="mt-0.5 text-xs leading-snug text-slate-400">Artwork behind the narrator&rsquo;s night screens. Portrait photos fit best.</p>
+          <div className="text-[15px] font-semibold">{title}</div>
+          <p className="mt-0.5 text-xs leading-snug text-slate-400">{desc}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <label className="inline-flex min-h-[44px] cursor-pointer items-center rounded-lg px-3 text-sm font-semibold text-slate-100 focus-within:outline focus-within:outline-2 focus-within:outline-slate-200"
               style={{ background: 'var(--card)', border: '1px solid rgba(203,213,225,0.35)' }}>
               Choose photo
               <input type="file" accept="image/*" className="sr-only" onChange={pick} />
             </label>
-            {custom && <button onClick={() => { setNightBg(''); setMsg('Back to the default night background.'); }}
+            {custom && <button onClick={() => { store.set(''); setMsg(resetMsg); }}
               className="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-red-300 hover:bg-white/5" style={{ border: '1px solid #DC262666' }}>Reset to Default</button>}
           </div>
           {msg && <p role="status" className="mt-1.5 text-xs text-slate-400">{msg}</p>}
@@ -1425,7 +1436,8 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
               </button>
             </div>
 
-            <NightBgRow rowStyle={rowStyle} />
+            <BgRow rowStyle={rowStyle} store={nightBgStore} title="Night Phase Background" desc="Artwork behind the narrator’s night screens. Portrait photos fit best." savedMsg="Night background updated." resetMsg="Back to the default night background." />
+            <BgRow rowStyle={rowStyle} store={dayBgStore} title="Day Phase Background" desc="Artwork behind the dawn announcement, discussion and voting screens." savedMsg="Day background updated." resetMsg="Back to the default day background." />
             <ServerUrlRow rowStyle={rowStyle} />
 
             <div className="rounded-2xl p-4" style={rowStyle}>
@@ -2224,21 +2236,72 @@ const NIGHT_PROMPT = {
   spellcaster: 'Spellcaster, choose who to silence.'
 };
 const PROTECTED_LINE = 'The Werewolves attacked overnight, but the victim was protected!';
-function dawnLines(saved, deadNames) {
+function dawnLines(saved, deadNames, silencedName) {
   const out = [];
   if (saved) out.push(deadNames.length ? PROTECTED_LINE : PROTECTED_LINE + ' No one was eliminated.');
   deadNames.forEach((n) => out.push(`${n} was found dead this morning.`));
   if (!out.length) out.push('The night passed quietly. No one was eliminated.');
+  if (silencedName) out.push(`${silencedName} has been silenced for the day. They cannot speak or vote.`);
   return out;
 }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function NightStage({ children, dawn = false, shake = false, flash = false, onExit, fixed = true, pitch = false }) {
+// Day artwork (or the dawn gradient) with the 0.65 readability overlay. Sits behind content.
+function DayArt() {
+  const src = useDayBg();
+  return (
+    <>
+      {src ? <img src={src} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+        : <div className="pointer-events-none absolute inset-0" style={{ background: DAY_GRADIENT }} />}
+      <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(rgba(10,10,18,0.65), rgba(10,10,18,0.65))' }} />
+    </>
+  );
+}
+function DayBackdrop() {
+  return <div className="pointer-events-none fixed inset-0" style={{ zIndex: 0, background: '#0A0A12' }} aria-hidden="true"><DayArt /></div>;
+}
+function DayStage({ children }) {
+  return (
+    <div className="fixed inset-0 z-40 overflow-hidden" style={{ background: '#0A0A12' }}>
+      <DayArt />
+      <div className="relative z-10 h-full w-full overflow-y-auto">
+        <main className="screen-in mx-auto flex min-h-full w-full max-w-md flex-col px-4 md:max-w-xl" style={{ paddingTop: 'max(16px, env(safe-area-inset-top))', paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>{children}</main>
+      </div>
+    </div>
+  );
+}
+// Local discussion timer: tap to start or pause, add a minute, reset.
+function DayTimer({ minutes = 3 }) {
+  const [left, setLeft] = useState(minutes * 60);
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (!on) return;
+    const t = setInterval(() => setLeft((v) => Math.max(0, v - 1)), 1000);
+    return () => clearInterval(t);
+  }, [on]);
+  useEffect(() => { if (left === 0) setOn(false); }, [left]);
+  const mm = String(Math.floor(left / 60)).padStart(1, '0'), ss = String(left % 60).padStart(2, '0');
+  return (
+    <Panel className="text-center">
+      <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-300">Discussion</div>
+      <div className={`font-display mt-1 text-5xl font-black tabular-nums ${left === 0 ? 'hint-pulse text-red-300' : 'text-slate-50'}`} role="timer" aria-live="off">{mm}:{ss}</div>
+      {left === 0 && <p className="mt-1 text-sm font-semibold text-red-200">Time is up. Time to vote.</p>}
+      <div className="mt-3 flex gap-2">
+        <button onClick={() => setOn(!on)} disabled={left === 0} className="min-h-[44px] flex-1 rounded-xl text-sm font-semibold text-slate-100 disabled:opacity-40" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>{on ? 'Pause' : left === minutes * 60 ? 'Start' : 'Resume'}</button>
+        <button onClick={() => setLeft((v) => v + 60)} className="min-h-[44px] flex-1 rounded-xl text-sm font-semibold text-slate-100" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>+1 min</button>
+        <button onClick={() => { setOn(false); setLeft(minutes * 60); }} className="min-h-[44px] flex-1 rounded-xl text-sm font-semibold text-slate-300" style={{ border: '1px solid var(--line)' }}>Reset</button>
+      </div>
+    </Panel>
+  );
+}
+
+function NightStage({ children, dawn = false, shake = false, flash = false, onExit, fixed = true, pitch = false, day = false }) {
   const nightSrc = useNightBg();
   return (
     <div className={`${fixed ? 'fixed inset-0 z-40' : 'relative min-h-[70vh] rounded-3xl'} overflow-hidden ${shake ? 'dawn-shake' : ''}`} style={{ background: pitch ? '#000' : '#03050A' }}>
-      {!pitch && <img src={nightSrc} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-cover" />}
-      {!pitch && <div className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 38%, rgba(10,10,18,0) 35%, rgba(10,10,18,0.45) 100%), linear-gradient(rgba(10,10,18,${dawn ? 0.42 : 0.55}), rgba(10,10,18,${dawn ? 0.42 : 0.55}))`, transition: 'background 2s ease' }} />}
+      {day && <DayArt />}
+      {!pitch && !day && <img src={nightSrc} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-cover" />}
+      {!pitch && !day && <div className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 38%, rgba(10,10,18,0) 35%, rgba(10,10,18,0.45) 100%), linear-gradient(rgba(10,10,18,${dawn ? 0.42 : 0.55}), rgba(10,10,18,${dawn ? 0.42 : 0.55}))`, transition: 'background 2s ease' }} />}
       {flash && <div className="dawn-flash pointer-events-none absolute inset-0 z-20" />}
       {onExit && <ExitButton onClick={onExit} className="absolute left-4 z-30" style={{ top: 'max(16px, env(safe-area-inset-top))' }} />}
       <div className={`relative z-10 flex w-full overflow-y-auto px-5 ${fixed ? 'h-full' : 'min-h-[70vh]'}`} style={{ paddingTop: fixed ? 'max(64px, calc(env(safe-area-inset-top) + 48px))' : '24px', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
@@ -2327,6 +2390,7 @@ function NightActPP({ role, players, actor, choices, onDone }) {
   const nm = (id) => (players.find((p) => p.id === id) || {}).name || '?';
   const [pick, setPick] = useState(null);
   const [save, setSave] = useState(false);
+  const [seen, setSeen] = useState(null);
   const val = pick === null ? '' : pick;
   const choose = (v) => setPick(v === '' ? null : v);
 
@@ -2335,18 +2399,20 @@ function NightActPP({ role, players, actor, choices, onDone }) {
       <div className="flex flex-1 flex-col">
         <ActHeader role={role} sub="Agree silently, then one of you taps the name." />
         <PickList players={opts(alive.filter((p) => p.role !== 'werewolf'))} value={val} onChange={choose} />
-        <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ werewolf: pick })}>Confirm</Btn>
+        <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ werewolf: pick })}>{pick === null ? 'Select a target' : 'Confirm Target'}</Btn>
       </div>
     );
   }
   if (role === 'seer') {
-    const target = pick === null ? null : players.find((p) => p.id === pick);
+    const target = seen === null ? null : players.find((p) => p.id === seen);
     return (
       <div className="flex flex-1 flex-col">
-        <ActHeader role={role} sub={target ? '' : 'Choose carefully. You only get one look.'} />
-        <PickList players={opts(alive.filter((p) => p.id !== actor.id))} value={val} onChange={(v) => { if (pick === null && v !== '') choose(v); }} locked={pick !== null} />
+        <ActHeader role={role} sub={target ? '' : 'Tap a name to select. Nothing is revealed until you confirm.'} />
+        <PickList players={opts(alive.filter((p) => p.id !== actor.id))} value={val} onChange={choose} locked={seen !== null} />
         {target && <GhostFlip key={target.id} name={target.name} wolf={target.role === 'werewolf'} />}
-        <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ seer: pick })}>Confirm</Btn>
+        {target
+          ? <Btn className="mt-5" onClick={() => onDone({ seer: seen })}>Done</Btn>
+          : <Btn className="mt-5" disabled={pick === null} onClick={() => setSeen(pick)}>{pick === null ? 'Select a player' : 'Confirm Inspection'}</Btn>}
       </div>
     );
   }
@@ -2356,7 +2422,7 @@ function NightActPP({ role, players, actor, choices, onDone }) {
       <div className="flex flex-1 flex-col">
         <ActHeader role={role} sub={last !== undefined && last !== null ? `You cannot protect ${nm(last)} two nights in a row.` : 'They cannot be eliminated tonight.'} />
         <PickList players={opts(alive)} value={val} onChange={choose} disabled={last !== undefined && last !== null ? [last] : []} />
-        <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ bodyguard: pick })}>Confirm</Btn>
+        <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ bodyguard: pick })}>{pick === null ? 'Select a player' : 'Confirm Protection'}</Btn>
       </div>
     );
   }
@@ -2365,7 +2431,7 @@ function NightActPP({ role, players, actor, choices, onDone }) {
       <div className="flex flex-1 flex-col">
         <ActHeader role={role} sub="They may not speak during tomorrow’s discussion." />
         <PickList players={opts(alive.filter((p) => p.id !== actor.id))} value={val} onChange={choose} />
-        <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ spellcaster: pick })}>Confirm</Btn>
+        <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ spellcaster: pick })}>{pick === null ? 'Select a player' : 'Confirm Silence'}</Btn>
       </div>
     );
   }
@@ -2392,7 +2458,7 @@ function NightActPP({ role, players, actor, choices, onDone }) {
             <div className="mb-2 mt-4 text-center text-xs font-semibold uppercase tracking-widest text-slate-400">Poison a player (optional)</div>
             <PickList players={opts(alive.filter((p) => p.id !== actor.id))} value={val} onChange={choose} />
           </>}
-      <Btn className="mt-5" onClick={() => onDone({ witchSave: save && canSave, witchPoison: pick })}>{pick !== null || (save && canSave) ? 'Confirm' : 'Do Nothing Tonight'}</Btn>
+      <Btn className="mt-5" onClick={() => onDone({ witchSave: save && canSave, witchPoison: pick })}>{pick !== null ? 'Confirm Poison' : save && canSave ? 'Confirm Save' : 'Do Nothing Tonight'}</Btn>
     </div>
   );
 }
@@ -2415,7 +2481,8 @@ function resolveNightPP(players, c, night) {
     if (p.role === 'witch') { if (c.witchSave && victim !== null) q.saveUsed = true; if (poison !== null) q.poisonUsed = true; }
     return q;
   });
-  return { next, dead, saved, victim, silenced, silencedName: silenced !== null && byId.get(silenced) ? byId.get(silenced).name : '', lines: dawnLines(saved, dead.map((id) => byId.get(id).name)) };
+  const silencedName = silenced !== null && byId.get(silenced) && !dead.includes(silenced) ? byId.get(silenced).name : '';
+  return { next, dead, saved, victim, silenced, silencedName, lines: dawnLines(saved, dead.map((id) => byId.get(id).name), silencedName) };
 }
 
 // Pass & Play: the narrator runs the whole night by voice. One device, passed to each role in turn.
@@ -2499,7 +2566,7 @@ function NightLoopPP({ players, night, onFinish, onExit }) {
     );
   }
   return (
-    <NightStage dawn={dawn} shake={shake} flash={flash} onExit={() => setConfirmExit(true)}>
+    <NightStage dawn={dawn} day={st.k === 'dawn'} shake={shake} flash={flash} onExit={() => setConfirmExit(true)}>
       {body}
       {confirmExit && (
         <ConfirmExit confirmLabel="Leave night" body="The night's choices so far are discarded. You can start the night again from the Grimoire."
@@ -2523,72 +2590,122 @@ function NightStartCard({ night, onStart, over }) {
   );
 }
 
-// Pass & Play day: recap the dawn, then the village puts one player on trial.
+const SilencedBadge = () => <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-100" style={{ background: 'rgba(109,40,217,0.45)', border: '1px solid rgba(167,139,250,0.7)' }}>SILENCED</span>;
+
+// Pass & Play day: recap the dawn, talk, then each voter takes the phone and casts a secret ballot. Silenced players cannot vote.
 function DayTrial({ players, setPlayers, night, info, onNight, onGrimoire }) {
   const reveal = useSettings().revealDead;
-  const [sel, setSel] = useState(null);
+  const [phase, setPhase] = useState('talk'); // talk | ballots | result
+  const [bi, setBi] = useState(0);
+  const [hold, setHold] = useState(true);
+  const [pick, setPick] = useState(null);
+  const [ballots, setBallots] = useState({});
+  const [res, setRes] = useState(null);
   const [out, setOut] = useState(null);
   const [hunter, setHunter] = useState(null);
   const [shot, setShot] = useState(null);
   const alive = players.filter((p) => p.alive);
+  const voters = alive.filter((p) => !p.silencedTag);
+  const silenced = alive.filter((p) => p.silencedTag);
   const wolves = alive.filter((p) => ROLES_DATA[p.role].team === 'werewolf').length;
   const village = alive.length - wolves;
   const over = wolves === 0 ? { text: 'No Werewolves are left. The Village wins!', color: '#34D399' } : wolves >= village ? { text: 'The Werewolves match or outnumber the Village. The Werewolves win!', color: '#F87171' } : null;
   const kill = (ids) => setPlayers(players.map((p) => (ids.includes(p.id) ? { ...p, alive: false, protectedTag: false, silencedTag: false } : p)));
-  const eliminate = () => {
-    const p = players.find((x) => x.id === sel);
-    if (!p) return;
-    kill([p.id]); setOut(p); setSel(null);
-    if (p.role === 'hunter') setHunter(p);
-  };
-  const fire = () => { const t = players.find((x) => x.id === shot); if (!t) return; kill([t.id]); setOut(t); setHunter(null); setShot(null); };
-  const pick = (v) => setSel(v === '' ? null : v);
   const opts = (list) => list.map((p) => ({ id: p.id, n: p.name }));
-  const target = sel === null ? null : players.find((p) => p.id === sel);
-  const silenced = players.filter((p) => p.alive && p.silencedTag);
+  const nm = (id) => (players.find((p) => p.id === id) || {}).name || '?';
+  const voter = phase === 'ballots' ? voters[bi] : null;
+
+  const tallyUp = (all) => {
+    const tally = {};
+    voters.forEach((v) => { const t = all[v.id]; if (t !== undefined && t !== null) tally[t] = (tally[t] || 0) + 1; });
+    const ranked = Object.keys(tally).map(Number).sort((x, y) => tally[y] - tally[x]);
+    const top = ranked.length ? ranked[0] : null;
+    const tie = ranked.length > 1 && tally[ranked[1]] === tally[top];
+    setRes({ tally, ranked, top, tie });
+    if (top !== null && !tie) { const p = players.find((x) => x.id === top); kill([top]); setOut(p); if (p.role === 'hunter') setHunter(p); }
+    setPhase('result');
+  };
+  const cast = () => {
+    const all = { ...ballots, [voter.id]: pick };
+    setBallots(all); setPick(null);
+    if (bi + 1 < voters.length) { setBi(bi + 1); setHold(true); } else tallyUp(all);
+  };
+  const startVote = () => { setBallots({}); setBi(0); setHold(true); setPick(null); setOut(null); setRes(null); if (voters.length === 0) { setRes({ tally: {}, ranked: [], top: null, tie: false }); setPhase('result'); } else setPhase('ballots'); };
+  const fire = () => { const t = players.find((x) => x.id === shot); if (!t) return; kill([t.id]); setOut(t); setHunter(null); setShot(null); };
+
   return (
-    <Screen>
+    <DayStage>
       <header className="pb-3">
         <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-amber-300">Day {night}</p>
-        <h1 className="font-display text-3xl font-bold tracking-wide">The Village Wakes</h1>
+        <h1 className="font-display text-3xl font-bold tracking-wide text-slate-50">{phase === 'ballots' ? 'The Vote' : 'The Village Wakes'}</h1>
       </header>
-      {info && (
-        <Panel className="text-center" style={{ border: '1px solid rgba(251,191,36,0.4)', background: 'linear-gradient(160deg, rgba(251,191,36,0.1), rgba(21,26,36,0.95))' }}>
-          {info.lines.map((t, i) => <p key={i} className="font-display text-lg font-bold leading-snug text-slate-50">{t}</p>)}
-          {reveal && info.dead.length > 0 && <p className="mt-2 text-sm text-slate-300">{info.dead.map((id) => { const p = players.find((x) => x.id === id); return `${p.name}: ${ROLES_DATA[p.role].name}`; }).join(' · ')}</p>}
-        </Panel>
+      {phase === 'talk' && (
+        <>
+          {info && (
+            <Panel className="text-center" style={{ border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(21,26,36,0.82)' }}>
+              {info.lines.map((t, i) => <p key={i} className="font-display text-lg font-bold leading-snug text-slate-50">{t}</p>)}
+              {reveal && info.dead.length > 0 && <p className="mt-2 text-sm text-slate-300">{info.dead.map((id) => `${nm(id)}: ${ROLES_DATA[players.find((x) => x.id === id).role].name}`).join(' · ')}</p>}
+            </Panel>
+          )}
+          {silenced.length > 0 && (
+            <p role="alert" className="mt-3 rounded-xl px-4 py-2.5 text-center text-sm font-semibold text-violet-100" style={{ background: 'rgba(109,40,217,0.3)', border: '1px solid rgba(167,139,250,0.6)' }}>
+              {silenced.map((p) => p.name).join(', ')} {silenced.length > 1 ? 'have' : 'has'} been silenced by the Spellcaster and cannot speak or vote today.
+            </p>
+          )}
+          {over && <p role="status" className="mt-3 rounded-xl px-4 py-3 text-center text-sm font-bold" style={{ color: over.color, background: 'rgba(10,10,18,0.8)', border: `1px solid ${over.color}66` }}>{over.text}</p>}
+          <div className="mt-3"><DayTimer /></div>
+          <Panel className="mt-3" style={{ background: 'rgba(21,26,36,0.82)' }}>
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Players still alive</h2>
+            <ul className="flex flex-col gap-1.5">
+              {alive.map((p) => <li key={p.id} className="flex items-center justify-between gap-2 text-[15px] font-semibold text-slate-100"><span>{p.name}</span>{p.silencedTag && <SilencedBadge />}</li>)}
+            </ul>
+          </Panel>
+        </>
       )}
-      {silenced.length > 0 && <p className="mt-3 rounded-xl px-4 py-2.5 text-center text-sm font-semibold text-violet-200" style={{ background: 'rgba(109,40,217,0.18)', border: '1px solid rgba(167,139,250,0.45)' }}>{silenced.map((p) => p.name).join(', ')} {silenced.length > 1 ? 'are' : 'is'} silenced today and may not speak.</p>}
-      {over && <p role="status" className="mt-3 rounded-xl px-4 py-3 text-center text-sm font-bold" style={{ color: over.color, background: over.color + '18', border: `1px solid ${over.color}66` }}>{over.text}</p>}
-      {out && (
-        <Panel className="mt-3 text-center">
-          <p className="text-sm font-semibold text-slate-100">{out.name} was eliminated.</p>
-          {reveal && <div className="mt-3"><NightCard player={out} line={`${out.name} was the ${ROLES_DATA[out.role].name}`} /></div>}
-        </Panel>
+      {phase === 'ballots' && voter && (
+        <div className="flex flex-1 flex-col">
+          <p className="text-center text-xs tabular-nums text-slate-300">Ballot {bi + 1} of {voters.length}{silenced.length > 0 ? ` · ${silenced.map((p) => p.name).join(', ')} silenced, skipped` : ''}</p>
+          {hold ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
+              <ShieldIcon width="64" height="64" className="text-slate-200" />
+              <p className="font-display text-2xl font-bold text-slate-50">Pass the phone to {voter.name}</p>
+              <p className="max-w-xs text-sm text-slate-300">Eyes only. Everyone else look away while {voter.name} votes.</p>
+              <Btn className="max-w-xs" onClick={() => setHold(false)}>I&rsquo;m {voter.name}. Show my ballot</Btn>
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-1 flex-col">
+              <h2 className="font-display mb-3 text-center text-xl font-bold text-slate-50">{voter.name}, who do you vote to eliminate?</h2>
+              <PickList players={opts(alive.filter((p) => p.id !== voter.id))} value={pick === null ? '' : pick} onChange={(v) => setPick(v === '' ? null : v)} />
+              <Btn className="mt-5" disabled={pick === null} onClick={cast}>{pick === null ? 'Select a player' : `Confirm Vote for ${nm(pick)}`}</Btn>
+            </div>
+          )}
+        </div>
       )}
-      {hunter && (
-        <Panel className="mt-3" style={{ border: '1px solid rgba(245,158,11,0.6)' }}>
-          <h3 className="font-display text-lg font-bold text-amber-300">{hunter.name}, take your last shot</h3>
-          <p className="mb-3 mt-1 text-xs text-slate-300">The Hunter chooses one player to take down.</p>
-          <PickList players={opts(players.filter((p) => p.alive))} value={shot === null ? '' : shot} onChange={(v) => setShot(v === '' ? null : v)} />
-          <Btn className="mt-3" disabled={shot === null} onClick={fire}>Fire</Btn>
-        </Panel>
-      )}
-      {!over && !hunter && (
-        <section className="mt-5">
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Trial vote</h2>
-          <p className="mb-3 text-sm text-slate-400">Discuss, vote together, then choose the player the village condemns.</p>
-          <PickList players={opts(alive)} value={sel === null ? '' : sel} onChange={pick} />
-          <div className="mt-3 flex flex-col gap-2">
-            <Btn disabled={!target} onClick={eliminate}>{target ? `Eliminate ${target.name}` : 'Choose a player'}</Btn>
-          </div>
-        </section>
+      {phase === 'result' && res && (
+        <>
+          <Panel className="text-center" style={{ border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(21,26,36,0.85)' }}>
+            <p className="font-display text-xl font-bold text-slate-50">{out ? `${out.name} was voted out by the village.` : res.ranked.length === 0 ? 'No votes were cast. No one is eliminated.' : 'The vote is tied. No one is eliminated.'}</p>
+            {res.ranked.length > 0 && <ul className="mt-3 flex flex-col gap-1 text-sm text-slate-200">{res.ranked.map((id) => <li key={id} className="flex justify-between"><span>{nm(id)}</span><span className="tabular-nums text-slate-400">{res.tally[id]}</span></li>)}</ul>}
+            {out && reveal && <div className="mt-3"><NightCard player={out} line={`${out.name} was the ${ROLES_DATA[out.role].name}`} /></div>}
+          </Panel>
+          {over && <p role="status" className="mt-3 rounded-xl px-4 py-3 text-center text-sm font-bold" style={{ color: over.color, background: 'rgba(10,10,18,0.8)', border: `1px solid ${over.color}66` }}>{over.text}</p>}
+          {hunter && (
+            <Panel className="mt-3" style={{ border: '1px solid rgba(245,158,11,0.6)', background: 'rgba(21,26,36,0.85)' }}>
+              <h3 className="font-display text-lg font-bold text-amber-300">{hunter.name}, take your last shot</h3>
+              <p className="mb-3 mt-1 text-xs text-slate-300">The Hunter chooses one player to take down.</p>
+              <PickList players={opts(players.filter((p) => p.alive))} value={shot === null ? '' : shot} onChange={(v) => setShot(v === '' ? null : v)} />
+              <Btn className="mt-3" disabled={shot === null} onClick={fire}>Fire</Btn>
+            </Panel>
+          )}
+        </>
       )}
       <div className="mt-auto flex flex-col gap-2.5 pt-6">
-        <Btn disabled={!!over || !!hunter} onClick={onNight}>Start Night {night + 1}</Btn>
-        <Btn variant="ghost" onClick={onGrimoire}>Open Grimoire</Btn>
+        {phase === 'talk' && <Btn disabled={!!over} onClick={startVote}>{voters.length === 0 ? 'Skip Voting' : 'Start Voting'}</Btn>}
+        {phase === 'result' && res && res.tie && !over && <Btn variant="secondary" onClick={startVote}>Revote</Btn>}
+        {phase !== 'ballots' && <Btn disabled={!!over || !!hunter || phase === 'talk'} variant={phase === 'result' ? 'primary' : 'secondary'} onClick={onNight}>Start Night {night + 1}</Btn>}
+        {phase !== 'ballots' && <Btn variant="ghost" onClick={onGrimoire}>Open Grimoire</Btn>}
       </div>
-    </Screen>
+    </DayStage>
   );
 }
 
@@ -2596,6 +2713,8 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
   const [mode, setMode] = useState(autoNight ? 'night' : 'grimoire'); // grimoire | night | day
   const [night, setNight] = useState(() => players.reduce((m, p) => Math.max(m, p.nn || 0), 0) + 1);
   const [info, setInfo] = useState(null);
+  const clearSilence = () => { if (players.some((p) => p.silencedTag)) setPlayers(players.map((p) => ({ ...p, silencedTag: false }))); };
+  useEffect(() => { if (autoNight) clearSilence(); }, []);
   const [checked, setChecked] = useState({});
   const [confirmExit, setConfirmExit] = useState(false);
   const [confirm, setConfirm] = useState(null); // 'again' | 'new' | null
@@ -2628,7 +2747,7 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
   }
   if (mode === 'day') {
     return <DayTrial players={players} setPlayers={setPlayers} night={night} info={info}
-      onNight={() => { setNight(night + 1); setInfo(null); setMode('night'); }}
+      onNight={() => { clearSilence(); setNight(night + 1); setInfo(null); setMode('night'); }}
       onGrimoire={() => { setNight(night + 1); setMode('grimoire'); }} />;
   }
 
@@ -2705,7 +2824,7 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
         </ul>
       </section>
 
-      {narrator && <NightStartCard night={night} over={!!status && wolvesAlive === 0} onStart={() => { setInfo(null); setMode('night'); }} />}
+      {narrator && <NightStartCard night={night} over={!!status && wolvesAlive === 0} onStart={() => { clearSilence(); setInfo(null); setMode('night'); }} />}
 
       {/* Night guide */}
       <section className="mt-6 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
@@ -2949,7 +3068,7 @@ function mpDealPatch(room, deck) {
   return patch;
 }
 function mpLobbyPatch(room) {
-  const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null };
+  const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null, vd: null };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
     ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'lf', 'v'].forEach((f) => { patch[b + f] = null; });
@@ -2958,10 +3077,10 @@ function mpLobbyPatch(room) {
   return patch;
 }
 function mpNightPatch(room) {
-  const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1 };
+  const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1, vd: null };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
-    patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0; patch[b + 'v'] = '';
+    patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0; patch[b + 'v'] = ''; patch[b + 's'] = 0;
   });
   return patch;
 }
@@ -2986,15 +3105,16 @@ function mpResolveNight(room) {
   if (poison && poison !== guarded && !dead.includes(poison)) dead.push(poison);
 
   const lines = dawnLines(saved, dead.map((id) => byId[id].n));
-  const an = { k: room.k || 0, t: Date.now(), l: Object.fromEntries(lines.map((t, i) => [i, t])), sv: saved ? 1 : 0, si: silenced };
+  const silencedAlive = silenced && !dead.includes(silenced) ? silenced : '';
+  const an = { k: room.k || 0, t: Date.now(), l: Object.fromEntries(lines.map((t, i) => [i, t])), sv: saved ? 1 : 0, si: silencedAlive };
   if (dead.length && getSettings().revealDead) an.rv = Object.fromEntries(dead.map((id) => [id, byId[id].r]));
   const patch = { ph: 'day', an, ns: null, nk: null };
-  ps.forEach((p) => { patch[`pl/${p.id}/s`] = p.id === silenced ? 1 : 0; });
+  ps.forEach((p) => { patch[`pl/${p.id}/s`] = silencedAlive && p.id === silencedAlive ? 1 : 0; });
   dead.forEach((id) => { patch[`pl/${id}/a`] = 0; });
   if (witch && witch.ws === 1 && victim && !witch.wsu) patch[`pl/${witch.id}/wsu`] = 1;
   if (poison) patch[`pl/${witch.id}/wpu`] = 1;
   if (bg) patch[`pl/${bg.id}/lp`] = guarded;
-  return { patch, dead, saved, victim, guarded, silenced, lines };
+  return { patch, dead, saved, victim, guarded, silenced: silencedAlive, lines, silencedLine: silencedAlive ? `${byId[silencedAlive].n} has been silenced for the day. They cannot speak or vote.` : '' };
 }
 
 /* ------------------------------------------------------------------ */
@@ -3312,8 +3432,8 @@ function PickList({ players, value, onChange, disabled = [], locked }) {
           <li key={p.id}>
             <button role="option" aria-selected={sel} disabled={off} onClick={() => onChange(sel ? '' : p.id)}
               className="flex min-h-[52px] w-full items-center justify-between rounded-xl px-4 text-left text-[15px] font-semibold transition active:scale-[0.99] disabled:opacity-40"
-              style={{ background: sel ? 'rgba(109,40,217,0.35)' : 'var(--card-2)', border: `1px solid ${sel ? '#A78BFA' : 'var(--line)'}`, color: '#E6EAF2' }}>
-              {p.n}{sel && <span aria-hidden="true">✓</span>}
+              style={{ background: sel ? 'rgba(109,40,217,0.4)' : 'var(--card-2)', border: `${sel ? 2 : 1}px solid ${sel ? '#C4B5FD' : 'var(--line)'}`, boxShadow: sel ? '0 0 18px -4px rgba(167,139,250,0.7)' : 'none', color: '#E6EAF2' }}>
+              {p.n}{sel && <span aria-hidden="true" className="text-lg">✓</span>}
             </button>
           </li>
         );
@@ -3536,25 +3656,55 @@ function useNightDirector({ room, players, write }) {
       const result = mpResolveNight(latest.current.room);
       await write(result.patch);
       setDir({ on: false, label: '' });
-      for (const line of result.lines) { await wait(800); if (!live()) return; await Narrator.say(line); if (!live()) return; }
+      const spoken = result.silencedLine ? result.lines.concat(result.silencedLine) : result.lines;
+      for (const line of spoken) { await wait(800); if (!live()) return; await Narrator.say(line); if (!live()) return; }
     } catch (e) { setDir({ on: false, label: '' }); }
   };
   return { dir, start, stop, skipRole };
 }
 
-function MpVote({ me, players, write }) {
+// Votes in a room snapshot. Silenced players cannot vote, so they are left out of the voter count and their ballots are ignored.
+function mpTally(players) {
+  const byId = Object.fromEntries(players.map((p) => [p.id, p]));
   const alive = players.filter((p) => p.a === 1);
+  const voters = alive.filter((p) => p.s !== 1);
+  const tally = {};
+  voters.forEach((p) => { if (p.v && byId[p.v] && byId[p.v].a === 1) tally[p.v] = (tally[p.v] || 0) + 1; });
+  const ranked = Object.keys(tally).sort((x, y) => tally[y] - tally[x]);
+  const top = ranked[0] || '';
+  const tie = ranked.length > 1 && tally[ranked[1]] === tally[top];
+  return { tally, ranked, top, tie, voters, voted: voters.filter((p) => p.v).length };
+}
+function mpVotePatch(players, id, opts) {
+  const o = opts || {};
+  const patch = {};
+  const ts = String(Date.now());
+  players.forEach((p) => { patch[`pl/${p.id}/v`] = ''; });
+  if (!o.revote) patch.vd = 1;
+  const t = id ? players.find((p) => p.id === id) : null;
+  if (t) {
+    patch[`pl/${id}/a`] = 0;
+    patch[`an/x/${ts}a`] = `${t.n} was voted out by the village.`;
+    if (getSettings().revealDead && ROLES_DATA[t.r]) patch[`an/x/${ts}b`] = `${t.n} was the ${ROLES_DATA[t.r].name}.`;
+  } else if (o.tie) patch[`an/x/${ts}a`] = 'The vote was tied. No one was eliminated.';
+  return patch;
+}
+
+function MpVote({ me, players, room, write }) {
+  const alive = players.filter((p) => p.a === 1);
+  const { voters, voted } = mpTally(players);
   const [pick, setPick] = useState(me.v || '');
-  const voted = alive.filter((p) => p.v).length;
+  const silenced = me.s === 1;
   const nm = (id) => (players.find((p) => p.id === id) || {}).n || '?';
-  if (me.a !== 1) return <Panel className="text-center text-sm text-slate-400">The village is voting. {voted} of {alive.length} votes are in.</Panel>;
+  if (room.vd === 1) return <Panel className="text-center text-sm text-slate-300">The village has decided.</Panel>;
+  if (me.a !== 1) return <Panel className="text-center text-sm text-slate-400">The village is voting. {voted} of {voters.length} votes are in.</Panel>;
   return (
     <Panel>
       <h3 className="font-display text-lg font-bold">Trial vote</h3>
-      <p className="mb-3 mt-1 text-xs text-slate-300">Discuss, then vote for the player you want eliminated. {voted} of {alive.length} votes are in.</p>
-      <PickList players={alive.filter((p) => p.id !== me.id)} value={pick} onChange={setPick} />
-      <Btn className="mt-3" disabled={!pick || pick === me.v} onClick={() => write({ [`pl/${me.id}/v`]: pick })}>{me.v ? 'Change Vote' : 'Cast Vote'}</Btn>
-      {me.v && <p className="mt-2 text-center text-xs text-emerald-300">Your vote: {nm(me.v)}</p>}
+      <p className="mb-3 mt-1 text-xs text-slate-300">{silenced ? 'You cannot vote today.' : 'Discuss, then vote for the player you want eliminated.'} {voted} of {voters.length} votes are in.</p>
+      <PickList players={alive.filter((p) => p.id !== me.id)} value={silenced ? '' : pick} onChange={setPick} locked={silenced} />
+      <Btn className="mt-3" disabled={silenced || !pick || pick === me.v} onClick={() => write({ [`pl/${me.id}/v`]: pick })}>{silenced ? 'Voting disabled' : me.v ? 'Change Vote' : 'Cast Vote'}</Btn>
+      {!silenced && me.v && <p className="mt-2 text-center text-xs text-emerald-300">Your vote: {nm(me.v)}</p>}
     </Panel>
   );
 }
@@ -3575,7 +3725,7 @@ function AnnounceCard({ room, players }) {
             {Object.entries(an.rv).map(([id, role]) => { const dp = players.find((x) => x.id === id); return dp && ROLES_DATA[role] ? <NightCard key={id} player={{ role }} line={`${dp.n} was the ${ROLES_DATA[role].name}`} /> : null; })}
           </div>
         )}
-        {si && <p className="text-sm text-violet-200">{si.n} has been silenced for today&rsquo;s discussion.</p>}
+        {si && <p className="text-sm text-violet-200">{si.n} has been silenced for the day. They cannot speak or vote.</p>}
         {extra.map((t, i) => <p key={'x' + i} className="text-sm text-slate-300">{t}</p>)}
       </div>
     </Panel>
@@ -3617,10 +3767,11 @@ function MpDay({ me, players, room, write }) {
         </div>
       )}
       <AnnounceCard room={room} players={players} />
+      <DayTimer />
       {me.a !== 1
         ? <Panel className="text-center text-sm text-slate-300">You are eliminated. You can still watch, but keep quiet.</Panel>
         : me.s === 1
-          ? <Panel className="text-center text-sm font-semibold text-violet-200" style={{ border: '1px solid rgba(167,139,250,0.5)' }}>You are silenced today. Do not speak during the discussion.</Panel>
+          ? <Panel className="text-center text-sm font-semibold text-violet-100" style={{ border: '1px solid rgba(167,139,250,0.7)', background: 'rgba(109,40,217,0.25)' }} role="alert">You have been silenced by the Spellcaster &mdash; you cannot speak or vote today.</Panel>
           : <Panel className="text-center text-sm text-slate-300">You are alive. Discuss and find the werewolves.</Panel>}
       {hunterShot && (
         <Panel style={{ border: '1px solid rgba(245,158,11,0.6)' }}>
@@ -3630,7 +3781,7 @@ function MpDay({ me, players, room, write }) {
           <Btn className="mt-3" disabled={!target} onClick={shoot}>Fire</Btn>
         </Panel>
       )}
-      {!hunterShot && <MpVote me={me} players={players} write={write} />}
+      {!hunterShot && <MpVote me={me} players={players} room={room} write={write} />}
       <div>
         <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Players</div>
         <StatusBadges players={players} meId={me.id} />
@@ -3675,22 +3826,8 @@ function MpMod({ room, players, me, write, director }) {
 
   const startNight = () => director.start();
   const dawn = () => { director.stop(); const r = mpResolveNight(room); write(r.patch); };
-  const tally = {};
-  alive.forEach((p) => { if (p.v && byId[p.v] && byId[p.v].a === 1) tally[p.v] = (tally[p.v] || 0) + 1; });
-  const ranked = Object.keys(tally).sort((x, y) => tally[y] - tally[x]);
-  const top = ranked[0];
-  const tie = ranked.length > 1 && tally[ranked[1]] === tally[top];
-  const closeVote = (id) => {
-    const patch = {};
-    players.forEach((p) => { patch[`pl/${p.id}/v`] = ''; });
-    if (id) {
-      const t = byId[id]; const ts = String(Date.now());
-      patch[`pl/${id}/a`] = 0;
-      patch[`an/x/${ts}a`] = `${t.n} was voted out by the village.`;
-      if (getSettings().revealDead && ROLES_DATA[t.r]) patch[`an/x/${ts}b`] = `${t.n} was the ${ROLES_DATA[t.r].name}.`;
-    }
-    write(patch);
-  };
+  const { tally, ranked, top, tie, voters, voted } = mpTally(players);
+  const closeVote = (id, opts) => write(mpVotePatch(players, id, opts));
   const toggleAlive = (p) => {
     const patch = { [`pl/${p.id}/a`]: p.a === 1 ? 0 : 1 };
     if (p.a === 1) patch[`an/x/${String(Date.now())}`] = `${p.n} was eliminated by the village.`;
@@ -3779,15 +3916,15 @@ function MpMod({ room, players, me, write, director }) {
         <Panel>
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">Trial vote</span>
-            <span className="text-xs tabular-nums text-slate-400">{alive.filter((p) => p.v).length} of {alive.length} voted</span>
+            <span className="text-xs tabular-nums text-slate-400">{room.vd === 1 ? 'Vote closed' : `${voted} of ${voters.length} voted`}</span>
           </div>
           {ranked.length === 0
             ? <p className="mt-2 text-sm text-slate-400">No votes yet. Players vote on their own phones.</p>
             : <ul className="mt-2 flex flex-col gap-1 text-sm text-slate-200">{ranked.map((id) => <li key={id} className="flex justify-between"><span>{nm(id)}</span><span className="tabular-nums text-slate-400">{tally[id]}</span></li>)}</ul>}
           <div className="mt-3 flex flex-col gap-2">
-            {top && !tie && <Btn onClick={() => closeVote(top)}>Eliminate {nm(top)}</Btn>}
-            {tie && <p className="text-xs text-amber-300">It is a tie. Use Eliminate below, or clear the votes and revote.</p>}
-            {ranked.length > 0 && <Btn variant="ghost" onClick={() => closeVote('')}>Clear votes, no one falls</Btn>}
+            {top && !tie && room.vd !== 1 && <Btn onClick={() => closeVote(top)}>Eliminate {nm(top)}</Btn>}
+            {tie && <p className="text-xs text-amber-300">It is a tie. Clear the votes and revote, or use Eliminate on a player below.</p>}
+            {ranked.length > 0 && room.vd !== 1 && <Btn variant="ghost" onClick={() => closeVote('', { revote: true })}>Clear votes and revote</Btn>}
           </div>
         </Panel>
       )}
@@ -3808,13 +3945,52 @@ function MpMod({ room, players, me, write, director }) {
   );
 }
 
+/* ---------- host who is also playing: spoiler-free controls only ---------- */
+function MpHostPanel({ room, players, write, director }) {
+  const ph = room.ph;
+  const winner = mpWinner(players);
+  const { voters, voted, ranked } = mpTally(players);
+  const allReady = players.length > 0 && players.every((p) => p.d === 1);
+  const dawn = () => { director.stop(); write(mpResolveNight(room).patch); };
+  if (ph === 'over') return <Btn onClick={() => write(mpLobbyPatch(room))}>Play Again With This Room</Btn>;
+  return (
+    <Panel>
+      <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Host controls</h3>
+      <div className="mt-3 flex flex-col gap-2.5">
+        {ph === 'reveal' && (
+          <>
+            <p className="text-sm text-slate-300">{players.filter((p) => p.d === 1).length} of {players.length} players have seen their card.</p>
+            <Btn onClick={() => director.start()}>{allReady ? 'Start Night 1' : 'Start Night 1 Anyway'}</Btn>
+          </>
+        )}
+        {ph === 'night' && (
+          <>
+            <p className="text-sm italic text-slate-300" aria-live="polite">{director.dir.on ? 'The narrator is running the night.' : 'The narrator is not running.'}</p>
+            {director.dir.on
+              ? <div className="flex gap-2"><Btn variant="secondary" onClick={director.skipRole}>Skip waiting</Btn><Btn variant="ghost" onClick={director.stop}>Stop narrator</Btn></div>
+              : <Btn variant="secondary" onClick={() => director.start({ again: true })}>Restart narrated night</Btn>}
+            <Btn variant="ghost" onClick={dawn}>Advance to Dawn</Btn>
+          </>
+        )}
+        {ph === 'day' && (
+          <>
+            <p className="text-sm text-slate-300">{room.vd === 1 ? 'The vote is closed.' : `${voted} of ${voters.length} players have voted. The vote closes by itself when everyone has.`}</p>
+            {room.vd !== 1 && ranked.length > 0 && <Btn variant="secondary" onClick={() => { const t = mpTally(players); write(mpVotePatch(players, t.tie ? '' : t.top, { tie: t.tie })); }}>Close Vote Now</Btn>}
+            <Btn onClick={() => director.start()}>Start Night {(room.k || 0) + 1}</Btn>
+          </>
+        )}
+        {winner && (ph === 'night' || ph === 'day') && <Btn onClick={() => write({ ph: 'over', w: winner })}>End Game</Btn>}
+      </div>
+    </Panel>
+  );
+}
+
 /* ---------- the room (everything after joining) ---------- */
 function MpRoom({ session, onExit, onPhase }) {
   const { code, pid } = session;
   const { room, err, refresh } = useRoom(code);
   const [cardsStep, setCardsStep] = useState(false);
   const [deck, setDeck] = useState(emptyDeck);
-  const [tab, setTab] = useState('mod');
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [busy, setBusy] = useState(false);
   const [wErr, setWErr] = useState('');
@@ -3827,7 +4003,6 @@ function MpRoom({ session, onExit, onPhase }) {
 
   useEffect(() => { onPhase(cardsStep ? 'cards' : ph); }, [ph, cardsStep]);
   useEffect(() => () => onPhase(''), []);
-  useEffect(() => { if (isHost && me) setTab(ph === 'reveal' ? 'player' : 'mod'); }, [ph, isHost, !!me]);
   useEffect(() => { if (cardsStep) setDeck(autoFill(players.length)); }, [cardsStep, players.length]);
   useEffect(() => { if (ph !== 'lobby' && cardsStep) setCardsStep(false); }, [ph]);
 
@@ -3837,12 +4012,18 @@ function MpRoom({ session, onExit, onPhase }) {
     refresh();
   };
   writeRef.current = write;
-  const nsNow = (room && room.ns) || '';
+  // A host who is also playing is a regular player: no Grimoire, no roles, only spoiler-free room controls.
+  const hostPlays = isHost && !!room && !!room.hp && !!me;
+  const voteClosed = useRef('');
   useEffect(() => {
-    if (!isHost || !me || ph !== 'night' || !nsNow) return;
-    const mineTurn = nsNow.indexOf('r:') === 0 && nsNow.slice(2) === me.r && me.a === 1 && me.nd !== 1;
-    setTab(mineTurn ? 'player' : 'mod');
-  }, [nsNow, room && room.nk, me && me.nd]);
+    if (!hostPlays || ph !== 'day' || room.vd === 1) return;
+    const t = mpTally(players);
+    if (t.voters.length > 0 && t.voted >= t.voters.length && voteClosed.current !== String(room.k)) {
+      voteClosed.current = String(room.k);
+      write(mpVotePatch(players, t.tie ? '' : t.top, { tie: t.tie }));
+    }
+  }, [players, ph]);
+  useEffect(() => { if (ph !== 'day') voteClosed.current = ''; }, [ph]);
   const leave = async () => {
     setBusy(true);
     try {
@@ -3874,7 +4055,7 @@ function MpRoom({ session, onExit, onPhase }) {
     return <ChooseCards count={players.length} deck={deck} setDeck={setDeck} onBack={closeCards} onStart={deal} startLabel="Deal Cards & Start" showBalance />;
   }
 
-  const showPlayer = !!me && (!isHost || tab === 'player');
+  const showPlayer = !!me && (!isHost || hostPlays);
   let body = null;
   if (ph === 'lobby') {
     body = (
@@ -3901,22 +4082,17 @@ function MpRoom({ session, onExit, onPhase }) {
     else if (ph === 'night') body = <MpNight key={`n${room.k}`} me={me} players={players} room={room} write={write} immersive={!isHost} onLeave={() => setConfirmLeave(true)} />;
     else if (ph === 'day') body = <MpDay key={`d${room.k}`} me={me} players={players} room={room} write={write} />;
     else body = <MpOver room={room} players={players} meId={pid} />;
+    if (hostPlays && ph !== 'lobby') body = <div className="flex flex-1 flex-col gap-4">{body}<MpHostPanel room={room} players={players} write={write} director={director} /></div>;
   } else {
     body = <MpMod room={room} players={players} me={me} write={write} director={director} />;
   }
 
   return (
-    <Screen>
+    <>
+    {ph === 'day' && <DayBackdrop />}
+    <Screen className={ph === 'day' ? 'relative z-10' : ''}>
       <MpHeader code={code} roomName={room.rn} onLeave={() => setConfirmLeave(true)} leaveLabel="Leave room" />
       {session.local && <p className="mb-3 text-center text-[11px] font-semibold tracking-wide text-slate-500">Preview Mode &mdash; deploy to Vercel for live multi-phone sync</p>}
-      {isHost && me && ph !== 'lobby' && (
-        <div role="tablist" className="mb-3 flex gap-1 rounded-xl p-1" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
-          {[['mod', 'Moderator'], ['player', 'My Role']].map(([k, label]) => (
-            <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className="min-h-[40px] flex-1 rounded-lg text-sm font-bold transition"
-              style={tab === k ? { background: 'rgba(109,40,217,0.5)', color: '#fff' } : { color: '#94A3B8' }}>{label}</button>
-          ))}
-        </div>
-      )}
       {(err || wErr) && <p role="alert" className="mb-3 rounded-xl px-3 py-2 text-center text-xs font-semibold text-amber-200" style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)' }}>{wErr || `${err} Retrying...`}</p>}
       {body}
       {confirmLeave && (
@@ -3925,6 +4101,7 @@ function MpRoom({ session, onExit, onPhase }) {
           onCancel={() => setConfirmLeave(false)} onConfirm={leave} />
       )}
     </Screen>
+    </>
   );
 }
 
@@ -4139,6 +4316,7 @@ function AppInner() {
 /* ------------------------------------------------------------------ */
 function activeImageSources() {
   const list = [DEFAULT_BG, LOADING_BG, DEFAULT_BACK, getNightBg()];
+  if (dayBgStore.isCustom()) list.push(dayBgStore.get());
   ROLE_IDS.forEach((id) => {
     const src = ROLES_DATA[id].imageUrl;
     if (src) list.push(src);

@@ -1,0 +1,1901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WEREWOLF</title>
+<link rel="preload" as="image" href="images/loading-bg.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          display: ['Cinzel', 'Georgia', 'serif'],
+          body: ['Figtree', 'system-ui', 'sans-serif']
+        }
+      }
+    }
+  };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
+<style>
+  /* Layout idea: single centered phone column, one screen at a time, cards elevated on a moonlit charcoal field. */
+  :root {
+    --bg: #0B0E14;
+    --card: #151A24;
+    --card-2: #1B2230;
+    --line: rgba(203, 213, 225, 0.16);
+    --text: #E6EAF2;
+    --muted: #8B95A8;
+    --wolf: #DC2626;
+    --village: #34D399;
+    color-scheme: dark;
+  }
+  html, body, #root { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Figtree', system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    background-image:
+      radial-gradient(ellipse 80% 40% at 50% -5%, rgba(148, 163, 184, 0.16), transparent 70%),
+      radial-gradient(ellipse 60% 30% at 50% 110%, rgba(220, 38, 38, 0.08), transparent 70%);
+    background-attachment: fixed;
+  }
+  .font-display { font-family: 'Cinzel', Georgia, serif; }
+  button { font-family: inherit; }
+  button:focus-visible, input:focus-visible {
+    outline: 2px solid #CBD5E1;
+    outline-offset: 2px;
+  }
+  .flip-scene { perspective: 1200px; border-radius: 20px; transition: transform 0.3s ease-out, box-shadow 0.3s ease-out; }
+  .flip-scene.is-lifted { transform: scale(1.04); box-shadow: 0 0 42px 6px rgba(220,38,38,0.65), 0 0 16px 3px rgba(226,232,240,0.5); }
+  .flip-card {
+    position: relative; width: 100%; height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .flip-card.is-flipped { transform: rotateY(180deg); transition: transform 1.2s cubic-bezier(0.22, 1, 0.36, 1); }
+  .face {
+    position: absolute; inset: 0;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    border-radius: 20px;
+    overflow: hidden;
+  }
+  .face-front { transform: rotateY(180deg); }
+  .pcard { container-type: size; }
+  .atmos-drift { animation: atmos-drift 20s ease-in-out infinite; transform-origin: 50% 40%; will-change: transform; }
+  @keyframes atmos-drift { 0%, 100% { transform: scale(1) translate(0, 0); } 50% { transform: scale(1.06) translate(-1.2%, -0.8%); } }
+  .blood-moon-glow { transform: translate(-50%, -50%); border-radius: 50%; mix-blend-mode: screen; background: radial-gradient(circle, rgba(239,68,68,0.55) 0%, rgba(220,38,38,0.28) 32%, rgba(220,38,38,0) 66%); animation: moon-pulse 6s ease-in-out infinite; }
+  @keyframes moon-pulse { 0%, 100% { opacity: 0.35; transform: translate(-50%, -50%) scale(0.94); } 50% { opacity: 0.95; transform: translate(-50%, -50%) scale(1.08); } }
+  .mist { position: absolute; left: 0; width: 200%; background-repeat: repeat-x; background-size: 50% 100%; will-change: transform; }
+  .mist-a { bottom: 20%; height: 26%; animation: mist-drift 70s linear infinite;
+    background-image: radial-gradient(ellipse 24% 55% at 25% 55%, rgba(210,218,235,0.15), transparent 70%), radial-gradient(ellipse 22% 45% at 62% 45%, rgba(210,218,235,0.12), transparent 70%), radial-gradient(ellipse 16% 50% at 86% 60%, rgba(210,218,235,0.1), transparent 70%); }
+  .mist-b { bottom: 6%; height: 22%; animation: mist-drift 46s linear infinite reverse;
+    background-image: radial-gradient(ellipse 26% 50% at 30% 55%, rgba(200,208,228,0.13), transparent 70%), radial-gradient(ellipse 18% 55% at 70% 50%, rgba(200,208,228,0.11), transparent 70%); }
+  @keyframes mist-drift { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .leaf { animation: leaf-fall linear infinite; will-change: transform, opacity; }
+  .leaf-shape { border-radius: 0 100% 0 100%; animation: leaf-sway ease-in-out infinite alternate; }
+  @keyframes leaf-fall { 0% { transform: translate(0, 0); opacity: 0; } 8% { opacity: 0.85; } 92% { opacity: 0.85; } 100% { transform: translate(var(--dx), 108vh); opacity: 0; } }
+  @keyframes leaf-sway { from { transform: translateX(-12px) rotate(-30deg); } to { transform: translateX(12px) rotate(40deg); } }
+  .ember { border-radius: 50%; animation: ember-rise linear infinite; will-change: transform, opacity; }
+  @keyframes ember-rise { 0% { transform: translate(0, 0) scale(1); opacity: 0; } 15% { opacity: 0.9; } 100% { transform: translate(var(--dx), -80vh) scale(0.5); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .atmos-drift, .blood-moon-glow, .mist { animation: none; } .leaf, .ember { display: none; } }
+  .load-pulse { animation: load-pulse 2.4s ease-in-out infinite; }
+  @keyframes load-pulse { 0%, 100% { text-shadow: 0 0 18px rgba(220,38,38,0.25), 0 0 40px rgba(203,213,225,0.1); } 50% { text-shadow: 0 0 26px rgba(220,38,38,0.6), 0 0 54px rgba(203,213,225,0.28); } }
+  @media (prefers-reduced-motion: reduce) { .load-pulse { animation: none; } }
+  .blood-dot { position: absolute; animation: blood-dot 2.4s cubic-bezier(0.15, 0.6, 0.3, 1) forwards; will-change: transform, opacity; }
+  @keyframes blood-dot { 0% { transform: translate(0, 0) scale(1); opacity: 1; } 100% { transform: translate(var(--tx), var(--ty)) scale(0.3); opacity: 0; } }
+  .breathe { background-color: #DC2626; animation: breathe 5s ease-in-out infinite; }
+  @keyframes breathe {
+    0%, 100% { background-color: #DC2626; box-shadow: 0 0 26px -6px rgba(220,38,38,0.4), 0 8px 24px -10px rgba(220,38,38,0.5), inset 0 1px 0 rgba(255,255,255,0.18); }
+    50% { background-color: #A31919; box-shadow: 0 0 34px -4px rgba(163,25,25,0.55), 0 8px 24px -10px rgba(163,25,25,0.6), inset 0 1px 0 rgba(255,255,255,0.12); }
+  }
+  @media (prefers-reduced-motion: reduce) { .breathe { animation: none; } }
+  .no-select { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .screen-in { animation: fadeUp 0.35s ease both; }
+  @keyframes glow { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+  .moon-glow { animation: glow 5s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    .flip-card, .flip-card.is-flipped, .flip-scene { transition-duration: 0.01s; }
+    .screen-in, .moon-glow { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+/* ------------------------------------------------------------------ */
+/* Role icons: original minimalist line art, 64x64 grid                */
+/* ------------------------------------------------------------------ */
+const iconProps = {
+  viewBox: '0 0 64 64', fill: 'none', stroke: 'currentColor',
+  strokeWidth: 3, strokeLinecap: 'round', strokeLinejoin: 'round',
+  'aria-hidden': true
+};
+
+const WolfIcon = (p) => (
+  <svg {...iconProps} {...p}>
+    <path d="M12 8 L25 21 H39 L52 8 L54 34 C54 46 43 55 32 58 C21 55 10 46 10 34 Z" />
+    <path d="M22 34 L28 37 M42 34 L36 37" />
+    <path d="M28 48 L32 52 L36 48" />
+    <path d="M32 40 V46" />
+  </svg>
+);
+const EyeIcon = (p) => (
+  <svg {...iconProps} {...p}>
+    <path d="M4 32 C14 15 50 15 60 32 C50 49 14 49 4 32 Z" />
+    <circle cx="32" cy="32" r="9" />
+    <circle cx="32" cy="32" r="3" fill="currentColor" />
+    <path d="M32 6 V10 M16 11 L18 15 M48 11 L46 15" />
+  </svg>
+);
+const ShieldIcon = (p) => (
+  <svg {...iconProps} {...p}>
+    <path d="M32 6 L52 14 V32 C52 46 42 54 32 58 C22 54 12 46 12 32 V14 Z" />
+    <path d="M22 32 L29 39 L43 24" />
+  </svg>
+);
+const PotionIcon = (p) => (
+  <svg {...iconProps} {...p}>
+    <path d="M26 6 H38 M28 6 V22 L14 48 C12 54 16 58 22 58 H42 C48 58 52 54 50 48 L36 22 V6" />
+    <path d="M19 42 C25 38 31 46 37 42 C41 40 44 41 46 43" />
+    <circle cx="28" cy="50" r="2" />
+    <circle cx="38" cy="14" r="0.5" />
+  </svg>
+);
+const WandIcon = (p) => (
+  <svg {...iconProps} {...p}>
+    <path d="M10 56 L34 30" />
+    <path d="M44 6 L48 16 L58 20 L48 24 L44 34 L40 24 L30 20 L40 16 Z" />
+    <path d="M14 22 V28 M11 25 H17 M24 48 V52 M22 50 H26" />
+  </svg>
+);
+const CrosshairIcon = (p) => (
+  <svg {...iconProps} {...p}>
+    <circle cx="32" cy="32" r="17" />
+    <path d="M32 6 V20 M32 44 V58 M6 32 H20 M44 32 H58" />
+    <circle cx="32" cy="32" r="2.5" fill="currentColor" />
+  </svg>
+);
+const HouseIcon = (p) => (
+  <svg {...iconProps} {...p}>
+    <path d="M8 32 L32 11 L56 32" />
+    <path d="M15 27 V53 H49 V27" />
+    <path d="M27 53 V40 H37 V53" />
+    <path d="M44 14 V22" />
+  </svg>
+);
+const MoonIcon = (p) => (
+  <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
+    <path d="M42 8 C28 10 18 21 18 34 C18 47 28 57 41 57 C47 57 52 55 56 51 C54 52 52 52 50 52 C38 52 29 43 29 31 C29 21 34 12 42 8 Z" fill="currentColor" fillOpacity="0.12" />
+  </svg>
+);
+
+/* ------------------------------------------------------------------ */
+/* Original card illustrations (200x267 canvas, art sits above banner) */
+/* ------------------------------------------------------------------ */
+const artSvg = { viewBox: '0 0 200 267', preserveAspectRatio: 'xMidYMid slice', className: 'absolute inset-0 h-full w-full', 'aria-hidden': true };
+const Stars = ({ pts, fill = '#E2E8F0' }) => pts.map(([x, y, r], i) => <circle key={i} cx={x} cy={y} r={r} fill={fill} opacity="0.75" />);
+
+const WerewolfArt = () => (
+  <svg {...artSvg}>
+    <defs>
+      <linearGradient id="wa-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2A0A0E" /><stop offset="1" stopColor="#07090D" /></linearGradient>
+      <radialGradient id="wa-moon"><stop offset="0" stopColor="#FCA5A5" /><stop offset="0.55" stopColor="#DC2626" /><stop offset="1" stopColor="#7F1D1D" /></radialGradient>
+    </defs>
+    <rect width="200" height="267" fill="url(#wa-bg)" />
+    <Stars pts={[[22, 30, 1.2], [160, 24, 1], [176, 70, 1.4], [18, 96, 1], [150, 130, 0.8], [30, 150, 0.8]]} />
+    <circle cx="90" cy="84" r="60" fill="url(#wa-moon)" />
+    <circle cx="66" cy="66" r="9" fill="#7F1D1D" opacity="0.35" />
+    <circle cx="112" cy="102" r="12" fill="#7F1D1D" opacity="0.3" />
+    <circle cx="104" cy="52" r="5" fill="#7F1D1D" opacity="0.35" />
+    <path d="M0 215 L8 172 L16 198 L26 148 L38 200 L50 176 L60 218Z" fill="#05060A" />
+    <path d="M200 215 L194 168 L184 196 L174 142 L162 200 L150 174 L140 218Z" fill="#05060A" />
+    <g transform="translate(0,-16)">
+      <path d="M36 176 L40 84 L66 116 Q90 108 114 116 L140 84 L144 176 Q140 200 116 210 Q90 218 64 210 Q40 200 36 176 Z" fill="#06070A" stroke="#4A1017" strokeWidth="1.5" />
+      <path d="M46 100 L62 120 L48 130Z M134 100 L118 120 L132 130Z" fill="#4A1017" />
+      <path d="M36 150 L26 158 L38 162 M144 150 L154 158 L142 162 M38 128 L28 130 L38 140 M142 128 L152 130 L142 140" fill="#06070A" stroke="#06070A" strokeWidth="2" />
+      <circle cx="68" cy="147" r="13" fill="#FACC15" opacity="0.22" />
+      <circle cx="112" cy="147" r="13" fill="#FACC15" opacity="0.22" />
+      <path d="M54 140 Q68 140 82 152 Q66 155 54 140Z M126 140 Q112 140 98 152 Q114 155 126 140Z" fill="#FACC15" />
+      <ellipse cx="71" cy="148" rx="2.2" ry="4" fill="#000" /><ellipse cx="109" cy="148" rx="2.2" ry="4" fill="#000" />
+      <path d="M72 170 Q90 160 108 170 L104 198 Q90 206 76 198 Z" fill="#14080B" stroke="#2A1014" />
+      <path d="M82 172 Q90 168 98 172 Q96 181 90 183 Q84 181 82 172Z" fill="#000" />
+      <path d="M90 183 V193 M76 197 Q90 203 104 197" stroke="#5B1D25" strokeWidth="1.5" fill="none" />
+      <path d="M80 197 L84 207 L88 198Z M92 198 L96 207 L100 197Z" fill="#F1F5F9" />
+    </g>
+  </svg>
+);
+
+const SeerArt = () => (
+  <svg {...artSvg}>
+    <defs>
+      <linearGradient id="se-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1B1245" /><stop offset="1" stopColor="#07060F" /></linearGradient>
+      <radialGradient id="se-ball"><stop offset="0" stopColor="#C4B5FD" /><stop offset="0.6" stopColor="#6D28D9" /><stop offset="1" stopColor="#1E1B4B" /></radialGradient>
+    </defs>
+    <rect width="200" height="267" fill="url(#se-bg)" />
+    <Stars pts={[[24, 28, 1.3], [150, 22, 1], [172, 80, 1.2], [20, 120, 1], [160, 150, 0.9]]} fill="#DDD6FE" />
+    <path d="M26 56 L40 80 L32 104 M154 50 L142 76 L150 100" stroke="#7C6BE0" strokeWidth="0.8" fill="none" opacity="0.7" />
+    <path d="M24 205 Q20 50 90 34 Q160 50 156 205 Z" fill="#120C30" stroke="#5B3FD1" strokeWidth="1.5" />
+    <ellipse cx="90" cy="92" rx="36" ry="44" fill="#05040C" />
+    <ellipse cx="78" cy="88" rx="5" ry="2.6" fill="#C4B5FD" /><ellipse cx="102" cy="88" rx="5" ry="2.6" fill="#C4B5FD" />
+    <circle cx="90" cy="152" r="46" fill="#8B5CF6" opacity="0.18" />
+    <circle cx="90" cy="152" r="38" fill="url(#se-ball)" stroke="#DDD6FE" strokeWidth="1.5" />
+    <path d="M58 152 Q90 128 122 152 Q90 176 58 152Z" fill="#0B0620" stroke="#EDE9FE" strokeWidth="1.5" />
+    <circle cx="90" cy="152" r="12" fill="#8B5CF6" /><circle cx="90" cy="152" r="5" fill="#000" /><circle cx="94" cy="148" r="2" fill="#fff" />
+    <path d="M90 108 V116 M62 118 L67 124 M118 118 L113 124" stroke="#C4B5FD" strokeWidth="1.5" strokeLinecap="round" />
+    <path d="M44 204 Q50 178 76 184 L84 196 Z M136 204 Q130 178 104 184 L96 196 Z" fill="#05040C" stroke="#5B3FD1" />
+  </svg>
+);
+
+const BodyguardArt = () => (
+  <svg {...artSvg}>
+    <defs>
+      <linearGradient id="bg-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#06261C" /><stop offset="1" stopColor="#050A09" /></linearGradient>
+      <linearGradient id="bg-sh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#14543E" /><stop offset="1" stopColor="#082016" /></linearGradient>
+    </defs>
+    <rect width="200" height="267" fill="url(#bg-bg)" />
+    <g stroke="#34D399" strokeWidth="1" opacity="0.18">
+      <path d="M90 110 L90 0 M90 110 L0 40 M90 110 L180 40 M90 110 L0 130 M90 110 L180 130 M90 110 L30 0 M90 110 L150 0" />
+    </g>
+    <Stars pts={[[20, 24, 1.2], [168, 30, 1], [14, 190, 1]]} fill="#A7F3D0" />
+    <path d="M90 30 L148 52 V118 C148 160 122 186 90 200 C58 186 32 160 32 118 V52 Z" fill="url(#bg-sh)" stroke="#34D399" strokeWidth="2.5" />
+    <path d="M90 42 L138 60 V118 C138 152 116 174 90 188 C64 174 42 152 42 118 V60 Z" fill="none" stroke="#34D399" strokeWidth="1" opacity="0.55" />
+    <path d="M52 92 Q44 132 70 166 M128 92 Q136 132 110 166" stroke="#6EE7B7" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+    <path d="M90 54 L96 122 L90 130 L84 122 Z" fill="#D1FAE5" />
+    <path d="M90 54 L90 130" stroke="#6EE7B7" strokeWidth="1" />
+    <path d="M66 128 H114 V134 H66Z" fill="#6EE7B7" />
+    <rect x="87.5" y="134" width="5" height="22" rx="2" fill="#A7F3D0" /><circle cx="90" cy="160" r="5" fill="#6EE7B7" />
+  </svg>
+);
+
+const WitchArt = () => (
+  <svg {...artSvg}>
+    <defs>
+      <linearGradient id="wi-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2A0830" /><stop offset="1" stopColor="#0A0310" /></linearGradient>
+    </defs>
+    <rect width="200" height="267" fill="url(#wi-bg)" />
+    <Stars pts={[[110, 20, 1.2], [170, 40, 1], [20, 110, 1], [160, 120, 0.9], [100, 12, 0.8]]} fill="#F5D0FE" />
+    <path d="M52 34 A20 20 0 1 0 52 74 A15 15 0 1 1 52 34Z" fill="#F5D0FE" opacity="0.9" />
+    <path d="M58 126 Q76 78 90 62 Q96 40 130 26 Q108 46 112 66 Q118 96 126 126 Z" fill="#12051A" stroke="#D946EF" strokeWidth="1.5" />
+    <ellipse cx="92" cy="128" rx="68" ry="14" fill="#12051A" stroke="#D946EF" strokeWidth="1.5" />
+    <path d="M62 114 Q92 128 122 114 L124 124 Q92 138 60 126Z" fill="#7E22CE" />
+    <rect x="84" y="118" width="16" height="12" rx="1" fill="none" stroke="#FDE047" strokeWidth="1.5" />
+    <g>
+      <path d="M58 158 V172 L44 198 Q42 203 48 203 H78 Q84 203 82 198 L68 172 V158Z" fill="#1A0A24" stroke="#F0ABFC" strokeWidth="1.2" />
+      <path d="M47 192 H79 L82 198 Q84 203 78 203 H48 Q42 203 45 198Z" fill="#F43F5E" />
+      <rect x="55" y="154" width="16" height="5" rx="1" fill="#F0ABFC" />
+      <circle cx="62" cy="144" r="2.5" fill="#F43F5E" opacity="0.7" /><circle cx="68" cy="136" r="1.6" fill="#F43F5E" opacity="0.6" />
+    </g>
+    <g transform="translate(64,0)">
+      <path d="M58 158 V172 L44 198 Q42 203 48 203 H78 Q84 203 82 198 L68 172 V158Z" fill="#1A0A24" stroke="#F0ABFC" strokeWidth="1.2" />
+      <path d="M47 190 H79 L82 198 Q84 203 78 203 H48 Q42 203 45 198Z" fill="#A855F7" />
+      <rect x="55" y="154" width="16" height="5" rx="1" fill="#F0ABFC" />
+      <circle cx="64" cy="146" r="2.5" fill="#A855F7" opacity="0.7" /><circle cx="60" cy="138" r="1.6" fill="#A855F7" opacity="0.6" />
+    </g>
+  </svg>
+);
+
+const SpellcasterArt = () => (
+  <svg {...artSvg}>
+    <defs>
+      <linearGradient id="sp-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0E1338" /><stop offset="1" stopColor="#05060F" /></linearGradient>
+      <radialGradient id="sp-glow"><stop offset="0" stopColor="#818CF8" stopOpacity="0.55" /><stop offset="1" stopColor="#818CF8" stopOpacity="0" /></radialGradient>
+      <linearGradient id="sp-skin" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#E4DBFF" /><stop offset="1" stopColor="#A99BE6" /></linearGradient>
+    </defs>
+    <rect width="200" height="267" fill="url(#sp-bg)" />
+    <circle cx="90" cy="96" r="78" fill="url(#sp-glow)" opacity="0.5" />
+    <circle cx="90" cy="100" r="66" fill="none" stroke="#818CF8" strokeWidth="1" opacity="0.7" />
+    <circle cx="90" cy="100" r="56" fill="none" stroke="#818CF8" strokeWidth="0.8" strokeDasharray="3 4" opacity="0.7" />
+    {Array.from({ length: 24 }).map((_, i) => {
+      const a = (i * 15 * Math.PI) / 180;
+      return <line key={i} x1={90 + Math.cos(a) * 66} y1={100 + Math.sin(a) * 66} x2={90 + Math.cos(a) * 72} y2={100 + Math.sin(a) * 72} stroke="#A5B4FC" strokeWidth="1" opacity="0.7" />;
+    })}
+    <Stars pts={[[20, 24, 1.2], [160, 20, 1.1], [18, 196, 1], [160, 190, 0.9]]} fill="#C7D2FE" />
+    {/* floating silence sigils */}
+    <g stroke="#A5B4FC" strokeWidth="1.4" fill="none" strokeLinecap="round" opacity="0.85">
+      <circle cx="30" cy="66" r="8" /><path d="M24 72 L36 60" />
+      <circle cx="152" cy="138" r="7" /><path d="M147 143 L157 133" />
+      <path d="M26 138 l3 6 6 3 -6 3 -3 6 -3 -6 -6 -3 6 -3z" />
+    </g>
+    {/* cloak and hood */}
+    <path d="M90 36 Q60 40 56 78 Q54 112 30 206 H150 Q126 112 124 78 Q120 40 90 36Z" fill="#0D1038" stroke="#818CF8" strokeWidth="1.5" />
+    <path d="M90 46 Q68 50 66 80 Q66 94 72 104 Q90 112 108 104 Q114 94 114 80 Q112 50 90 46Z" fill="#070824" stroke="#5B63D9" strokeWidth="1" />
+    <ellipse cx="90" cy="84" rx="21" ry="25" fill="#02030A" />
+    <circle cx="80" cy="80" r="8" fill="#818CF8" opacity="0.3" /><circle cx="100" cy="80" r="8" fill="#818CF8" opacity="0.3" />
+    <path d="M72 80 Q80 76 87 80 Q80 84 72 80Z M93 80 Q100 76 108 80 Q100 84 93 80Z" fill="#E0E7FF" />
+    {/* sleeve and hand with finger to the lips */}
+    <path d="M66 176 Q54 192 54 206 H126 Q126 192 114 176Z" fill="#0D1038" stroke="#818CF8" strokeWidth="1.2" />
+    <path d="M60 192 H120 M62 198 H118" stroke="#A5B4FC" strokeWidth="1" opacity="0.8" />
+    <circle cx="90" cy="98" r="14" fill="#818CF8" opacity="0.3" />
+    <path d="M70 156 Q66 148 74 146 L82 148 L82 112 Q82 106 88.5 106 Q95 106 95 112 L95 140 L104 140 Q112 142 112 152 L112 170 Q112 178 104 178 H80 Q70 178 70 168Z" fill="url(#sp-skin)" stroke="#6D5BD0" strokeWidth="1.2" strokeLinejoin="round" />
+    <path d="M95 142 H108 M95 150 H110 M95 158 H108" stroke="#6D5BD0" strokeWidth="1" opacity="0.7" strokeLinecap="round" />
+    <path d="M70 156 Q74 158 82 156" stroke="#6D5BD0" strokeWidth="1" fill="none" />
+    <path d="M85 98 V112" stroke="#FFFFFF" strokeWidth="1.2" opacity="0.6" strokeLinecap="round" />
+  </svg>
+);
+
+const HunterArt = () => (
+  <svg {...artSvg}>
+    <defs>
+      <linearGradient id="hu-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2A1806" /><stop offset="1" stopColor="#0A0602" /></linearGradient>
+    </defs>
+    <rect width="200" height="267" fill="url(#hu-bg)" />
+    <g fill="none" stroke="#F59E0B" opacity="0.5">
+      <circle cx="90" cy="112" r="70" strokeWidth="1.2" /><circle cx="90" cy="112" r="50" strokeWidth="1" /><circle cx="90" cy="112" r="28" strokeWidth="1" />
+      <path d="M90 30 V194 M8 112 H172" strokeWidth="0.8" />
+    </g>
+    <Stars pts={[[20, 26, 1.2], [166, 22, 1], [20, 200, 1]]} fill="#FDE68A" />
+    <path d="M24 90 Q90 36 156 90" stroke="#3B2410" strokeWidth="9" fill="none" strokeLinecap="round" />
+    <path d="M24 90 Q90 36 156 90" stroke="#FBBF24" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+    <path d="M24 90 L90 128 L156 90" stroke="#FDE68A" strokeWidth="1.5" fill="none" />
+    <path d="M90 40 V128" stroke="#FDE68A" strokeWidth="2.2" />
+    <path d="M90 16 L82 40 H98Z" fill="#FDE68A" />
+    <path d="M86 122 L90 112 L94 122 M86 130 L90 120 L94 130" stroke="#FBBF24" strokeWidth="1.5" fill="none" />
+    <path d="M82 124 H98 L100 190 Q100 198 90 198 Q80 198 80 190Z" fill="#3B2410" stroke="#F59E0B" strokeWidth="1.5" />
+    <path d="M84 150 H96 M84 160 H96 M84 170 H96" stroke="#F59E0B" strokeWidth="1" opacity="0.7" />
+    <circle cx="90" cy="112" r="3" fill="#EF4444" />
+  </svg>
+);
+
+const VillagerArt = () => (
+  <svg {...artSvg}>
+    <defs>
+      <linearGradient id="vi-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1A2230" /><stop offset="1" stopColor="#07090D" /></linearGradient>
+      <radialGradient id="vi-glow"><stop offset="0" stopColor="#FBBF24" stopOpacity="0.5" /><stop offset="1" stopColor="#FBBF24" stopOpacity="0" /></radialGradient>
+    </defs>
+    <rect width="200" height="267" fill="url(#vi-bg)" />
+    <Stars pts={[[24, 24, 1.2], [140, 20, 1], [172, 56, 1], [18, 90, 0.9], [150, 80, 0.8]]} />
+    <circle cx="62" cy="52" r="20" fill="#E2E8F0" opacity="0.92" />
+    <circle cx="68" cy="48" r="4" fill="#94A3B8" opacity="0.5" /><circle cx="56" cy="60" r="3" fill="#94A3B8" opacity="0.4" />
+    <path d="M0 190 Q60 160 120 178 T200 170 V267 H0Z" fill="#0A0D13" />
+    <circle cx="90" cy="158" r="46" fill="url(#vi-glow)" />
+    <rect x="106" y="98" width="12" height="24" fill="#1B2230" stroke="#94A3B8" />
+    <path d="M112 94 Q104 84 112 76 Q120 68 112 58" stroke="#64748B" strokeWidth="2.5" fill="none" opacity="0.6" strokeLinecap="round" />
+    <rect x="48" y="130" width="84" height="64" fill="#1B2230" stroke="#94A3B8" />
+    <path d="M38 134 L90 94 L142 134Z" fill="#0F131B" stroke="#94A3B8" strokeLinejoin="round" />
+    <rect x="56" y="148" width="22" height="20" fill="#FBBF24" /><path d="M67 148 V168 M56 158 H78" stroke="#1B2230" strokeWidth="1.5" />
+    <rect x="102" y="148" width="22" height="20" fill="#FBBF24" /><path d="M113 148 V168 M102 158 H124" stroke="#1B2230" strokeWidth="1.5" />
+    <rect x="83" y="162" width="14" height="32" fill="#0B0E14" stroke="#94A3B8" />
+    <path d="M24 124 V200 M17 124 V138 Q24 144 31 138 V124 M24 124 V134" stroke="#94A3B8" strokeWidth="2" fill="none" strokeLinecap="round" />
+    <path d="M158 140 V202" stroke="#64748B" strokeWidth="3" strokeLinecap="round" />
+    <path d="M158 140 Q148 128 158 112 Q160 124 168 126 Q170 136 158 140Z" fill="#F97316" />
+    <path d="M158 138 Q154 130 158 122 Q162 130 158 138Z" fill="#FDE68A" />
+  </svg>
+);
+
+/* ------------------------------------------------------------------ */
+/* Custom card art: full pre-designed card images. A role shows its    */
+/* uploaded image (localStorage), else ROLES_DATA[id].imageUrl, else   */
+/* the built-in SVG card.                                              */
+/* ------------------------------------------------------------------ */
+/* Decoded-image cache: keeps decoded images referenced so mobile browsers don't drop them. */
+const imageCache = new Map();
+function preloadImage(src) {
+  const hit = imageCache.get(src);
+  if (hit) return Promise.resolve(hit);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = src;
+    const done = () => {
+      if (img.naturalWidth > 0) imageCache.set(src, img);
+      resolve(img);
+    };
+    if (typeof img.decode === 'function') img.decode().then(done, done);
+    else { img.onload = done; img.onerror = done; }
+  });
+}
+
+const ART_KEY = 'nightfall.cardart.v1';
+let customArt = (() => {
+  try { const v = JSON.parse(localStorage.getItem(ART_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; }
+  catch (e) { return {}; }
+})();
+const artListeners = new Set();
+const subscribeArt = (fn) => { artListeners.add(fn); return () => artListeners.delete(fn); };
+const getArt = () => customArt;
+function setCustomArt(id, dataUrl) {
+  const next = { ...customArt };
+  const old = customArt[id];
+  if (old && old !== dataUrl) imageCache.delete(old);
+  if (dataUrl) { next[id] = dataUrl; preloadImage(dataUrl); } else delete next[id];
+  customArt = next;
+  artListeners.forEach((fn) => fn());
+  try { localStorage.setItem(ART_KEY, JSON.stringify(next)); return true; } catch (e) { return false; }
+}
+function useCustomArt() { return React.useSyncExternalStore(subscribeArt, getArt); }
+function useCardImage(role) {
+  const art = useCustomArt();
+  return art[role] || ROLES_DATA[role].imageUrl || '';
+}
+// Downscale to max 600px wide (and 900px tall), WebP where the browser can encode it, else JPEG.
+function processImage(file, maxW = 600, maxH = 900) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const k = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
+        const w = Math.max(1, Math.round(img.naturalWidth * k));
+        const h = Math.max(1, Math.round(img.naturalHeight * k));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        let out = c.toDataURL('image/webp', 0.85);
+        if (!out.startsWith('data:image/webp')) out = c.toDataURL('image/jpeg', 0.85);
+        resolve(out);
+      } catch (e) { reject(e); } finally { URL.revokeObjectURL(url); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable image')); };
+    img.src = url;
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* PlayingCard: art + vertical title (right edge) + ability banner     */
+/* Sizes use container units, so it scales from the grid to the reveal */
+/* ------------------------------------------------------------------ */
+function PlayingCard({ role }) {
+  const r = ROLES_DATA[role];
+  const img = useCardImage(role);
+  if (img) {
+    return (
+      <div className="relative h-full w-full bg-black">
+        <img src={img} alt={`${r.name} card`} draggable={false} className="h-full w-full object-cover" />
+      </div>
+    );
+  }
+  const Art = r.Art;
+  const letters = r.name.toUpperCase().split('');
+  const fs = Math.min(7, 62 / letters.length);
+  const bannerBg = r.team === 'werewolf' ? '#8B1E1E' : '#2B4C6F';
+  return (
+    <div className="pcard relative h-full w-full overflow-hidden">
+      <Art />
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, transparent 62%, rgba(0,0,0,0.5))' }} />
+      <div className="absolute flex flex-col items-center" style={{ right: '3.5%', top: '6%', fontSize: `${fs}cqh`, lineHeight: 1.04 }} aria-label={r.name}>
+        {letters.map((c, i) => (
+          <span key={i} aria-hidden="true" className="font-display font-black text-white" style={{ textShadow: '0 2px 5px rgba(0,0,0,0.95), 0 0 2px #000' }}>{c}</span>
+        ))}
+      </div>
+      <div className="absolute inset-x-0 bottom-0 flex items-center"
+        style={{ height: '24%', padding: '0 4.5cqw', background: bannerBg, borderTop: '1px solid rgba(255,255,255,0.28)', boxShadow: '0 -6px 14px rgba(0,0,0,0.35)' }}>
+        <span className="line-clamp-2 font-medium text-white" style={{ fontSize: '6.3cqw', lineHeight: 1.28 }}>{r.blurb}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* ROLES_DATA: add roles here. `max` caps copies in the deck,          */
+/* `nightOrder` places a role in the moderator's wake-up guide.        */
+/* ------------------------------------------------------------------ */
+const ROLES_DATA = {
+  werewolf: {
+    id: 'werewolf', balance: -6, Art: WerewolfArt, imageUrl: 'images/werewolf-card.jpg', blurb: 'Wake at night and choose a victim.', name: 'Werewolf', team: 'werewolf', max: 2, color: '#DC2626', Icon: WolfIcon,
+    nightOrder: 2, nightPrompt: 'Werewolves wake and agree on one victim.',
+    short: 'Wakes each night to choose a victim.',
+    ability: 'Wakes each night with the other Werewolf to choose a victim. Wins when Werewolves match or outnumber the Village.'
+  },
+  seer: {
+    id: 'seer', balance: 7, Art: SeerArt, imageUrl: '', blurb: 'Inspect one player\u2019s alignment each night.', name: 'Seer', team: 'village', max: 1, color: '#A78BFA', Icon: EyeIcon,
+    nightOrder: 3, nightPrompt: 'Seer wakes and points at one player. Show a thumb up (Village) or down (Werewolf).',
+    short: 'Inspects one player’s alignment each night.',
+    ability: 'Wakes each night to inspect one player’s alignment.'
+  },
+  bodyguard: {
+    id: 'bodyguard', balance: 3, Art: BodyguardArt, imageUrl: '', blurb: 'Shield a player nightly, never the same twice.', name: 'Bodyguard', team: 'village', max: 1, color: '#34D399', Icon: ShieldIcon,
+    nightOrder: 1, nightPrompt: 'Bodyguard wakes and protects one player. Not the same player as last night.',
+    short: 'Protects one player each night, never the same one twice running.',
+    ability: 'Wakes each night to protect one player from elimination. Cannot protect the same player two nights in a row.'
+  },
+  witch: {
+    id: 'witch', balance: 4, Art: WitchArt, imageUrl: '', blurb: 'One potion to save, one to eliminate. Single use.', name: 'Witch', team: 'village', max: 1, color: '#D946EF', Icon: PotionIcon,
+    nightOrder: 4, nightPrompt: 'Show the Witch tonight’s victim. She may save them and/or eliminate another player. Each potion is single use.',
+    short: 'Two single-use potions: one to save, one to eliminate.',
+    ability: 'Has two single-use potions: one saves the night’s victim, the other eliminates a player.'
+  },
+  spellcaster: {
+    id: 'spellcaster', balance: 1, Art: SpellcasterArt, imageUrl: '', blurb: 'Silence one player for the coming day discussion.', name: 'Spellcaster', team: 'village', max: 1, color: '#818CF8', Icon: WandIcon,
+    nightOrder: 5, nightPrompt: 'Spellcaster wakes and silences one player for tomorrow’s discussion.',
+    short: 'Silences one player for the next day’s discussion.',
+    ability: 'Wakes each night to silence one player for the upcoming day discussion.'
+  },
+  hunter: {
+    id: 'hunter', balance: 3, Art: HunterArt, imageUrl: '', blurb: 'If eliminated, take one player down with you.', name: 'Hunter', team: 'village', max: 1, color: '#F59E0B', Icon: CrosshairIcon,
+    nightOrder: null, nightPrompt: null,
+    short: 'If eliminated, takes one player down immediately.',
+    ability: 'If eliminated at any time, immediately chooses one player to take down with them.'
+  },
+  villager: {
+    id: 'villager', balance: 1, Art: VillagerArt, imageUrl: '', blurb: 'No night power. Use deduction to find the wolves.', name: 'Villager', team: 'village', max: 1, color: '#CBD5E1', Icon: HouseIcon,
+    nightOrder: null, nightPrompt: null,
+    short: 'No night ability. Uses deduction to find the Werewolves.',
+    ability: 'No night ability. Uses deduction during the day to find the Werewolves.'
+  }
+};
+const ROLE_IDS = Object.keys(ROLES_DATA);
+const MIN_PLAYERS = 4;
+const MAX_PLAYERS = 8;
+
+const TEAM_LABEL = { village: 'Village', werewolf: 'Werewolf' };
+const teamColor = (team) => (team === 'werewolf' ? '#DC2626' : '#34D399');
+
+/* ------------------------------------------------------------------ */
+/* Pure helpers                                                        */
+/* ------------------------------------------------------------------ */
+function emptyDeck() {
+  return Object.fromEntries(ROLE_IDS.map((id) => [id, 0]));
+}
+function deckTotal(deck) {
+  return ROLE_IDS.reduce((n, id) => n + (deck[id] || 0), 0);
+}
+// Balanced preset. Every role has a `balance` value (Werewolf -6 each, Village roles positive).
+// Aims for a deck total inside -1..+3, closest to +1. Uses 1 Werewolf whenever that can land in the
+// window, and 2 only when it cannot. Ties prefer more special roles.
+const BALANCE_MIN = -1, BALANCE_MAX = 3, BALANCE_TARGET = 1;
+const FILL_PRIORITY = ['seer', 'witch', 'bodyguard', 'hunter', 'spellcaster', 'villager'];
+function deckBalance(deck) {
+  return ROLE_IDS.reduce((n, id) => n + (deck[id] || 0) * (ROLES_DATA[id].balance || 0), 0);
+}
+function bestVillageFill(count, wolves) {
+  const wolfScore = wolves * ROLES_DATA.werewolf.balance;
+  const need = count - wolves;
+  const pool = FILL_PRIORITY.filter((id) => ROLES_DATA[id] && ROLES_DATA[id].team === 'village');
+  let best = null;
+  const counts = {};
+  const consider = () => {
+    let score = wolfScore, fun = 0;
+    pool.forEach((id, i) => { const n = counts[id] || 0; score += n * ROLES_DATA[id].balance; fun += n * (pool.length - i); });
+    const dist = score < BALANCE_MIN ? BALANCE_MIN - score : score > BALANCE_MAX ? score - BALANCE_MAX : 0;
+    const off = Math.abs(score - BALANCE_TARGET);
+    if (!best || dist < best.dist || (dist === best.dist && (off < best.off || (off === best.off && fun > best.fun)))) {
+      best = { dist, fun, off, score, wolves, counts: { ...counts } };
+    }
+  };
+  const walk = (i, left) => {
+    if (left === 0) { consider(); return; }
+    if (i >= pool.length) return;
+    const id = pool[i];
+    for (let n = Math.min(ROLES_DATA[id].max, left); n >= 0; n--) { counts[id] = n; walk(i + 1, left - n); }
+    counts[id] = 0;
+  };
+  walk(0, need);
+  return best;
+}
+function autoFill(count) {
+  // Try 1 Werewolf first; use 2 only when 1 cannot land inside the balance window.
+  const options = [1, 2].map((w) => bestVillageFill(count, w)).filter(Boolean);
+  const best = options.reduce((a, b) => (b.dist < a.dist ? b : a));
+  const deck = emptyDeck();
+  deck.werewolf = best.wolves;
+  Object.keys(best.counts).forEach((id) => { deck[id] = best.counts[id]; });
+  return deck;
+}
+
+// Fisher-Yates
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function deal(deck, names, count) {
+  const cards = [];
+  ROLE_IDS.forEach((id) => { for (let i = 0; i < deck[id]; i++) cards.push(id); });
+  const shuffled = shuffle(cards);
+  return names.slice(0, count).map((n, i) => ({
+    id: i,
+    name: n.trim() || `Player ${i + 1}`,
+    role: shuffled[i],
+    alive: true,
+    protectedTag: false,
+    silencedTag: false
+  }));
+}
+
+/* ------------------------------------------------------------------ */
+/* Small UI pieces                                                     */
+/* ------------------------------------------------------------------ */
+function TeamBadge({ team }) {
+  const c = teamColor(team);
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider"
+      style={{ color: c, background: c + '1F', border: `1px solid ${c}55` }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: c }} />
+      {TEAM_LABEL[team]}
+    </span>
+  );
+}
+
+function RoleEmblem({ role, size = 28, className = '' }) {
+  const r = ROLES_DATA[role];
+  const Icon = r.Icon;
+  return <Icon width={size} height={size} style={{ color: r.color }} className={className} />;
+}
+
+function Btn({ variant = 'primary', className = '', style, ...rest }) {
+  const base = 'min-h-[56px] w-full rounded-xl px-5 text-base font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100';
+  const variants = {
+    primary: 'text-white',
+    secondary: 'text-slate-200 hover:bg-white/5',
+    ghost: 'text-slate-300 hover:bg-white/5'
+  };
+  const styles = {
+    primary: { background: 'linear-gradient(180deg, #E23A3A, #B91C1C)', boxShadow: '0 6px 24px -8px rgba(220,38,38,0.7), inset 0 1px 0 rgba(255,255,255,0.18)' },
+    secondary: { background: 'var(--card)', border: '1px solid var(--line)' },
+    ghost: { background: 'transparent', border: '1px solid var(--line)' }
+  };
+  return <button className={`${base} ${variants[variant]} ${className}`} style={{ ...styles[variant], ...style }} {...rest} />;
+}
+
+function Screen({ children, className = '' }) {
+  return (
+    <main className={`screen-in mx-auto flex min-h-full w-full max-w-md flex-col px-4 ${className}`}
+      style={{ paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+      {children}
+    </main>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Role Guide modal                                                    */
+/* ------------------------------------------------------------------ */
+function CardArtPanel() {
+  const art = useCustomArt();
+  const [msg, setMsg] = useState({});
+  const pick = async (id, e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    setMsg((m) => ({ ...m, [id]: 'Processing…' }));
+    try {
+      const data = await processImage(f);
+      const saved = setCustomArt(id, data);
+      setMsg((m) => ({ ...m, [id]: saved ? 'Saved on this device.' : 'Applied, but storage is full or blocked, so it resets on reload.' }));
+    } catch (err) {
+      setMsg((m) => ({ ...m, [id]: 'Could not read that image. Try a JPEG or PNG.' }));
+    }
+  };
+  return (
+    <div className="overflow-y-auto px-5 pb-6">
+      <p className="mb-3 text-sm leading-snug text-slate-400">
+        Pick a finished card image for any role. It replaces the whole card face everywhere. Portrait 3:4 images fit best.
+      </p>
+      <ul className="flex flex-col gap-3">
+        {ROLE_IDS.map((id) => {
+          const r = ROLES_DATA[id];
+          const custom = art[id];
+          const src = custom || r.imageUrl;
+          return (
+            <li key={id} className="flex gap-3 rounded-2xl p-3" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>
+              <div className="flex aspect-[3/4] w-[64px] shrink-0 items-center justify-center overflow-hidden rounded-lg"
+                style={{ background: r.color + '1A', border: `1px solid ${r.color}40` }}>
+                {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : <RoleEmblem role={id} size={30} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-display text-base font-bold leading-tight">{r.name}</h3>
+                <p className="text-xs text-slate-500">{custom ? 'Using your image' : r.imageUrl ? 'Using bundled card image' : 'Using built-in art'}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <label htmlFor={`art-${id}`}
+                    className="inline-flex min-h-[44px] cursor-pointer items-center rounded-lg px-3 text-sm font-semibold text-slate-100 focus-within:outline focus-within:outline-2 focus-within:outline-slate-300"
+                    style={{ background: 'var(--card)', border: '1px solid rgba(203,213,225,0.35)' }}>
+                    Choose photo
+                    <input id={`art-${id}`} type="file" accept="image/*" className="sr-only" onChange={(e) => pick(id, e)} />
+                  </label>
+                  {custom && (
+                    <button onClick={() => { setCustomArt(id, null); setMsg((m) => ({ ...m, [id]: 'Reset to default.' })); }}
+                      className="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-red-300 hover:bg-white/5"
+                      style={{ border: '1px solid #DC262666' }}>Reset to Default</button>
+                  )}
+                </div>
+                {msg[id] && <p role="status" className="mt-1.5 text-xs text-slate-400">{msg[id]}</p>}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function RoleGuide({ onClose }) {
+  const [view, setView] = useState('guide'); // guide | art
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label="Role Guide">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="screen-in relative flex max-h-[88%] w-full max-w-md flex-col rounded-t-3xl sm:rounded-3xl"
+        style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+        <div className="flex items-center justify-between px-5 pb-3 pt-5">
+          <h2 className="font-display text-2xl font-bold tracking-wide">{view === 'art' ? 'Custom Card Art' : 'Role Guide'}</h2>
+          <button onClick={onClose} aria-label="Close role guide"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-slate-300 hover:bg-white/10">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 5 L19 19 M19 5 L5 19" /></svg>
+          </button>
+        </div>
+        <div className="px-5 pb-3">
+          <button onClick={() => setView(view === 'art' ? 'guide' : 'art')}
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-slate-200 hover:bg-white/5"
+            style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="2" /><path d="M21 16 L15 11 L5 20" /></svg>
+            {view === 'art' ? 'Back to roles' : 'Custom Card Art'}
+          </button>
+        </div>
+        {view === 'art' ? <CardArtPanel /> : (
+          <ul className="flex flex-col gap-3 overflow-y-auto px-5 pb-6">
+            {ROLE_IDS.map((id) => {
+              const r = ROLES_DATA[id];
+              return (
+                <li key={id} className="flex gap-3 rounded-2xl p-3" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl" style={{ background: r.color + '1A', border: `1px solid ${r.color}40` }}>
+                    <RoleEmblem role={id} size={34} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-display text-lg font-bold leading-tight">{r.name}</h3>
+                      <TeamBadge team={r.team} />
+                    </div>
+                    <p className="mt-1 text-sm leading-snug text-slate-300">{r.ability}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Home start screen: full-bleed background (custom image or default)  */
+/* ------------------------------------------------------------------ */
+const BG_KEY = 'nightfall.bg.v1';
+const DEFAULT_BG = 'images/home-bg.jpg';
+const LOADING_BG = 'images/loading-bg.jpg';
+try { localStorage.removeItem('nightfall.bg.v1'); } catch (e) { /* background is fixed now */ }
+
+function DefaultBackdrop() {
+  const trees = [[10, 120, 26], [50, 170, 30], [92, 130, 24], [130, 190, 34], [178, 140, 26], [224, 200, 36], [270, 150, 28], [312, 185, 32], [356, 135, 26], [392, 175, 30]];
+  return (
+    <svg viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full" aria-hidden="true">
+      <defs>
+        <linearGradient id="bk-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#101A33" /><stop offset="0.7" stopColor="#0B0E14" /></linearGradient>
+        <radialGradient id="bk-moon"><stop offset="0" stopColor="#F1F5F9" /><stop offset="0.7" stopColor="#CBD5E1" /><stop offset="1" stopColor="#94A3B8" /></radialGradient>
+        <radialGradient id="bk-halo"><stop offset="0" stopColor="#CBD5E1" stopOpacity="0.35" /><stop offset="1" stopColor="#CBD5E1" stopOpacity="0" /></radialGradient>
+        <radialGradient id="bk-eye"><stop offset="0" stopColor="#EF4444" stopOpacity="0.65" /><stop offset="1" stopColor="#EF4444" stopOpacity="0" /></radialGradient>
+      </defs>
+      <rect width="400" height="800" fill="url(#bk-sky)" />
+      <circle cx="300" cy="150" r="150" fill="url(#bk-halo)" />
+      <circle cx="300" cy="150" r="64" fill="url(#bk-moon)" />
+      <circle cx="282" cy="132" r="10" fill="#94A3B8" opacity="0.4" /><circle cx="322" cy="170" r="14" fill="#94A3B8" opacity="0.3" />
+      <ellipse cx="260" cy="140" rx="110" ry="12" fill="#0B0E14" opacity="0.55" />
+      <ellipse cx="350" cy="190" rx="90" ry="10" fill="#0B0E14" opacity="0.5" />
+      {trees.map(([x, h, w], i) => <path key={'b' + i} d={`M${x - w} 560 L${x} ${560 - h} L${x + w} 560Z`} fill="#0A0D14" />)}
+      <rect y="540" width="400" height="260" fill="#07090D" />
+      {trees.map(([x, h, w], i) => <path key={'f' + i} d={`M${x + 20 - w} 620 L${x + 20} ${620 - h * 1.25} L${x + 20 + w} 620Z`} fill="#05060A" />)}
+      <circle cx="148" cy="468" r="34" fill="url(#bk-eye)" /><circle cx="214" cy="472" r="34" fill="url(#bk-eye)" />
+      <path d="M134 464 Q148 462 164 472 Q148 476 134 464Z M228 464 Q214 462 198 472 Q214 476 228 464Z" fill="#EF4444" />
+    </svg>
+  );
+}
+
+function LobbyModal({ onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label="Multi-Device Lobby">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="screen-in relative w-full max-w-md rounded-t-3xl p-6 text-center sm:rounded-3xl"
+        style={{ background: 'var(--card)', border: '1px solid var(--line)', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="6" width="9" height="15" rx="2" /><rect x="12" y="3" width="9" height="15" rx="2" /></svg>
+        </div>
+        <span className="mt-4 inline-block rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-widest" style={{ color: '#FBBF24', background: '#FBBF241F', border: '1px solid #FBBF2455' }}>Coming soon</span>
+        <h2 className="font-display mt-3 text-2xl font-bold">Multi-Device Lobby</h2>
+        <p className="mt-3 text-sm leading-relaxed text-slate-300">
+          Room-code multiplayer across separate phones is planned for the next update. The host will share a short code, everyone joins on their own phone, and each player sees only their own card.
+        </p>
+        <p className="mt-3 text-sm leading-relaxed text-slate-400">Until then, Pass &amp; Play deals every card from one device.</p>
+        <div className="mt-6"><Btn onClick={onClose}>Got it</Btn></div>
+      </div>
+    </div>
+  );
+}
+
+const glassBtn = { background: 'rgba(11,14,20,0.5)', border: '1px solid rgba(226,232,240,0.28)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' };
+
+let burstSeq = 0;
+const DOT_COLORS = ['#DC2626', '#991B1B', '#7F1D1D'];
+function makeBurst(x, y) {
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const count = 10 + Math.floor(Math.random() * 5);
+  const dots = Array.from({ length: count }, () => {
+    const a = rnd(0, Math.PI * 2);
+    const d = rnd(40, 100);
+    return {
+      size: Math.round(rnd(6, 14)),
+      color: DOT_COLORS[Math.floor(Math.random() * DOT_COLORS.length)],
+      tx: Math.cos(a) * d,
+      ty: Math.sin(a) * d + rnd(18, 40)
+    };
+  });
+  return { id: ++burstSeq, x, y, dots };
+}
+
+function DotBurst({ b }) {
+  return (
+    <div className="absolute" style={{ left: b.x, top: b.y }}>
+      {b.dots.map((d, i) => (
+        <span key={i} className="blood-dot rounded-full"
+          style={{ width: d.size, height: d.size, left: -d.size / 2, top: -d.size / 2, background: d.color, '--tx': d.tx.toFixed(1) + 'px', '--ty': d.ty.toFixed(1) + 'px' }} />
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Settings: tap effect toggle, custom card art, clear saved games     */
+/* ------------------------------------------------------------------ */
+const SET_KEY = 'nightfall.settings.v1';
+let settings = (() => {
+  try { const v = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); return { blood: !(v && v.blood === false) }; }
+  catch (e) { return { blood: true }; }
+})();
+const setListeners = new Set();
+const subscribeSet = (fn) => { setListeners.add(fn); return () => setListeners.delete(fn); };
+const getSettings = () => settings;
+function updateSettings(patch) {
+  settings = { ...settings, ...patch };
+  setListeners.forEach((fn) => fn());
+  try { localStorage.setItem(SET_KEY, JSON.stringify(settings)); } catch (e) { /* storage unavailable */ }
+}
+function useSettings() { return React.useSyncExternalStore(subscribeSet, getSettings); }
+
+function GearIcon(p) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" {...p}>
+      <circle cx="12" cy="12" r="3" />
+      <circle cx="12" cy="12" r="7" />
+      {Array.from({ length: 8 }).map((_, i) => {
+        const a = (i * Math.PI) / 4;
+        return <line key={i} x1={12 + Math.cos(a) * 8.4} y1={12 + Math.sin(a) * 8.4} x2={12 + Math.cos(a) * 10.6} y2={12 + Math.sin(a) * 10.6} strokeWidth="3" strokeLinecap="butt" />;
+      })}
+    </svg>
+  );
+}
+
+function SettingsModal({ onClose, gameCount, onClearGames }) {
+  const st = useSettings();
+  const [view, setView] = useState('main'); // main | art
+  const [confirm, setConfirm] = useState(false);
+  const [note, setNote] = useState('');
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const rowStyle = { background: 'var(--card-2)', border: '1px solid var(--line)' };
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label="Settings">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="screen-in relative flex max-h-[88%] w-full max-w-md flex-col rounded-t-3xl sm:rounded-3xl"
+        style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+        <div className="flex items-center justify-between px-5 pb-3 pt-5">
+          <h2 className="font-display text-2xl font-bold tracking-wide">{view === 'art' ? 'Custom Card Art' : 'Settings'}</h2>
+          <button onClick={onClose} aria-label="Close settings" className="flex h-11 w-11 items-center justify-center rounded-full text-slate-300 hover:bg-white/10">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 5 L19 19 M19 5 L5 19" /></svg>
+          </button>
+        </div>
+
+        {view === 'art' ? (
+          <>
+            <div className="px-5 pb-3">
+              <button onClick={() => setView('main')} className="flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm font-semibold text-slate-200 hover:bg-white/5" style={rowStyle}>Back to settings</button>
+            </div>
+            <CardArtPanel />
+          </>
+        ) : (
+          <div className="flex flex-col gap-3 overflow-y-auto px-5 pb-6">
+            <div className="flex items-center justify-between gap-4 rounded-2xl p-4" style={rowStyle}>
+              <div>
+                <div className="text-[15px] font-semibold" id="blood-label">Tap Blood Effects</div>
+                <p className="mt-0.5 text-xs leading-snug text-slate-400">Red dots burst from your finger on the home screen.</p>
+              </div>
+              <button role="switch" aria-checked={st.blood} aria-labelledby="blood-label" onClick={() => updateSettings({ blood: !st.blood })}
+                className="relative h-8 w-14 shrink-0 rounded-full transition-colors"
+                style={{ background: st.blood ? '#B91C1C' : '#2E3646', border: '1px solid rgba(203,213,225,0.3)' }}>
+                <span className="absolute top-0.5 h-6 w-6 rounded-full bg-white transition-all" style={{ left: st.blood ? 'calc(100% - 1.625rem)' : '0.125rem' }} />
+              </button>
+            </div>
+
+            <button onClick={() => setView('art')} className="flex min-h-[60px] items-center justify-between rounded-2xl px-4 text-left hover:bg-white/5" style={rowStyle}>
+              <span>
+                <span className="block text-[15px] font-semibold">Custom Card Art</span>
+                <span className="block text-xs text-slate-400">Upload or reset role card images</span>
+              </span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="M9 5 L16 12 L9 19" /></svg>
+            </button>
+
+            <div className="rounded-2xl p-4" style={rowStyle}>
+              <div className="text-[15px] font-semibold">Saved Games</div>
+              <p className="mt-0.5 text-xs text-slate-400">{gameCount === 0 ? 'No saved games on this device.' : `${gameCount} saved ${gameCount === 1 ? 'game' : 'games'} on this device.`}</p>
+              {confirm ? (
+                <div className="mt-3">
+                  <p className="text-sm text-red-300">Delete {gameCount === 1 ? 'this game' : `all ${gameCount} games`}? This cannot be undone.</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <button onClick={() => { onClearGames(); setConfirm(false); setNote('Saved games cleared.'); }}
+                      className="min-h-[48px] rounded-xl text-sm font-bold text-white" style={{ background: '#B91C1C' }}>Delete</button>
+                    <button onClick={() => setConfirm(false)} className="min-h-[48px] rounded-xl text-sm font-semibold text-slate-200" style={{ border: '1px solid var(--line)' }}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button disabled={gameCount === 0} onClick={() => { setNote(''); setConfirm(true); }}
+                  className="mt-3 min-h-[48px] w-full rounded-xl text-sm font-semibold text-red-300 disabled:opacity-35"
+                  style={{ border: '1px solid #DC262666' }}>Clear Saved Games</button>
+              )}
+              {note && <p role="status" className="mt-2 text-xs text-slate-400">{note}</p>}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StartScreen({ onPlay, gameCount, onClearGames }) {
+  const src = DEFAULT_BG;
+  const st = useSettings();
+  const atmos = useMemo(() => {
+    const r = (a, b) => a + Math.random() * (b - a);
+    const leaves = Array.from({ length: 7 }, (_, i) => ({
+      left: r(3, 42), size: r(9, 16), dur: r(10, 17), delay: -r(0, 15), dx: r(30, 90), sway: r(3, 5.5), color: ['#7F1D1D', '#991B1B', '#5B1016'][i % 3]
+    }));
+    const embers = Array.from({ length: 6 }, () => ({
+      left: r(5, 95), size: r(3, 5.5), dur: r(8, 14), delay: -r(0, 12), dx: r(-30, 30), color: ['#F97316', '#FB923C', '#EF4444'][Math.floor(Math.random() * 3)]
+    }));
+    return { leaves, embers };
+  }, []);
+  const [imgOk, setImgOk] = useState(true);
+  const [guide, setGuide] = useState(false);
+  const [lobby, setLobby] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  useEffect(() => setImgOk(true), [src]);
+  const [splats, setSplats] = useState([]);
+  const timers = useRef([]);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  const spawn = (e) => {
+    if (!st.blood || guide || lobby || settingsOpen) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const sp = makeBurst(e.clientX, e.clientY);
+    setSplats((a) => [...a.slice(-15), sp]);
+    timers.current.push(setTimeout(() => setSplats((a) => a.filter((x) => x.id !== sp.id)), 2600));
+  };
+  return (
+    <div className="relative min-h-full w-full" onPointerDown={spawn}>
+      <div className="fixed inset-0 z-0 overflow-hidden" style={{ background: '#0B0E14' }} aria-hidden="true">
+        <DefaultBackdrop />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="atmos-drift relative shrink-0" style={{ width: 'max(100vw, calc(100vh * 0.5628))', height: 'max(100vh, calc(100vw * 1.7768))' }}>
+            {imgOk && <img src={src} alt="" onError={() => setImgOk(false)} className="absolute inset-0 h-full w-full object-cover" style={{ filter: 'brightness(1.2) saturate(1.1)' }} />}
+            <div className="blood-moon-glow pointer-events-none absolute" style={{ left: '68.8%', top: '15.7%', width: '62%', aspectRatio: '1 / 1' }} />
+          </div>
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-[#0B0E14]/10 via-40% to-[#0B0E14]/95" />
+        <div className="mist mist-a pointer-events-none" />
+        <div className="mist mist-b pointer-events-none" />
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          {atmos.leaves.map((l, i) => (
+            <span key={'l' + i} className="leaf absolute" style={{ left: l.left + '%', top: '-4vh', animationDuration: l.dur + 's', animationDelay: l.delay + 's', '--dx': l.dx + 'px' }}>
+              <span className="leaf-shape block" style={{ width: l.size, height: l.size * 0.8, background: l.color, animationDuration: l.sway + 's' }} />
+            </span>
+          ))}
+          {atmos.embers.map((e, i) => (
+            <span key={'e' + i} className="ember absolute" style={{ left: e.left + '%', bottom: '-2vh', width: e.size, height: e.size, background: e.color, boxShadow: `0 0 8px 2px ${e.color}99`, animationDuration: e.dur + 's', animationDelay: e.delay + 's', '--dx': e.dx + 'px' }} />
+          ))}
+        </div>
+      </div>
+
+      <main className="screen-in relative z-10 mx-auto flex min-h-full w-full max-w-md flex-col px-4"
+        style={{ paddingTop: 'max(16px, env(safe-area-inset-top))', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+        <header className="flex items-center justify-between">
+          <button onClick={() => setSettingsOpen(true)} aria-label="Settings"
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-200 hover:bg-white/10" style={glassBtn}>
+            <GearIcon />
+          </button>
+          <button onClick={() => setGuide(true)} className="min-h-[44px] rounded-xl px-3.5 text-sm font-semibold text-slate-100 hover:bg-white/10" style={glassBtn}>Role Guide</button>
+        </header>
+
+        <div className="flex-1" style={{ minHeight: '34vh' }} />
+
+        <div className="text-center">
+          <h1 className="font-display text-5xl font-black tracking-[0.12em] text-slate-50" style={{ textShadow: '0 2px 24px rgba(0,0,0,0.8), 0 0 40px rgba(203,213,225,0.2)' }}>WEREWOLF</h1>
+          <p className="mt-3 text-sm italic tracking-[0.2em] text-slate-300" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>At Nightfall</p>
+        </div>
+
+        <div className="mt-8 flex flex-col items-center gap-3.5">
+          <button onClick={onPlay}
+            className="breathe mx-auto flex w-full max-w-[260px] items-center justify-center gap-3 rounded-2xl py-4 text-xl font-bold tracking-wide text-white transition active:scale-[0.98]">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M7 4 L20 12 L7 20Z" /></svg>
+            Pass &amp; Play
+          </button>
+          <button onClick={() => setLobby(true)} aria-label="Multi-Device, coming in version 2"
+            className="relative mx-auto flex w-full max-w-[260px] items-center justify-center gap-3 overflow-hidden rounded-2xl py-4 text-xl font-bold tracking-wide text-white transition hover:brightness-110 active:scale-[0.98]"
+            style={{ background: '#6D28D9', border: '1px solid rgba(167,139,250,0.4)', boxShadow: '0 8px 26px -8px rgba(109,40,217,0.6)' }}>
+            <span className="absolute left-0 top-0 rounded-br-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-100"
+              style={{ background: 'rgba(11,14,20,0.5)' }} aria-hidden="true">V2</span>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="6" width="9" height="15" rx="2" /><rect x="12" y="3" width="9" height="15" rx="2" /></svg>
+            Multi-Device
+          </button>
+        </div>
+      </main>
+
+      <div className="pointer-events-none fixed inset-0 z-30 overflow-hidden" aria-hidden="true">
+        {splats.map((sp) => <DotBurst key={sp.id} b={sp} />)}
+      </div>
+
+      {guide && <RoleGuide onClose={() => setGuide(false)} />}
+      {lobby && <LobbyModal onClose={() => setLobby(false)} />}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} gameCount={gameCount} onClearGames={onClearGames} />}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Screen 1: Home                                                      */
+/* ------------------------------------------------------------------ */
+function summarizeDeck(deck) {
+  return ROLE_IDS.filter((id) => deck[id] > 0).map((id) => {
+    if (id === 'werewolf') return `${deck[id]} ${deck[id] === 1 ? 'Wolf' : 'Wolves'}`;
+    return deck[id] > 1 ? `${deck[id]} ${ROLES_DATA[id].name}s` : ROLES_DATA[id].name;
+  }).join(', ');
+}
+
+function GameSheet({ game, onClose, onResume, onRedeal, onEdit }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const active = game.status === 'active' && game.players;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={game.name}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="screen-in relative w-full max-w-md rounded-t-3xl p-5"
+        style={{ background: 'var(--card)', border: '1px solid var(--line)', paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
+        <h2 className="font-display text-2xl font-bold">{game.name}</h2>
+        <p className="mt-1 text-sm text-slate-400">{game.count} Players &middot; {summarizeDeck(game.deck)}</p>
+        {active && <p className="mt-2 text-sm text-slate-300">Players: {game.players.map((pl) => pl.name).join(', ')}</p>}
+        <div className="mt-5 flex flex-col gap-3">
+          {active && <Btn onClick={onResume}>Resume Grimoire</Btn>}
+          <Btn variant={active ? 'secondary' : 'primary'} onClick={onRedeal}>Re-deal Same Setup</Btn>
+          <Btn variant="secondary" onClick={onEdit}>Edit Setup</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GameCard({ game, confirming, onOpen, onAskDelete, onCancelDelete, onDelete }) {
+  const active = game.status === 'active' && game.players;
+  const tag = active ? { text: 'Active', c: '#34D399' } : { text: 'Saved Setup', c: '#94A3B8' };
+  return (
+    <div className="relative aspect-[3/4]">
+      <button onClick={onOpen}
+        className="absolute inset-0 flex flex-col items-start overflow-hidden rounded-2xl p-3.5 text-left transition active:scale-[0.98]"
+        style={{ background: '#151A24', border: '1px solid var(--line)' }}
+        aria-label={`Open ${game.name}`}>
+        <span className="pointer-events-none absolute -bottom-6 -right-6 opacity-[0.07]"><MoonIcon width="120" height="120" className="text-slate-200" /></span>
+        <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+          style={{ color: tag.c, background: tag.c + '1F', border: `1px solid ${tag.c}55` }}>{tag.text}</span>
+        <span className="font-display mt-3 line-clamp-2 break-words pr-1 text-lg font-bold leading-tight">{game.name}</span>
+        <span className="mt-2 rounded-md px-2 py-0.5 text-xs font-semibold text-slate-200 tabular-nums"
+          style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>{game.count} Players</span>
+        <span className="mt-auto line-clamp-3 text-xs leading-snug text-slate-400">{summarizeDeck(game.deck)}</span>
+      </button>
+      <button onClick={onAskDelete} aria-label={`Delete ${game.name}`}
+        className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded-full text-slate-400 hover:bg-white/10 hover:text-slate-100">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6 L18 18 M18 6 L6 18" /></svg>
+      </button>
+      {confirming && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl p-3 text-center"
+          style={{ background: 'rgba(11,14,20,0.94)', border: '1px solid #DC262677' }}>
+          <p className="text-sm font-semibold">Delete this game?</p>
+          <button onClick={onDelete} className="min-h-[44px] w-full rounded-lg text-sm font-bold text-white" style={{ background: '#B91C1C' }}>Delete</button>
+          <button onClick={onCancelDelete} className="min-h-[44px] w-full rounded-lg text-sm font-semibold text-slate-300" style={{ border: '1px solid var(--line)' }}>Keep</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Home({ games, onBack, onCreate, onResume, onRedeal, onEdit, onDelete }) {
+  const [guide, setGuide] = useState(false);
+  const [confirmId, setConfirmId] = useState(null);
+  const [sheetId, setSheetId] = useState(null);
+  const sheetGame = games.find((g) => g.id === sheetId);
+  return (
+    <Screen>
+      <header className="flex items-center justify-between pb-5">
+        <div className="flex items-center gap-1">
+          <button onClick={onBack} aria-label="Back to home screen"
+            className="flex min-h-[44px] items-center gap-0.5 rounded-xl pl-1 pr-3 text-sm font-semibold text-slate-200 hover:bg-white/5">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5 L8 12 L15 19" /></svg>
+            Home
+          </button>
+          <h1 className="font-display text-lg font-bold tracking-wide text-slate-100">WEREWOLF</h1>
+        </div>
+        <button onClick={() => setGuide(true)}
+          className="min-h-[44px] rounded-xl px-3.5 text-sm font-semibold text-slate-200 hover:bg-white/5"
+          style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>Role Guide</button>
+      </header>
+
+      <div className="grid grid-cols-2 gap-3.5">
+        <button onClick={onCreate}
+          className="flex aspect-[3/4] flex-col items-center justify-center gap-3 rounded-2xl p-3 text-center transition hover:brightness-125 active:scale-[0.98]"
+          style={{ background: '#181D27', border: '2px dashed #2E3646' }}>
+          <span className="flex h-14 w-14 items-center justify-center rounded-full" style={{ border: '1px solid #2E3646' }}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="2" strokeLinecap="round"><path d="M12 4 V20 M4 12 H20" /></svg>
+          </span>
+          <span className="text-sm font-semibold leading-tight text-slate-300">Create a new game</span>
+        </button>
+        {games.map((g) => (
+          <GameCard key={g.id} game={g} confirming={confirmId === g.id}
+            onOpen={() => setSheetId(g.id)}
+            onAskDelete={() => setConfirmId(g.id)}
+            onCancelDelete={() => setConfirmId(null)}
+            onDelete={() => { onDelete(g.id); setConfirmId(null); }} />
+        ))}
+      </div>
+
+      {guide && <RoleGuide onClose={() => setGuide(false)} />}
+      {sheetGame && (
+        <GameSheet game={sheetGame} onClose={() => setSheetId(null)}
+          onResume={() => { setSheetId(null); onResume(sheetGame); }}
+          onRedeal={() => { setSheetId(null); onRedeal(sheetGame); }}
+          onEdit={() => { setSheetId(null); onEdit(sheetGame); }} />
+      )}
+    </Screen>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Screen 2: Setup                                                     */
+/* ------------------------------------------------------------------ */
+function Setup({ count, setCount, gameName, setGameName, defaultName, onBack, onNext }) {
+  return (
+    <Screen>
+      <header className="flex items-center gap-2 pb-4">
+        <button onClick={onBack} aria-label="Back to home" className="flex h-11 w-11 items-center justify-center rounded-full text-slate-300 hover:bg-white/10">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5 L8 12 L15 19" /></svg>
+        </button>
+        <h1 className="font-display text-2xl font-bold tracking-wide">Game Setup</h1>
+      </header>
+
+      <section className="rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+        <label htmlFor="game-name" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Game Name</label>
+        <input id="game-name" type="text" value={gameName} maxLength={28} placeholder={defaultName}
+          onChange={(e) => setGameName(e.target.value)}
+          className="mt-3 h-12 w-full rounded-lg px-3 text-[15px] text-slate-100 placeholder-slate-500"
+          style={{ background: 'var(--bg)', border: '1px solid var(--line)' }} />
+      </section>
+
+      <section className="mt-4 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Players</h2>
+        <div className="mt-3 flex items-center justify-between">
+          <button aria-label="Fewer players" disabled={count <= MIN_PLAYERS} onClick={() => setCount(count - 1)}
+            className="flex h-14 w-14 items-center justify-center rounded-xl text-3xl text-slate-200 disabled:opacity-30"
+            style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>&minus;</button>
+          <div className="text-center" aria-live="polite">
+            <div className="font-display text-5xl font-bold leading-none tabular-nums">{count}</div>
+            <div className="mt-1 text-xs text-slate-400">{MIN_PLAYERS} to {MAX_PLAYERS} players</div>
+          </div>
+          <button aria-label="More players" disabled={count >= MAX_PLAYERS} onClick={() => setCount(count + 1)}
+            className="flex h-14 w-14 items-center justify-center rounded-xl text-3xl text-slate-200 disabled:opacity-30"
+            style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>+</button>
+        </div>
+      </section>
+
+      <div className="mt-auto pt-8">
+        <Btn onClick={onNext}>Next: Choose Cards</Btn>
+      </div>
+    </Screen>
+  );
+}
+
+function QtyPill({ role, n, canAdd, onChange }) {
+  const name = ROLES_DATA[role].name;
+  return (
+    <div className="absolute left-2 top-2 flex items-center rounded-full"
+      style={{ background: 'rgba(8,10,15,0.82)', border: '1px solid rgba(226,232,240,0.35)', backdropFilter: 'blur(4px)' }}>
+      <button aria-label={`Remove ${name}`} disabled={n <= 0} onClick={() => onChange(-1)}
+        className="flex h-9 w-9 items-center justify-center text-lg text-slate-100 disabled:opacity-30">&minus;</button>
+      <span className="min-w-[1ch] px-0.5 text-center text-sm font-bold tabular-nums text-white" aria-live="polite">{n}</span>
+      <button aria-label={`Add ${name}`} disabled={!canAdd} onClick={() => onChange(1)}
+        className="flex h-9 w-9 items-center justify-center text-lg text-slate-100 disabled:opacity-30">+</button>
+    </div>
+  );
+}
+
+function ChooseCards({ count, deck, setDeck, onBack, onStart }) {
+  const [q, setQ] = useState('');
+  const total = deckTotal(deck);
+  const slotsLeft = count - total;
+  const wolves = deck.werewolf;
+  const canStart = slotsLeft === 0 && wolves >= 1;
+
+  const change = (id, d) => {
+    const next = deck[id] + d;
+    if (next < 0 || next > ROLES_DATA[id].max) return;
+    if (d > 0 && slotsLeft <= 0) return;
+    setDeck({ ...deck, [id]: next });
+  };
+  const needle = q.trim().toLowerCase();
+  const visible = ROLE_IDS.filter((id) => {
+    if (!needle) return true;
+    const r = ROLES_DATA[id];
+    return [r.name, r.ability, r.short, r.blurb, TEAM_LABEL[r.team]].join(' ').toLowerCase().includes(needle);
+  });
+
+  const ruleOk = wolves >= 1;
+  const ruleColor = ruleOk ? '#34D399' : '#F59E0B';
+
+  return (
+    <Screen>
+      <div className="sticky top-0 z-10 -mx-4 px-4 pb-3 pt-1" style={{ background: 'linear-gradient(180deg, var(--bg) 85%, rgba(11,14,20,0))' }}>
+        <header className="flex items-center gap-2">
+          <button onClick={onBack} aria-label="Back to game setup" className="flex h-11 w-11 items-center justify-center rounded-full text-slate-300 hover:bg-white/10">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5 L8 12 L15 19" /></svg>
+          </button>
+          <h1 className="font-display text-lg font-bold tracking-wide">Choose Cards</h1>
+        </header>
+        <div className="mt-2 flex items-end justify-between gap-3">
+          <div aria-live="polite">
+            <div className="font-display text-2xl font-black leading-none tabular-nums text-white">{slotsLeft} {slotsLeft === 1 ? 'slot' : 'slots'} left</div>
+            <div className="mt-1 text-sm tabular-nums text-slate-400">{total} / {count} selected</div>
+          </div>
+          <div className="flex gap-1.5">
+            <button onClick={() => setDeck(autoFill(count))} className="min-h-[40px] rounded-lg px-3 text-xs font-semibold text-slate-200 hover:bg-white/5" style={{ border: '1px solid var(--line)' }}>Auto-fill</button>
+            <button onClick={() => setDeck(emptyDeck())} disabled={total === 0} className="min-h-[40px] rounded-lg px-3 text-xs font-semibold text-slate-400 hover:bg-white/5 disabled:opacity-30" style={{ border: '1px solid var(--line)' }}>Clear</button>
+          </div>
+        </div>
+        <div role="status" className="mt-2.5 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold"
+          style={{ color: ruleColor, background: ruleColor + (ruleOk ? '14' : '1F'), border: `1px solid ${ruleColor}${ruleOk ? '40' : '88'}` }}>
+          <span aria-hidden="true">{ruleOk ? '✓' : '!'}</span>
+          At least 1 Werewolf required
+        </div>
+      </div>
+
+      <div className="relative mt-1">
+        <svg className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20 L16 16" /></svg>
+        <input id="role-search" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search roles..." aria-label="Search roles"
+          className="h-12 w-full rounded-xl pl-10 pr-3 text-[15px] text-slate-100 placeholder-slate-500"
+          style={{ background: 'var(--card)', border: '1px solid var(--line)' }} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3.5">
+        {visible.map((id) => {
+          const r = ROLES_DATA[id];
+          const n = deck[id];
+          const ring = n > 0
+            ? (r.team === 'werewolf'
+              ? '0 0 0 2px #EF4444, 0 0 26px 3px rgba(220,38,38,0.55)'
+              : '0 0 0 2px #E2E8F0, 0 0 24px 3px rgba(226,232,240,0.4)')
+            : '0 0 0 1px rgba(203,213,225,0.2)';
+          return (
+            <div key={id} className="relative aspect-[3/4] overflow-hidden rounded-2xl transition-shadow" style={{ boxShadow: ring, opacity: n === 0 && slotsLeft === 0 ? 0.6 : 1 }}>
+              <PlayingCard role={id} />
+              <QtyPill role={id} n={n} canAdd={slotsLeft > 0 && n < r.max} onChange={(d) => change(id, d)} />
+            </div>
+          );
+        })}
+      </div>
+      {visible.length === 0 && <p className="mt-6 text-center text-sm text-slate-400">No roles match &ldquo;{q.trim()}&rdquo;.</p>}
+
+      <div className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-1 pt-6" style={{ background: 'linear-gradient(0deg, var(--bg) 70%, rgba(11,14,20,0))' }}>
+        {!canStart && (
+          <p className="mb-2 text-center text-xs text-slate-400">
+            {slotsLeft > 0 ? `Fill ${slotsLeft} more ${slotsLeft === 1 ? 'slot' : 'slots'}` : ''}{slotsLeft > 0 && !ruleOk ? ' and add ' : ''}{!ruleOk ? (slotsLeft > 0 ? 'a Werewolf' : 'Add a Werewolf') : ''} to continue.
+          </p>
+        )}
+        <Btn disabled={!canStart} onClick={onStart}>Start &amp; Deal Cards</Btn>
+      </div>
+    </Screen>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Screen 3: Pass-and-play card reveal                                 */
+/* ------------------------------------------------------------------ */
+function RoleCard({ role, phase }) {
+  const r = ROLES_DATA[role];
+  const hasImg = !!useCardImage(role);
+  const flipped = phase === 'flipping' || phase === 'open';
+  const lifted = phase === 'lift' || phase === 'flipping';
+  const edge = r.team === 'werewolf' ? '#EF4444' : '#E2E8F0';
+  const glow = `0 0 44px -8px ${r.team === 'werewolf' ? 'rgba(220,38,38,0.8)' : 'rgba(226,232,240,0.45)'}`;
+  return (
+    <div className={`flip-scene aspect-[3/4] ${lifted ? 'is-lifted' : ''}`} style={{ width: 'max(11rem, min(17rem, 78vw, calc((100vh - 27rem) * 0.75)))' }}>
+      <div className={`flip-card ${flipped ? 'is-flipped' : ''}`}>
+        <div className="face" style={{ background: 'linear-gradient(160deg, #1B2230, #10141D)', border: '1px solid rgba(203,213,225,0.28)' }}>
+          <div className="absolute inset-3 rounded-2xl" style={{ border: '1px solid rgba(203,213,225,0.16)' }} />
+          <div className="flex h-full flex-col items-center justify-center gap-5">
+            <div className="relative flex h-28 w-28 items-center justify-center">
+              <div className="absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle, rgba(203,213,225,0.22), transparent 70%)' }} />
+              <MoonIcon width="96" height="96" className="relative text-slate-300" />
+            </div>
+            <span className="font-display text-sm font-bold tracking-[0.4em] text-slate-400">WEREWOLF</span>
+          </div>
+        </div>
+        <div className="face face-front" style={hasImg ? { boxShadow: glow } : { border: `2px solid ${edge}`, boxShadow: glow }}>
+          <PlayingCard role={role} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Reveal({ players, onName, onDone }) {
+  const [idx, setIdx] = useState(0);
+  const [phase, setPhase] = useState('idle'); // idle | lift | flipping | open
+  const flipped = phase !== 'idle';
+  const [busy, setBusy] = useState(false);
+  const [input, setInput] = useState('');
+  const [entered, setEntered] = useState([]);
+  const timer = useRef(null);
+  const timers = useRef([]);
+  useEffect(() => () => { clearTimeout(timer.current); timers.current.forEach(clearTimeout); }, []);
+
+  const p = players[idx];
+  const last = idx === players.length - 1;
+  const hasImg = !!useCardImage(p.role);
+  const name = input.trim();
+  const taken = name !== '' && entered.some((n) => n.toLowerCase() === name.toLowerCase());
+  const canReveal = name !== '' && !taken && !busy;
+
+  const reveal = () => {
+    if (!canReveal || phase !== 'idle') return;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    setPhase('lift'); // 0.3s anticipation lift and glow
+    timers.current.push(setTimeout(() => setPhase('flipping'), 300)); // 1.2s turn
+    timers.current.push(setTimeout(() => setPhase('open'), 1500)); // flip finished
+  };
+  const hideAndPass = () => {
+    if (busy || phase !== 'open') return;
+    setBusy(true);
+    setPhase('idle');
+    onName(idx, name);
+    setEntered((e) => [...e, name]);
+    setInput('');
+    timer.current = setTimeout(() => {
+      setBusy(false);
+      if (last) onDone();
+      else setIdx((i) => i + 1);
+    }, 700);
+  };
+
+  return (
+    <Screen className="items-center">
+      <div className="flex w-full flex-col items-center gap-2.5">
+        <span className="rounded-full px-3 py-1 text-xs font-semibold uppercase tabular-nums tracking-[0.18em] text-slate-300"
+          style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+          Player {idx + 1} of {players.length}
+        </span>
+        <div className="flex w-full gap-1" aria-hidden="true">
+          {players.map((_, i) => (
+            <div key={i} className="h-1 flex-1 rounded-full" style={{ background: i <= idx ? '#CBD5E1' : 'rgba(203,213,225,0.15)' }} />
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-5 min-h-[84px] w-full" aria-live="polite">
+        {flipped ? (
+          <div className="pt-1 text-center">
+            <p className="text-sm text-slate-400">This card belongs to</p>
+            <p className="font-display mt-1 break-words text-3xl font-bold leading-tight">{name}</p>
+          </div>
+        ) : (
+          <div role="note" className="flex items-start gap-3 rounded-xl px-4 py-3 text-left text-sm leading-snug"
+            style={{ color: '#FDE68A', background: 'linear-gradient(135deg, rgba(220,38,38,0.16), rgba(245,158,11,0.12))', border: '1px solid rgba(245,158,11,0.55)' }}>
+            <svg className="mt-0.5 shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 L22 20 H2 Z" /><path d="M12 10 V14 M12 17 V17.5" /></svg>
+            <span><strong className="font-bold text-amber-200">Eyes only!</strong> Shield your screen and make sure no other players are looking before you reveal your card.</span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 py-3">
+        <RoleCard role={p.role} phase={phase} />
+        <div className={`min-h-[84px] text-center transition-opacity duration-500 ${phase === 'open' ? 'opacity-100' : 'opacity-0'}`}
+          style={{ width: 'min(19rem, 86vw)' }} aria-hidden={phase !== 'open'}>
+          <TeamBadge team={ROLES_DATA[p.role].team} />
+          {!hasImg && <p className="mt-2 text-xs leading-snug text-slate-300">{ROLES_DATA[p.role].ability}</p>}
+        </div>
+      </div>
+
+      <div className="w-full pt-2">
+        {flipped ? (
+          <div className={phase === 'open' ? '' : 'invisible'} aria-hidden={phase !== 'open'}>
+            <Btn variant="secondary" disabled={busy || phase !== 'open'} onClick={hideAndPass}>
+              {last ? 'Hide & Finish' : 'Hide & Pass to Next Player'}
+            </Btn>
+          </div>
+        ) : (
+          <>
+            <label htmlFor="player-name" className="sr-only">Your name</label>
+            <input id="player-name" type="text" value={input} maxLength={18} autoComplete="off" placeholder="Enter your name..."
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+              className="h-14 w-full rounded-xl px-4 text-center text-lg text-slate-100 placeholder-slate-500"
+              style={{ background: 'var(--card)', border: `1px solid ${taken ? '#F59E0B' : 'rgba(203,213,225,0.3)'}` }} />
+            <p role="alert" className="mb-2 mt-2 min-h-[18px] text-center text-xs text-amber-300">
+              {taken ? 'An earlier player already used that name. Add an initial.' : ''}
+            </p>
+            <Btn disabled={!canReveal} onClick={reveal}>Tap to Reveal Your Card</Btn>
+          </>
+        )}
+      </div>
+    </Screen>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Screen 4a: Privacy shield with press-and-hold                       */
+/* ------------------------------------------------------------------ */
+function HoldButton({ onComplete, ms = 1500, children }) {
+  const [p, setP] = useState(0);
+  const raf = useRef(0);
+  const start = useRef(0);
+  const done = useRef(false);
+
+  const tick = useCallback(() => {
+    const v = Math.min(1, (performance.now() - start.current) / ms);
+    setP(v);
+    if (v >= 1) {
+      if (!done.current) { done.current = true; onComplete(); }
+      return;
+    }
+    raf.current = requestAnimationFrame(tick);
+  }, [ms, onComplete]);
+
+  const begin = () => {
+    cancelAnimationFrame(raf.current);
+    done.current = false;
+    start.current = performance.now();
+    raf.current = requestAnimationFrame(tick);
+  };
+  const cancel = () => {
+    cancelAnimationFrame(raf.current);
+    if (!done.current) setP(0);
+  };
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+
+  return (
+    <button
+      className="no-select relative min-h-[72px] w-full overflow-hidden rounded-2xl text-base font-semibold text-white"
+      style={{ background: 'var(--card-2)', border: '1px solid rgba(203,213,225,0.3)' }}
+      onPointerDown={begin} onPointerUp={cancel} onPointerLeave={cancel} onPointerCancel={cancel}
+      onContextMenu={(e) => e.preventDefault()}
+      onKeyDown={(e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); begin(); } }}
+      onKeyUp={(e) => { if (e.key === ' ' || e.key === 'Enter') cancel(); }}
+      aria-label="Press and hold for one and a half seconds to unlock the Moderator view">
+      <span className="absolute inset-y-0 left-0" style={{ width: `${p * 100}%`, background: 'linear-gradient(90deg, #991B1B, #DC2626)' }} />
+      <span className="relative">{p > 0 && p < 1 ? 'Keep holding…' : children}</span>
+    </button>
+  );
+}
+
+function Shield({ onUnlock }) {
+  return (
+    <Screen className="items-center justify-center text-center">
+      <div className="flex h-28 w-28 items-center justify-center rounded-full" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+        <ShieldIcon width="56" height="56" className="text-slate-300" />
+      </div>
+      <h1 className="font-display mt-8 text-3xl font-bold leading-snug">All cards dealt!</h1>
+      <p className="mt-3 max-w-xs text-slate-300">Pass the phone to the <span className="font-bold text-white">Moderator</span>.</p>
+      <p className="mt-2 max-w-xs text-sm text-slate-500">The next screen shows every role. Hold the button to open it.</p>
+      <div className="mt-10 w-full">
+        <HoldButton onComplete={onUnlock}>Press &amp; Hold to Unlock</HoldButton>
+      </div>
+    </Screen>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Screen 4b: Moderator grimoire                                       */
+/* ------------------------------------------------------------------ */
+function StatusChip({ active, onClick, color, children }) {
+  return (
+    <button onClick={onClick} aria-pressed={active}
+      className="min-h-[36px] rounded-full px-3 text-xs font-semibold"
+      style={{
+        color: active ? '#0B0E14' : color,
+        background: active ? color : 'transparent',
+        border: `1px solid ${color}88`
+      }}>
+      {children}
+    </button>
+  );
+}
+
+function Moderator({ players, setPlayers, onAgain, onNew, onHome }) {
+  const [checked, setChecked] = useState({});
+  const [confirm, setConfirm] = useState(null); // 'again' | 'new' | null
+
+  useEffect(() => {
+    if (!confirm) return;
+    const t = setTimeout(() => setConfirm(null), 3500);
+    return () => clearTimeout(t);
+  }, [confirm]);
+
+  const update = (id, patch) => setPlayers(players.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+
+  const wolvesAlive = players.filter((p) => p.alive && ROLES_DATA[p.role].team === 'werewolf').length;
+  const villageAlive = players.filter((p) => p.alive && ROLES_DATA[p.role].team === 'village').length;
+
+  const nightRoles = useMemo(() => {
+    const present = ROLE_IDS.filter((id) => ROLES_DATA[id].nightOrder && players.some((p) => p.role === id));
+    return present.sort((a, b) => ROLES_DATA[a].nightOrder - ROLES_DATA[b].nightOrder);
+  }, [players]);
+  const hasHunter = players.some((p) => p.role === 'hunter');
+
+  let status = null;
+  if (wolvesAlive === 0) status = { text: 'No Werewolves left. The Village wins.', color: '#34D399' };
+  else if (wolvesAlive >= villageAlive) status = { text: 'Werewolves match or outnumber the Village.', color: '#F87171' };
+
+  return (
+    <Screen>
+      <header className="flex items-start justify-between gap-3 pb-4">
+        <div>
+          <h1 className="font-display text-3xl font-bold tracking-wide">Grimoire</h1>
+          <p className="text-sm text-slate-400">Moderator view. Keep the screen turned away from players.</p>
+        </div>
+        <button onClick={onHome} className="min-h-[44px] shrink-0 rounded-xl px-3.5 text-sm font-semibold text-slate-200 hover:bg-white/5"
+          style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>All games</button>
+      </header>
+
+      {/* Tally */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl p-3" style={{ background: '#DC262614', border: '1px solid #DC262655' }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-red-300">Werewolves alive</div>
+          <div className="font-display text-3xl font-bold tabular-nums text-red-400">{wolvesAlive}</div>
+        </div>
+        <div className="rounded-xl p-3" style={{ background: '#34D39912', border: '1px solid #34D39955' }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-300">Village alive</div>
+          <div className="font-display text-3xl font-bold tabular-nums text-emerald-400">{villageAlive}</div>
+        </div>
+      </div>
+      {status && (
+        <p role="status" className="mt-3 rounded-xl px-4 py-3 text-sm font-medium" style={{ color: status.color, background: status.color + '18', border: `1px solid ${status.color}55` }}>
+          {status.text}
+        </p>
+      )}
+
+      {/* Roster */}
+      <section className="mt-5">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Player Roster</h2>
+        <ul className="flex flex-col gap-2">
+          {players.map((p) => {
+            const r = ROLES_DATA[p.role];
+            return (
+              <li key={p.id} className="rounded-xl p-3 transition-opacity"
+                style={{ background: 'var(--card)', border: `1px solid ${p.alive ? r.color + '55' : 'var(--line)'}`, opacity: p.alive ? 1 : 0.55 }}>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg" style={{ background: r.color + '1A' }}>
+                    <RoleEmblem role={p.role} size={26} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className={`truncate text-[15px] font-semibold ${p.alive ? '' : 'line-through'}`}>{p.name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-display text-sm font-bold" style={{ color: r.color }}>{r.name}</span>
+                      <TeamBadge team={r.team} />
+                    </div>
+                  </div>
+                  <button onClick={() => update(p.id, p.alive ? { alive: false, protectedTag: false, silencedTag: false } : { alive: true })}
+                    aria-pressed={!p.alive}
+                    aria-label={`${p.name} is ${p.alive ? 'alive. Mark as eliminated' : 'eliminated. Mark as alive'}`}
+                    className="min-h-[44px] shrink-0 rounded-lg px-3 text-xs font-bold uppercase tracking-wider"
+                    style={p.alive
+                      ? { color: '#34D399', background: '#34D3991A', border: '1px solid #34D39966' }
+                      : { color: '#F87171', background: '#DC26261A', border: '1px solid #DC262677' }}>
+                    {p.alive ? 'Alive' : 'Eliminated'}
+                  </button>
+                </div>
+                {p.alive && (
+                  <div className="mt-2.5 flex gap-2 pl-14">
+                    <StatusChip color="#34D399" active={p.protectedTag} onClick={() => update(p.id, { protectedTag: !p.protectedTag })}>Protected</StatusChip>
+                    <StatusChip color="#818CF8" active={p.silencedTag} onClick={() => update(p.id, { silencedTag: !p.silencedTag })}>Silenced</StatusChip>
+                  </div>
+                )}
+                {p.role === 'hunter' && !p.alive && (
+                  <p className="mt-2 pl-14 text-xs text-amber-400">The Hunter chooses one player to take down now.</p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      {/* Night guide */}
+      <section className="mt-6 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Night Wake-Up Order</h2>
+          <button onClick={() => setChecked({})} className="min-h-[36px] rounded-lg px-2 text-xs font-semibold text-slate-400 hover:text-slate-200">Reset night</button>
+        </div>
+        <ol className="mt-3 flex flex-col gap-2">
+          {nightRoles.map((id, i) => {
+            const r = ROLES_DATA[id];
+            const holders = players.filter((p) => p.role === id);
+            const done = !!checked[id];
+            return (
+              <li key={id}>
+                <button onClick={() => setChecked({ ...checked, [id]: !done })} aria-pressed={done}
+                  className="flex w-full items-start gap-3 rounded-xl p-3 text-left"
+                  style={{ background: done ? 'transparent' : 'var(--card-2)', border: `1px solid ${done ? 'var(--line)' : r.color + '55'}`, opacity: done ? 0.55 : 1 }}>
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-bold"
+                    style={done ? { background: r.color, color: '#0B0E14' } : { border: `1.5px solid ${r.color}`, color: r.color }}>
+                    {done ? '✓' : i + 1}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`font-display block text-[15px] font-bold ${done ? 'line-through' : ''}`} style={{ color: r.color }}>
+                      {id === 'werewolf' ? 'Werewolves' : r.name}
+                    </span>
+                    <span className="block text-sm leading-snug text-slate-300">{r.nightPrompt}</span>
+                    <span className="mt-1 block text-xs text-slate-500">
+                      {holders.map((h, k) => (
+                        <span key={h.id} className={h.alive ? '' : 'line-through'}>{k > 0 ? ', ' : ''}{h.name}</span>
+                      ))}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+        {nightRoles.length === 0 && <p className="mt-3 text-sm text-slate-400">No night roles in this deck.</p>}
+        {hasHunter && <p className="mt-3 text-xs text-slate-500">The Hunter has no night action. Watch for their elimination during the day.</p>}
+      </section>
+
+      <div className="mt-6 flex flex-col gap-3">
+        <Btn variant="secondary" onClick={() => (confirm === 'again' ? onAgain() : setConfirm('again'))}>
+          {confirm === 'again' ? 'Tap again to re-deal' : 'Play Again (Same Setup)'}
+        </Btn>
+        <Btn variant="ghost" onClick={() => (confirm === 'new' ? onNew() : setConfirm('new'))}>
+          {confirm === 'new' ? 'Tap again to start over' : 'New Game'}
+        </Btn>
+      </div>
+    </Screen>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* App                                                                 */
+/* ------------------------------------------------------------------ */
+const STORE_KEY = 'nightfall.games.v1';
+function loadGames() {
+  try {
+    const v = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+    return Array.isArray(v) ? v : [];
+  } catch (e) { return []; }
+}
+function saveGames(g) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(g)); } catch (e) { /* storage unavailable */ }
+}
+
+function AppInner() {
+  const [screen, setScreen] = useState('start'); // start | home | setup | cards | reveal | shield | moderator
+  const [games, setGames] = useState(loadGames);
+  const [count, setCount] = useState(6);
+  const [names, setNames] = useState(Array(MAX_PLAYERS).fill(''));
+  const [deck, setDeck] = useState(emptyDeck);
+  const [gameName, setGameName] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [curId, setCurId] = useState(null);
+  const [players, setPlayers] = useState([]);
+  const [round, setRound] = useState(0);
+
+  useEffect(() => { saveGames(games); }, [games]);
+
+  const defaultName = useMemo(() => {
+    if (editingId) { const g = games.find((x) => x.id === editingId); if (g) return g.name; }
+    let n = games.length + 1;
+    while (games.some((g) => g.name === `Game #${n}`)) n++;
+    return `Game #${n}`;
+  }, [games, editingId]);
+
+  const updateGame = (id, patch) => setGames((gs) => gs.map((g) => (g.id === id ? { ...g, ...patch } : g)));
+
+  const openNewSetup = () => {
+    setEditingId(null);
+    setGameName('');
+    setCount(6);
+    setNames(Array(MAX_PLAYERS).fill(''));
+    setDeck(emptyDeck());
+    setScreen('setup');
+  };
+  const openEditSetup = (g) => {
+    setEditingId(g.id);
+    setGameName(g.name);
+    setCount(g.count);
+    setNames(g.names);
+    setDeck(g.deck);
+    setScreen('setup');
+  };
+  const toCards = () => {
+    if (deckTotal(deck) > count) setDeck(emptyDeck());
+    setScreen('cards');
+  };
+
+  const begin = (id, dealt) => {
+    setCurId(id);
+    setPlayers(dealt);
+    setRound((r) => r + 1);
+    setScreen('reveal');
+  };
+
+  const start = () => {
+    const dealt = deal(deck, names, count);
+    const name = gameName.trim() || defaultName;
+    if (editingId) {
+      updateGame(editingId, { name, count, names, deck, players: dealt, status: 'active' });
+      begin(editingId, dealt);
+    } else {
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      setGames((gs) => [{ id, name, count, names, deck, players: dealt, status: 'active', createdAt: Date.now() }, ...gs]);
+      begin(id, dealt);
+    }
+  };
+
+  const redeal = (g) => {
+    const dealt = deal(g.deck, g.names, g.count);
+    updateGame(g.id, { players: dealt, status: 'active' });
+    begin(g.id, dealt);
+  };
+  const resume = (g) => {
+    setCurId(g.id);
+    setPlayers(g.players);
+    setRound((r) => r + 1);
+    setScreen('shield');
+  };
+  const savePlayers = (p) => {
+    setPlayers(p);
+    updateGame(curId, { players: p });
+  };
+  const nameAt = (idx, name) => {
+    const next = players.map((pl) => (pl.id === idx ? { ...pl, name } : pl));
+    setPlayers(next);
+    updateGame(curId, { players: next });
+  };
+  const finishGame = () => updateGame(curId, { players: null, status: 'saved' });
+
+  if (screen === 'start') {
+    return <StartScreen onPlay={() => setScreen('home')} gameCount={games.length} onClearGames={() => setGames([])} />;
+  }
+  if (screen === 'home') {
+    return (
+      <Home games={games} onBack={() => setScreen('start')} onCreate={openNewSetup} onResume={resume} onRedeal={redeal}
+        onEdit={openEditSetup} onDelete={(id) => setGames((gs) => gs.filter((g) => g.id !== id))} />
+    );
+  }
+  if (screen === 'setup') {
+    return (
+      <Setup count={count} setCount={setCount} gameName={gameName} setGameName={setGameName}
+        defaultName={defaultName} onBack={() => setScreen('home')} onNext={toCards} />
+    );
+  }
+  if (screen === 'cards') {
+    return <ChooseCards count={count} deck={deck} setDeck={setDeck} onBack={() => setScreen('setup')} onStart={start} />;
+  }
+  if (screen === 'reveal') return <Reveal key={round} players={players} onName={nameAt} onDone={() => setScreen('shield')} />;
+  if (screen === 'shield') return <Shield onUnlock={() => setScreen('moderator')} />;
+  return (
+    <Moderator key={round} players={players} setPlayers={savePlayers}
+      onAgain={() => redeal(games.find((g) => g.id === curId))}
+      onNew={() => { finishGame(); openNewSetup(); }}
+      onHome={() => setScreen('home')} />
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Startup: preload and decode images, then fade into the start screen */
+/* ------------------------------------------------------------------ */
+function activeImageSources() {
+  const list = [DEFAULT_BG, LOADING_BG];
+  ROLE_IDS.forEach((id) => {
+    const src = customArt[id] || ROLES_DATA[id].imageUrl;
+    if (src) list.push(src);
+  });
+  return Array.from(new Set(list));
+}
+function preloadAll(onProgress) {
+  const sources = activeImageSources();
+  const total = sources.length;
+  let loaded = 0;
+  onProgress(0, total);
+  return Promise.all(sources.map((src) => preloadImage(src).then(() => { loaded += 1; onProgress(loaded, total); })));
+}
+
+function useBoot() {
+  const [phase, setPhase] = useState('loading'); // loading | fading | done
+  const [progress, setProgress] = useState({ loaded: 0, total: 1 });
+  useEffect(() => {
+    let finished = false;
+    const timers = [];
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      setProgress((p) => ({ ...p, loaded: p.total }));
+      timers.push(setTimeout(() => setPhase('fading'), 250));
+      timers.push(setTimeout(() => setPhase('done'), 850));
+    };
+    timers.push(setTimeout(finish, 3000)); // safety: always unlock after 3 seconds
+    preloadAll((loaded, total) => { if (!finished) setProgress({ loaded, total }); }).then(finish, finish);
+    return () => { finished = true; timers.forEach(clearTimeout); };
+  }, []);
+  return { phase, progress };
+}
+
+function LoadingScreen({ loaded, total, fading }) {
+  const pct = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 100;
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-8" role="status" aria-live="polite"
+      style={{ background: '#0B0E14', opacity: fading ? 0 : 1, transition: 'opacity 600ms ease-in-out', pointerEvents: fading ? 'none' : 'auto' }}>
+      <img src={LOADING_BG} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(11,14,20,0.25), rgba(11,14,20,0.7))' }} />
+      <h1 className="load-pulse font-display relative text-4xl font-black tracking-[0.14em] text-slate-100">WEREWOLF</h1>
+      <div className="relative mt-10 w-full max-w-[240px]">
+        <div className="h-1 w-full overflow-hidden rounded-full" style={{ background: 'rgba(203,213,225,0.12)' }}
+          role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={pct}>
+          <div className="h-full rounded-full" style={{ width: pct + '%', background: '#DC2626', boxShadow: '0 0 12px rgba(220,38,38,0.7)', transition: 'width 350ms ease-out' }} />
+        </div>
+        <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+          <span>Preparing the deck...</span>
+          <span className="tabular-nums">{pct}%</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const { phase, progress } = useBoot();
+  return (
+    <>
+      <AppInner />
+      {phase !== 'done' && <LoadingScreen loaded={progress.loaded} total={progress.total} fading={phase === 'fading'} />}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

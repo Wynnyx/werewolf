@@ -1215,23 +1215,27 @@ const Tension = (() => {
 
 const Sfx = (() => {
   let a = null, c = null;
+  const pool = {};
+  const play = (src) => {
+    if (!getSettings().sound) return;
+    try {
+      if (!pool[src]) { pool[src] = new Audio(src); pool[src].preload = 'auto'; pool[src].setAttribute('playsinline', ''); }
+      const x = pool[src]; x.currentTime = 0; const p = x.play(); if (p && p.catch) p.catch(() => {});
+    } catch (e) { /* ignore */ }
+  };
   const get = () => {
     if (!a) { a = new Audio('audio/card-flip.mp3'); a.preload = 'auto'; a.setAttribute('playsinline', ''); }
     return a;
   };
   return {
-    preload: () => { try { get(); if (!c) { c = new Audio('audio/create.mp3'); c.preload = 'auto'; } } catch (e) { /* ignore */ } },
+    preload: () => { try { get(); ['audio/create.mp3', 'audio/select.mp3', 'audio/deselect.mp3'].forEach((f) => { if (!pool[f]) { pool[f] = new Audio(f); pool[f].preload = 'auto'; } }); } catch (e) { /* ignore */ } },
     flip: () => {
       if (!getSettings().sound) return;
       try { const x = get(); x.currentTime = 0; const p = x.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ }
     },
-    enter: () => {
-      if (!getSettings().sound) return;
-      try {
-        if (!c) { c = new Audio('audio/create.mp3'); c.preload = 'auto'; c.setAttribute('playsinline', ''); }
-        c.currentTime = 0; const p = c.play(); if (p && p.catch) p.catch(() => {});
-      } catch (e) { /* ignore */ }
-    }
+    enter: () => play('audio/create.mp3'),
+    select: () => play('audio/select.mp3'),
+    deselect: () => play('audio/deselect.mp3')
   };
 })();
 
@@ -1857,6 +1861,7 @@ function QtyPill({ role, n, canAdd, onChange }) {
 
 function ChooseCards({ count, deck, setDeck, onBack, onStart }) {
   const [q, setQ] = useState('');
+  useEffect(() => { Sfx.preload(); }, []);
   const total = deckTotal(deck);
   const slotsLeft = count - total;
   const wolves = deck.werewolf;
@@ -1867,6 +1872,7 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart }) {
     if (next < 0 || next > ROLES_DATA[id].max) return;
     if (d > 0 && slotsLeft <= 0) return;
     setDeck({ ...deck, [id]: next });
+    if (d > 0) Sfx.select(); else Sfx.deselect();
   };
   const needle = q.trim().toLowerCase();
   const visible = ROLE_IDS.filter((id) => {
@@ -1925,7 +1931,7 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart }) {
               style={{ boxShadow: ring, opacity: n === 0 && slotsLeft === 0 ? 0.6 : 1, cursor: n === 0 && slotsLeft > 0 ? 'pointer' : 'default' }}
               onClick={(e) => { if (e.target.closest && e.target.closest('button')) return; if (n === 0) change(id, 1); }}>
               <div className="h-full w-full transition-[filter] duration-300"
-                style={{ filter: n === 0 ? 'grayscale(0.9) brightness(0.55) contrast(0.95)' : 'none' }}>
+                style={{ filter: n === 0 ? 'grayscale(0.5) brightness(0.78)' : 'none' }}>
                 <PlayingCard role={id} />
               </div>
               <QtyPill role={id} n={n} canAdd={slotsLeft > 0 && n < r.max} onChange={(d) => change(id, d)} />

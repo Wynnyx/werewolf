@@ -1206,16 +1206,23 @@ const Tension = (() => {
 })();
 
 const Sfx = (() => {
-  let a = null;
+  let a = null, c = null;
   const get = () => {
     if (!a) { a = new Audio('audio/card-flip.mp3'); a.preload = 'auto'; a.setAttribute('playsinline', ''); }
     return a;
   };
   return {
-    preload: () => { try { get(); } catch (e) { /* ignore */ } },
+    preload: () => { try { get(); if (!c) { c = new Audio('audio/create.mp3'); c.preload = 'auto'; } } catch (e) { /* ignore */ } },
     flip: () => {
       if (!getSettings().sound) return;
       try { const x = get(); x.currentTime = 0; const p = x.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ }
+    },
+    enter: () => {
+      if (!getSettings().sound) return;
+      try {
+        if (!c) { c = new Audio('audio/create.mp3'); c.preload = 'auto'; c.setAttribute('playsinline', ''); }
+        c.currentTime = 0; const p = c.play(); if (p && p.catch) p.catch(() => {});
+      } catch (e) { /* ignore */ }
     }
   };
 })();
@@ -1625,7 +1632,7 @@ function GameCard({ game, confirming, onOpen, onAskDelete, onCancelDelete, onDel
   const tag = active ? { text: 'Active', c: '#34D399' } : { text: 'Saved Setup', c: '#94A3B8' };
   return (
     <div className="relative aspect-[3/4]">
-      <button onClick={onOpen}
+      <button onClick={() => { Sfx.enter(); onOpen(); }}
         className="absolute inset-0 flex flex-col items-start overflow-hidden rounded-2xl p-3.5 text-left transition active:scale-[0.98]"
         style={{ background: '#151A24', border: '1px solid var(--line)' }}
         aria-label={`Open ${game.name}`}>
@@ -1660,7 +1667,7 @@ const POPULAR_COUNTS = [4, 5, 6, 7, 8];
 function PresetCard({ count, deck, onPick }) {
   const art = useCustomArt();
   return (
-    <button onClick={onPick} aria-label={`Popular ${count} player setup`}
+    <button onClick={() => { Sfx.enter(); onPick(); }} aria-label={`Popular ${count} player setup`}
       className="relative flex aspect-[3/4] w-full flex-col items-start overflow-hidden rounded-2xl p-3.5 text-left transition active:scale-[0.98]"
       style={{ background: 'linear-gradient(160deg, #1B2230, #121722)', border: '1px solid var(--line)' }}>
       <img src={art.werewolf || ROLES_DATA.werewolf.imageUrl} alt="" draggable="false" onError={(e) => { e.currentTarget.style.display = 'none'; }}
@@ -1682,6 +1689,7 @@ function Home({ games, onBack, onCreate, onPreset, onResume, onRedeal, onEdit, o
   const [guide, setGuide] = useState(false);
   const [confirmId, setConfirmId] = useState(null);
   const [sheetId, setSheetId] = useState(null);
+  useEffect(() => { Sfx.preload(); }, []);
   const sheetGame = games.find((g) => g.id === sheetId);
   const presets = useMemo(() => POPULAR_COUNTS.map((c) => ({ count: c, deck: autoFill(c) })), []);
   return (
@@ -1700,7 +1708,7 @@ function Home({ games, onBack, onCreate, onPreset, onResume, onRedeal, onEdit, o
           style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>Role Guide</button>
       </header>
 
-      <button onClick={onCreate}
+      <button onClick={() => { Sfx.enter(); onCreate(); }}
         className="flex w-full items-center gap-4 rounded-2xl p-4 text-left transition hover:brightness-125 active:scale-[0.99]"
         style={{ background: 'linear-gradient(135deg, rgba(220,38,38,0.2), rgba(21,26,36,0.9))', border: '1px solid rgba(239,68,68,0.5)' }}>
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full" style={{ background: 'rgba(220,38,38,0.25)', border: '1px solid rgba(239,68,68,0.6)' }}>

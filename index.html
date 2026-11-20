@@ -463,7 +463,8 @@ function makeBgStore(key, fallback) {
 }
 const NIGHT_BG_DEFAULT = 'images/night-bg.jpg';
 const nightBgStore = makeBgStore('nightfall.nightbg.v1', NIGHT_BG_DEFAULT);
-const dayBgStore = makeBgStore('nightfall.daybg.v1', '');
+const DAY_BG_DEFAULT = 'images/day-bg.jpg';
+const dayBgStore = makeBgStore('nightfall.daybg.v1', DAY_BG_DEFAULT);
 const getNightBg = () => nightBgStore.get();
 const useNightBg = () => nightBgStore.use();
 const useDayBg = () => dayBgStore.use();
@@ -1283,7 +1284,8 @@ function toggleSound() {
   const cur = getSettings().sound;
   if (cur && !Ambience.isRunning() && !Tension.isRunning()) { if (tensionScreen && getSettings().music) Tension.start(); else Ambience.start(); return; }
   updateSettings({ sound: !cur });
-  if (!cur) { if (tensionScreen && getSettings().music) Tension.start(); else Ambience.start(); } else { Ambience.stop(); Tension.stop(); }
+  // Sound covers the forest ambience and effects. Game Music is its own switch and keeps playing.
+  if (!cur) { if (!(tensionScreen && getSettings().music)) Ambience.start(); } else Ambience.stop();
 }
 
 function SpeakerIcon({ on }) {
@@ -1393,7 +1395,7 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
             <div className="flex items-center justify-between gap-4 rounded-2xl p-4" style={rowStyle}>
               <div>
                 <div className="text-[15px] font-semibold" id="sound-label">Sound</div>
-                <p className="mt-0.5 text-xs leading-snug text-slate-400">Forest ambience and sound effects. Starts on your first tap.</p>
+                <p className="mt-0.5 text-xs leading-snug text-slate-400">Forest ambience and sound effects (not the game music). Starts on your first tap.</p>
               </div>
               <button role="switch" aria-checked={st.sound} aria-labelledby="sound-label" onClick={toggleSound}
                 className="relative h-8 w-14 shrink-0 rounded-full transition-colors"
@@ -1404,7 +1406,7 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
             <div className="flex items-center justify-between gap-4 rounded-2xl p-4" style={rowStyle}>
               <div>
                 <div className="text-[15px] font-semibold" id="music-label">Game Music</div>
-                <p className="mt-0.5 text-xs leading-snug text-slate-400">Tense music while you set up a game and reveal cards.</p>
+                <p className="mt-0.5 text-xs leading-snug text-slate-400">Tense music while you set up a game and reveal cards. Works on its own, even with Sound off.</p>
               </div>
               <button role="switch" aria-checked={st.music} aria-labelledby="music-label" onClick={() => updateSettings({ music: !st.music })}
                 className="relative h-8 w-14 shrink-0 rounded-full transition-colors"
@@ -1485,17 +1487,18 @@ function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
   useEffect(() => setImgOk(true), [src]);
   useEffect(() => { Ambience.preload(); Tension.preload(); Sfx.preload(); }, []);
   useEffect(() => {
-    if (!st.sound) { Ambience.stop(); return; }
-    if (Ambience.unlocked()) Ambience.start();
+    if (!st.sound) Ambience.stop();
+    else if (Ambience.unlocked()) Ambience.start();
     const go = (e) => {
       if (e.target && e.target.closest && e.target.closest('[data-sound-toggle]')) return;
       Sfx.unlock();
-      if (getSettings().sound) { Ambience.start(); Tension.prime(); }
+      if (getSettings().sound) Ambience.start();
+      if (getSettings().music) Tension.prime();
     };
     const evs = ['touchend', 'click', 'keydown'];
     evs.forEach((n) => window.addEventListener(n, go, { passive: true }));
     return () => evs.forEach((n) => window.removeEventListener(n, go));
-  }, [st.sound]);
+  }, [st.sound, st.music]);
   useEffect(() => {
     document.body.classList.add('lock');
     return () => document.body.classList.remove('lock');
@@ -4274,9 +4277,9 @@ function AppInner() {
     const isTense = screen === 'setup' || screen === 'cards' || screen === 'reveal' || (screen === 'multi' && (mpPhase === 'lobby' || mpPhase === 'cards' || mpPhase === 'reveal'));
     const tense = isTense && musicOn;
     tensionScreen = isTense;
-    if (!soundOn) { Ambience.stop(); Tension.stop(); return; }
-    if (tense) { Ambience.stop(true); Tension.start(); return; }
+    if (tense) { Ambience.stop(true); Tension.start(); return; }   // music does not depend on the Sound switch
     Tension.stop();
+    if (!soundOn) { Ambience.stop(); return; }
     if (screen !== 'start' && Ambience.unlocked()) Ambience.start();
   }, [screen, soundOn, musicOn, mpPhase]);
   if (screen === 'start') {
@@ -4316,7 +4319,7 @@ function AppInner() {
 /* ------------------------------------------------------------------ */
 function activeImageSources() {
   const list = [DEFAULT_BG, LOADING_BG, DEFAULT_BACK, getNightBg()];
-  if (dayBgStore.isCustom()) list.push(dayBgStore.get());
+  list.push(dayBgStore.get());
   ROLE_IDS.forEach((id) => {
     const src = ROLES_DATA[id].imageUrl;
     if (src) list.push(src);

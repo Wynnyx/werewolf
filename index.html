@@ -444,6 +444,39 @@ function preloadImage(src) {
   });
 }
 
+/* Night Phase background: bundled artwork by default, or the player's own photo (kept in localStorage). */
+const NIGHT_BG_KEY = 'nightfall.nightbg.v1';
+const NIGHT_BG_DEFAULT = 'images/night-bg.jpg';
+let nightBgCustom = (() => { try { return localStorage.getItem(NIGHT_BG_KEY) || ''; } catch (e) { return ''; } })();
+const nightBgListeners = new Set();
+const getNightBg = () => nightBgCustom || NIGHT_BG_DEFAULT;
+function setNightBg(dataUrl) {
+  nightBgCustom = dataUrl || '';
+  if (nightBgCustom) preloadImage(nightBgCustom);
+  nightBgListeners.forEach((fn) => fn());
+  try { if (nightBgCustom) localStorage.setItem(NIGHT_BG_KEY, nightBgCustom); else localStorage.removeItem(NIGHT_BG_KEY); return true; } catch (e) { return false; }
+}
+function useNightBg() { return React.useSyncExternalStore((fn) => { nightBgListeners.add(fn); return () => nightBgListeners.delete(fn); }, getNightBg); }
+// Downscale a chosen photo (max 1080 x 1920) to JPEG so it fits comfortably in localStorage.
+function fileToNightBg(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const k = Math.min(1, 1080 / img.naturalWidth, 1920 / img.naturalHeight);
+        const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        const ctx = c.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', 0.8));
+      } catch (e) { URL.revokeObjectURL(url); reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable')); };
+    img.src = url;
+  });
+}
+
 try { localStorage.removeItem('nightfall.cardart.v1'); } catch (e) { /* custom art no longer exists */ }
 const DEFAULT_BACK = 'images/card-back.jpg';
 function useCardImage(role) {
@@ -629,13 +662,27 @@ function autoFill(count) {
 }
 
 // Fisher-Yates
-function shuffle(arr) {
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
+// Unbiased random integer in [0, n). Uses the browser's crypto source when available.
+function randInt(n) {
+  try {
+    const c = window.crypto || window.msCrypto;
+    if (c && c.getRandomValues) {
+      const limit = Math.floor(4294967296 / n) * n;
+      const buf = new Uint32Array(1);
+      do { c.getRandomValues(buf); } while (buf[0] >= limit);
+      return buf[0] % n;
+    }
+  } catch (e) { /* fall back below */ }
+  return Math.floor(Math.random() * n);
+}
+// Fisher-Yates. Always works on a fresh copy and draws new random numbers on every call, so no deal reuses an earlier order.
+function shuffle(source) {
+  const deck = source.slice();
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = randInt(i + 1);
+    const tmp = deck[i]; deck[i] = deck[j]; deck[j] = tmp;
   }
-  return a;
+  return deck;
 }
 function deal(deck, names, count) {
   const cards = [];
@@ -1270,6 +1317,44 @@ function ServerUrlRow({ rowStyle }) {
   );
 }
 
+function NightBgRow({ rowStyle }) {
+  const src = useNightBg();
+  const [msg, setMsg] = useState('');
+  const custom = src !== NIGHT_BG_DEFAULT;
+  const pick = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      const url = await fileToNightBg(f);
+      setMsg(setNightBg(url) ? 'Night background updated.' : 'Could not save. The photo is too large for this browser to keep.');
+    } catch (err) { setMsg('That file could not be read as an image.'); }
+  };
+  return (
+    <div className="rounded-2xl p-4" style={rowStyle}>
+      <div className="flex items-start gap-3">
+        <div className="aspect-[9/16] w-[54px] shrink-0 overflow-hidden rounded-lg" style={{ background: '#05070B', border: '1px solid var(--line)' }}>
+          <img src={src} alt="" className="h-full w-full object-cover" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-semibold">Night Phase Background</div>
+          <p className="mt-0.5 text-xs leading-snug text-slate-400">Artwork behind the narrator&rsquo;s night screens. Portrait photos fit best.</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <label className="inline-flex min-h-[44px] cursor-pointer items-center rounded-lg px-3 text-sm font-semibold text-slate-100 focus-within:outline focus-within:outline-2 focus-within:outline-slate-200"
+              style={{ background: 'var(--card)', border: '1px solid rgba(203,213,225,0.35)' }}>
+              Choose photo
+              <input type="file" accept="image/*" className="sr-only" onChange={pick} />
+            </label>
+            {custom && <button onClick={() => { setNightBg(''); setMsg('Back to the default night background.'); }}
+              className="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-red-300 hover:bg-white/5" style={{ border: '1px solid #DC262666' }}>Reset to Default</button>}
+          </div>
+          {msg && <p role="status" className="mt-1.5 text-xs text-slate-400">{msg}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SettingsModal({ onClose, gameCount, onClearGames }) {
   const st = useSettings();
   const [confirm, setConfirm] = useState(false);
@@ -1340,6 +1425,7 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
               </button>
             </div>
 
+            <NightBgRow rowStyle={rowStyle} />
             <ServerUrlRow rowStyle={rowStyle} />
 
             <div className="rounded-2xl p-4" style={rowStyle}>
@@ -2073,7 +2159,7 @@ function HoldButton({ onComplete, ms = 1500, children }) {
   );
 }
 
-function Shield({ onUnlock, onExit }) {
+function Shield({ narrator, onUnlock, onStartNight, onExit }) {
   const [confirmExit, setConfirmExit] = useState(false);
   return (
     <Screen className="relative items-center justify-center text-center">
@@ -2082,11 +2168,22 @@ function Shield({ onUnlock, onExit }) {
         <ShieldIcon width="56" height="56" className="text-slate-300" />
       </div>
       <h1 className="font-display mt-8 text-3xl font-bold leading-snug">All cards dealt!</h1>
-      <p className="mt-3 max-w-xs text-slate-300">Pass the phone to the <span className="font-bold text-white">Moderator</span>.</p>
-      <p className="mt-2 max-w-xs text-sm text-slate-500">The next screen shows every role. Hold the button to open it.</p>
-      <div className="mt-10 w-full">
-        <HoldButton onComplete={onUnlock}>Press &amp; Hold to Unlock</HoldButton>
-      </div>
+      {narrator ? (
+        <>
+          <p className="mt-3 max-w-xs text-slate-300">Place the phone in the center of the table. Everyone close your eyes before starting.</p>
+          <div className="mt-10 w-full">
+            <Btn onClick={onStartNight}>Start Night 1</Btn>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="mt-3 max-w-xs text-slate-300">Pass the phone to the <span className="font-bold text-white">Moderator</span>.</p>
+          <p className="mt-2 max-w-xs text-sm text-slate-500">The next screen shows every role. Hold the button to open it.</p>
+          <div className="mt-10 w-full">
+            <HoldButton onComplete={onUnlock}>Press &amp; Hold to Unlock</HoldButton>
+          </div>
+        </>
+      )}
       {confirmExit && (
         <ConfirmExit body="Your game stays saved. You can resume it from My Games."
           onCancel={() => setConfirmExit(false)} onConfirm={onExit} />
@@ -2137,11 +2234,11 @@ function dawnLines(saved, deadNames) {
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function NightStage({ children, dawn = false, shake = false, flash = false, onExit, fixed = true, pitch = false }) {
+  const nightSrc = useNightBg();
   return (
     <div className={`${fixed ? 'fixed inset-0 z-40' : 'relative min-h-[70vh] rounded-3xl'} overflow-hidden ${shake ? 'dawn-shake' : ''}`} style={{ background: pitch ? '#000' : '#03050A' }}>
-      {!pitch && <img src={DEFAULT_BG} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-        style={{ opacity: dawn ? 0.5 : 0.3, filter: 'brightness(0.6) saturate(0.85)', transition: 'opacity 2.5s ease' }} />}
-      {!pitch && <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(3,5,10,0) 0%, rgba(3,5,10,0.88) 78%)' }} />}
+      {!pitch && <img src={nightSrc} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-cover" />}
+      {!pitch && <div className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 38%, rgba(10,10,18,0) 35%, rgba(10,10,18,0.45) 100%), linear-gradient(rgba(10,10,18,${dawn ? 0.42 : 0.55}), rgba(10,10,18,${dawn ? 0.42 : 0.55}))`, transition: 'background 2s ease' }} />}
       {flash && <div className="dawn-flash pointer-events-none absolute inset-0 z-20" />}
       {onExit && <ExitButton onClick={onExit} className="absolute left-4 z-30" style={{ top: 'max(16px, env(safe-area-inset-top))' }} />}
       <div className={`relative z-10 flex w-full overflow-y-auto px-5 ${fixed ? 'h-full' : 'min-h-[70vh]'}`} style={{ paddingTop: fixed ? 'max(64px, calc(env(safe-area-inset-top) + 48px))' : '24px', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
@@ -2495,8 +2592,8 @@ function DayTrial({ players, setPlayers, night, info, onNight, onGrimoire }) {
   );
 }
 
-function Moderator({ players, setPlayers, narrator, onAgain, onNew, onHome }) {
-  const [mode, setMode] = useState('grimoire'); // grimoire | night | day
+function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, onHome }) {
+  const [mode, setMode] = useState(autoNight ? 'night' : 'grimoire'); // grimoire | night | day
   const [night, setNight] = useState(() => players.reduce((m, p) => Math.max(m, p.nn || 0), 0) + 1);
   const [info, setInfo] = useState(null);
   const [checked, setChecked] = useState({});
@@ -3907,6 +4004,8 @@ function AppInner() {
   const [players, setPlayers] = useState([]);
   const [round, setRound] = useState(0);
   const [mpPhase, setMpPhase] = useState('');
+  const [autoNight, setAutoNight] = useState(false);
+  const narratorOn = (games.find((g) => g.id === curId) || {}).narrator !== false;
 
   useEffect(() => { saveGames(games); }, [games]);
 
@@ -4025,10 +4124,10 @@ function AppInner() {
     return <ChooseCards count={count} deck={deck} setDeck={setDeck} onBack={() => setScreen('setup')} onStart={start} />;
   }
   if (screen === 'reveal') return <Reveal key={round} players={players} onName={nameAt} onDone={() => setScreen('shield')} onExit={() => { finishGame(); setScreen('home'); }} />;
-  if (screen === 'shield') return <Shield onUnlock={() => setScreen('moderator')} onExit={() => setScreen('home')} />;
+  if (screen === 'shield') return <Shield narrator={narratorOn} onUnlock={() => { setAutoNight(false); setScreen('moderator'); }} onStartNight={() => { setAutoNight(true); setScreen('moderator'); }} onExit={() => setScreen('home')} />;
   return (
     <Moderator key={round} players={players} setPlayers={savePlayers}
-      narrator={(games.find((g) => g.id === curId) || {}).narrator !== false}
+      narrator={narratorOn} autoNight={autoNight}
       onAgain={() => redeal(games.find((g) => g.id === curId))}
       onNew={() => { finishGame(); openNewSetup(); }}
       onHome={() => setScreen('home')} />
@@ -4039,7 +4138,7 @@ function AppInner() {
 /* Startup: preload and decode images, then fade into the start screen */
 /* ------------------------------------------------------------------ */
 function activeImageSources() {
-  const list = [DEFAULT_BG, LOADING_BG, DEFAULT_BACK];
+  const list = [DEFAULT_BG, LOADING_BG, DEFAULT_BACK, getNightBg()];
   ROLE_IDS.forEach((id) => {
     const src = ROLES_DATA[id].imageUrl;
     if (src) list.push(src);

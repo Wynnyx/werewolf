@@ -1558,7 +1558,7 @@ function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
   const timers = useRef([]);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
   const spawn = (e) => {
-    if (!st.blood || guide || lobby || settingsOpen) return;
+    if (!st.blood || guide || settingsOpen) return;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const sp = makeBurst(e.clientX, e.clientY);
     setSplats((a) => [...a.slice(-15), sp]);

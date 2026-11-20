@@ -1292,7 +1292,7 @@ function NarratorPanel({ roles }) {
         <span className="text-xs tabular-nums text-slate-500">{step >= 0 ? `Step ${step + 1} of ${steps.length}` : 'Ready'}</span>
       </div>
       <p className="mt-3 min-h-[3.25rem] text-sm italic leading-snug text-slate-300" aria-live="polite">
-        {line || 'Tap Begin Night and the narrator will guide the night out loud, one role at a time.'}
+        {line || 'Tap Begin Night and the narrator speaks for you, calling each role out loud in turn.'}
       </p>
       {!supported && <p className="mt-2 text-xs text-amber-300">Spoken narration is not available on this device. Use the Night Wake-Up Order below and read it aloud instead.</p>}
       <div className="mt-3">
@@ -1825,7 +1825,7 @@ function Setup({ count, setCount, gameName, setGameName, narrator, setNarrator, 
       <section className="mt-4 flex items-center justify-between gap-4 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
         <div>
           <div className="text-[15px] font-semibold" id="narrator-label">Narrator</div>
-          <p className="mt-0.5 text-xs leading-snug text-slate-400">A voice guides the night phase out loud for the moderator.</p>
+          <p className="mt-0.5 text-xs leading-snug text-slate-400">A voice speaks the night phase out loud, so it takes the moderator’s place.</p>
         </div>
         <button role="switch" aria-checked={narrator} aria-labelledby="narrator-label" onClick={() => setNarrator(!narrator)}
           className="relative h-8 w-14 shrink-0 rounded-full transition-colors"
@@ -1921,8 +1921,13 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart }) {
               : '0 0 0 2px #E2E8F0, 0 0 24px 3px rgba(226,232,240,0.4)')
             : '0 0 0 1px rgba(203,213,225,0.2)';
           return (
-            <div key={id} className="relative aspect-[3/4] overflow-hidden rounded-2xl transition-shadow" style={{ boxShadow: ring, opacity: n === 0 && slotsLeft === 0 ? 0.6 : 1 }}>
-              <PlayingCard role={id} />
+            <div key={id} className="relative aspect-[3/4] overflow-hidden rounded-2xl transition-[box-shadow,opacity] duration-300"
+              style={{ boxShadow: ring, opacity: n === 0 && slotsLeft === 0 ? 0.6 : 1, cursor: n === 0 && slotsLeft > 0 ? 'pointer' : 'default' }}
+              onClick={(e) => { if (e.target.closest && e.target.closest('button')) return; if (n === 0) change(id, 1); }}>
+              <div className="h-full w-full transition-[filter] duration-300"
+                style={{ filter: n === 0 ? 'grayscale(0.9) brightness(0.55) contrast(0.95)' : 'none' }}>
+                <PlayingCard role={id} />
+              </div>
               <QtyPill role={id} n={n} canAdd={slotsLeft > 0 && n < r.max} onChange={(d) => change(id, d)} />
             </div>
           );

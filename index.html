@@ -137,6 +137,9 @@
 <div id="root"></div>
 
 <script type="text/babel">
+// Paste your Firebase Realtime Database URL here to ship it with the app, or save one in Settings (Settings wins when set).
+const DEFAULT_FIREBASE_URL = "";
+
 const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
 /* ------------------------------------------------------------------ */
@@ -890,32 +893,6 @@ function DefaultBackdrop() {
   );
 }
 
-function LobbyModal({ onClose }) {
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label="Multi-Device Lobby">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="screen-in relative w-full max-w-md rounded-t-3xl p-6 text-center sm:rounded-3xl"
-        style={{ background: 'var(--card)', border: '1px solid var(--line)', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="6" width="9" height="15" rx="2" /><rect x="12" y="3" width="9" height="15" rx="2" /></svg>
-        </div>
-        <span className="mt-4 inline-block rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-widest" style={{ color: '#FBBF24', background: '#FBBF241F', border: '1px solid #FBBF2455' }}>Coming soon</span>
-        <h2 className="font-display mt-3 text-2xl font-bold">Multi-Device Lobby</h2>
-        <p className="mt-3 text-sm leading-relaxed text-slate-300">
-          Room-code multiplayer across separate phones is planned for the next update. The host will share a short code, everyone joins on their own phone, and each player sees only their own card.
-        </p>
-        <p className="mt-3 text-sm leading-relaxed text-slate-400">Until then, Pass &amp; Play deals every card from one device.</p>
-        <div className="mt-6"><Btn onClick={onClose}>Got it</Btn></div>
-      </div>
-    </div>
-  );
-}
-
 const glassBtn = { background: 'rgba(11,14,20,0.5)', border: '1px solid rgba(226,232,240,0.28)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' };
 
 let burstSeq = 0;
@@ -952,8 +929,8 @@ function DotBurst({ b }) {
 /* ------------------------------------------------------------------ */
 const SET_KEY = 'nightfall.settings.v1';
 let settings = (() => {
-  try { const v = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); return { blood: !(v && v.blood === false), sound: !(v && v.sound === false), music: !(v && v.music === false) }; }
-  catch (e) { return { blood: true, sound: true, music: true }; }
+  try { const v = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); return { blood: !(v && v.blood === false), sound: !(v && v.sound === false), music: !(v && v.music === false), fbUrl: v && typeof v.fbUrl === 'string' ? v.fbUrl : '' }; }
+  catch (e) { return { blood: true, sound: true, music: true, fbUrl: '' }; }
 })();
 const setListeners = new Set();
 const subscribeSet = (fn) => { setListeners.add(fn); return () => setListeners.delete(fn); };
@@ -1226,7 +1203,7 @@ const Sfx = (() => {
     const c = getCtx();
     if (!c || bufs[f] !== undefined) return;
     bufs[f] = null;
-    fetch(f).then((r) => r.arrayBuffer()).then((ab) => new Promise((ok, no) => c.decodeAudioData(ab, ok, no)))
+    fetch(f).then((r) => r.arrayBuffer()).then((ab) => new Promise((ok, no) => { const pr = c.decodeAudioData(ab, ok, no); if (pr && pr.catch) pr.catch(() => {}); }))
       .then((b) => { bufs[f] = b; }).catch(() => { bufs[f] = false; });
   };
   const fallback = (f) => {
@@ -1408,6 +1385,39 @@ function SpeakerIcon({ on }) {
   );
 }
 
+function ServerUrlRow({ rowStyle }) {
+  const st = useSettings();
+  const [draft, setDraft] = useState(st.fbUrl || '');
+  const [status, setStatus] = useState(null); // { ok, text }
+  const [busy, setBusy] = useState(false);
+  const clean = normalizeDbUrl(draft);
+  const save = () => { updateSettings({ fbUrl: clean }); setDraft(clean); setStatus({ ok: true, text: clean ? 'Saved.' : 'Cleared. Using the built-in default, if any.' }); };
+  const test = async () => {
+    if (!clean) { setStatus({ ok: false, text: 'Paste a database URL first.' }); return; }
+    setBusy(true); setStatus(null);
+    try {
+      const res = await fetch(`${clean}/rooms.json?shallow=true`, { cache: 'no-store' });
+      if (res.ok) setStatus({ ok: true, text: 'Connected. Multi-Device is ready.' });
+      else setStatus({ ok: false, text: res.status === 401 || res.status === 403 ? 'The database refused access. Set its rules to allow read and write.' : `The server answered with error ${res.status}.` });
+    } catch (e) { setStatus({ ok: false, text: 'Could not reach that address. Check the URL and your connection.' }); }
+    setBusy(false);
+  };
+  return (
+    <div className="rounded-2xl p-4" style={rowStyle}>
+      <div className="text-[15px] font-semibold" id="fb-label">Multiplayer Server URL</div>
+      <p className="mt-0.5 text-xs leading-snug text-slate-400">Your free Firebase Realtime Database URL for Multi-Device rooms.</p>
+      <input type="url" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} aria-labelledby="fb-label" value={draft} onChange={(e) => { setDraft(e.target.value); setStatus(null); }}
+        placeholder="https://your-project-default-rtdb.firebaseio.com"
+        className="mt-3 h-12 w-full rounded-xl px-3 text-sm text-slate-100 placeholder-slate-600" style={{ background: 'var(--card)', border: '1px solid rgba(203,213,225,0.3)' }} />
+      <div className="mt-2.5 flex gap-2">
+        <button onClick={save} className="min-h-[44px] flex-1 rounded-xl text-sm font-bold text-white" style={{ background: '#6D28D9' }}>Save</button>
+        <button onClick={test} disabled={busy} className="min-h-[44px] flex-1 rounded-xl text-sm font-semibold text-slate-200 disabled:opacity-50" style={{ border: '1px solid var(--line)' }}>{busy ? 'Testing...' : 'Test'}</button>
+      </div>
+      {status && <p role="status" className={`mt-2 text-xs font-semibold ${status.ok ? 'text-emerald-300' : 'text-amber-300'}`}>{status.text}</p>}
+    </div>
+  );
+}
+
 function SettingsModal({ onClose, gameCount, onClearGames }) {
   const st = useSettings();
   const [view, setView] = useState('main'); // main | art
@@ -1474,6 +1484,8 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
               </button>
             </div>
 
+            <ServerUrlRow rowStyle={rowStyle} />
+
             <button onClick={() => setView('art')} className="flex min-h-[60px] items-center justify-between rounded-2xl px-4 text-left hover:bg-white/5" style={rowStyle}>
               <span>
                 <span className="block text-[15px] font-semibold">Custom Card Art</span>
@@ -1508,7 +1520,7 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
   );
 }
 
-function StartScreen({ onPlay, gameCount, onClearGames }) {
+function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
   const src = DEFAULT_BG;
   const st = useSettings();
   const atmos = useMemo(() => {
@@ -1523,7 +1535,6 @@ function StartScreen({ onPlay, gameCount, onClearGames }) {
   }, []);
   const [imgOk, setImgOk] = useState(true);
   const [guide, setGuide] = useState(false);
-  const [lobby, setLobby] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => setImgOk(true), [src]);
   useEffect(() => { Ambience.preload(); Tension.preload(); Sfx.preload(); }, []);
@@ -1607,11 +1618,9 @@ function StartScreen({ onPlay, gameCount, onClearGames }) {
             <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M7 4 L20 12 L7 20Z" /></svg>
             Pass &amp; Play
           </button>
-          <button onClick={() => setLobby(true)} aria-label="Multi-Device, coming in version 2"
+          <button onClick={onMulti} aria-label="Multi-Device"
             className="relative mx-auto flex w-full max-w-[260px] items-center justify-center gap-3 overflow-hidden rounded-2xl py-4 text-xl md:max-w-[340px] md:py-5 md:text-2xl font-bold tracking-wide text-white transition hover:brightness-110 active:scale-[0.98]"
             style={{ background: '#6D28D9', border: '1px solid rgba(167,139,250,0.4)', boxShadow: '0 8px 26px -8px rgba(109,40,217,0.6)' }}>
-            <span className="absolute left-0 top-0 rounded-br-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-100"
-              style={{ background: 'rgba(11,14,20,0.5)' }} aria-hidden="true">V2</span>
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="6" width="9" height="15" rx="2" /><rect x="12" y="3" width="9" height="15" rx="2" /></svg>
             Multi-Device
           </button>
@@ -1623,7 +1632,6 @@ function StartScreen({ onPlay, gameCount, onClearGames }) {
       </div>
 
       {guide && <RoleGuide onClose={() => setGuide(false)} />}
-      {lobby && <LobbyModal onClose={() => setLobby(false)} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} gameCount={gameCount} onClearGames={onClearGames} />}
     </div>
   );
@@ -1880,7 +1888,7 @@ function QtyPill({ role, n, canAdd, onChange }) {
   );
 }
 
-function ChooseCards({ count, deck, setDeck, onBack, onStart }) {
+function ChooseCards({ count, deck, setDeck, onBack, onStart, startLabel = 'Start & Deal Cards', showBalance = false }) {
   const [q, setQ] = useState('');
   useEffect(() => { Sfx.preload(); }, []);
   const [notice, setNotice] = useState('');
@@ -1937,6 +1945,18 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart }) {
           <span aria-hidden="true">{ruleOk ? '✓' : '!'}</span>
           At least 1 Werewolf required
         </div>
+        {showBalance && (() => {
+          const bal = deckBalance(deck);
+          const fair = bal >= BALANCE_MIN && bal <= BALANCE_MAX;
+          const c = total < count ? '#94A3B8' : fair ? '#34D399' : '#F59E0B';
+          const label = total < count ? 'Balance updates as you pick' : fair ? 'Balanced deck' : bal < BALANCE_MIN ? 'Favors the Werewolves' : 'Favors the Village';
+          return (
+            <div className="ml-2 mt-2.5 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold tabular-nums"
+              style={{ color: c, background: c + '14', border: `1px solid ${c}55` }} aria-live="polite">
+              Balance {bal > 0 ? '+' : ''}{bal} · {label}
+            </div>
+          );
+        })()}
       </div>
 
       <div className="relative mt-1">
@@ -1987,7 +2007,7 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart }) {
             {slotsLeft > 0 ? `Fill ${slotsLeft} more ${slotsLeft === 1 ? 'slot' : 'slots'}` : ''}{slotsLeft > 0 && !ruleOk ? ' and add ' : ''}{!ruleOk ? (slotsLeft > 0 ? 'a Werewolf' : 'Add a Werewolf') : ''} to continue.
           </p>
         )}
-        <Btn disabled={!canStart} onClick={onStart}>Start &amp; Deal Cards</Btn>
+        <Btn disabled={!canStart} onClick={onStart}>{startLabel}</Btn>
       </div>
     </Screen>
   );
@@ -2402,6 +2422,965 @@ function Moderator({ players, setPlayers, narrator, onAgain, onNew, onHome }) {
 /* App                                                                 */
 /* ------------------------------------------------------------------ */
 const STORE_KEY = 'nightfall.games.v1';
+/* ------------------------------------------------------------------ */
+/* Multi-Device: Firebase Realtime Database over plain REST + room logic */
+/* ------------------------------------------------------------------ */
+// Room shape (kept tiny so it syncs fast on mobile data):
+//  { v, host, hp, ph, k, lk, w, an, pl }
+//  ph: lobby | reveal | night | day | over     k: night number     lk: 1 while the host picks cards
+//  w: winner ('village' | 'werewolf')          hp: 1 when the host also plays
+//  an: { k, l:{0:'text'}, sv, si, x:{ts:'text'} }   morning announcement
+//  pl[pid]: { n name, o join order, r roleId, a alive 1/0, d ready 1/0, t night target pid, nd night action done,
+//             ws witch save this night, wsu / wpu potion used, lp bodyguard last target, hs hunter shot used, s silenced, lf left }
+const SESSION_KEY = 'nightfall.mp.v1';
+const MP_ACTIVE = ['werewolf', 'seer', 'bodyguard', 'witch', 'spellcaster'];
+const MP_MIN = 4;
+const MP_MAX = 8;
+const CODE_WORDS = ['WOLF', 'MOON', 'FANG', 'HOWL', 'PACK', 'CLAW', 'DARK', 'BONE', 'MIST', 'GRIM', 'CROW', 'BATS', 'DUSK', 'DAWN', 'HUNT', 'PREY', 'FEAR', 'GORE', 'MAUL', 'OMEN'];
+
+function normalizeDbUrl(u) {
+  let s = String(u || '').trim();
+  if (!s) return '';
+  if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+  return s.replace(/\/+$/, '').replace(/\.json$/i, '').replace(/\/+$/, '');
+}
+function getDbUrl() {
+  return normalizeDbUrl(getSettings().fbUrl) || normalizeDbUrl(DEFAULT_FIREBASE_URL);
+}
+
+const Mp = {
+  async req(method, path, body) {
+    const base = getDbUrl();
+    if (!base) throw new Error('no-url');
+    // No custom headers: a plain request avoids a CORS preflight and Firebase reads the JSON body anyway.
+    const res = await fetch(`${base}/${path}.json`, { method, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' });
+    if (!res.ok) throw new Error(res.status === 401 || res.status === 403 ? 'denied' : `http-${res.status}`);
+    return res.status === 204 ? null : res.json();
+  },
+  get: (p) => Mp.req('GET', p),
+  put: (p, b) => Mp.req('PUT', p, b),
+  patch: (p, b) => Mp.req('PATCH', p, b),
+  del: (p) => Mp.req('DELETE', p)
+};
+function mpErrorText(e) {
+  const m = e && e.message;
+  if (m === 'no-url') return 'No multiplayer server is set up yet.';
+  if (m === 'denied') return 'The database refused access. In Firebase, set the Realtime Database rules to allow read and write.';
+  if (/^http-/.test(m || '')) return `The server answered with an error (${m.slice(5)}). Check the database URL in Settings.`;
+  return 'Could not reach the server. Check your connection and the database URL in Settings.';
+}
+
+const randId = () => 'p' + Math.random().toString(36).slice(2, 8);
+const randLetters = () => Array.from({ length: 4 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
+const cleanCode = (s) => String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+
+async function mpCreateRoom(name, hostPlays) {
+  const pid = randId();
+  let code = '';
+  const words = shuffle(CODE_WORDS);
+  for (let i = 0; i < 12; i++) {
+    const c = i < words.length ? words[i] : randLetters();
+    const existing = await Mp.get(`rooms/${c}`);
+    if (!existing) { code = c; break; }
+  }
+  if (!code) throw new Error('no-code');
+  const room = { v: 1, host: pid, hp: hostPlays ? 1 : 0, ph: 'lobby', k: 0, lk: 0, w: '', ts: Date.now() };
+  if (hostPlays) room.pl = { [pid]: { n: name, o: 1, a: 1, d: 0 } };
+  await Mp.put(`rooms/${code}`, room);
+  return { code, pid, host: true };
+}
+
+async function mpJoinRoom(codeIn, name) {
+  const code = cleanCode(codeIn);
+  if (code.length !== 4) throw new Error('bad-code');
+  const room = await Mp.get(`rooms/${code}`);
+  if (!room) throw new Error('not-found');
+  if (room.ph !== 'lobby') throw new Error('started');
+  if (room.lk) throw new Error('locked');
+  const pl = roomPlayers(room);
+  if (pl.length >= MP_MAX) throw new Error('full');
+  if (pl.some((p) => p.n.toLowerCase() === name.toLowerCase())) throw new Error('name-taken');
+  const pid = randId();
+  const o = pl.reduce((m, p) => Math.max(m, p.o || 0), 0) + 1;
+  await Mp.patch(`rooms/${code}/pl/${pid}`, { n: name, o, a: 1, d: 0 });
+  return { code, pid, host: false };
+}
+function mpJoinErrorText(e) {
+  const m = e && e.message;
+  return ({
+    'bad-code': 'Enter the 4-letter room code.',
+    'not-found': 'No room with that code. Check the letters and try again.',
+    started: 'That game has already started.',
+    locked: 'The host is choosing cards, so the room is closed to new players.',
+    full: `That room is full (${MP_MAX} players).`,
+    'name-taken': 'Someone in that room already uses this name. Add an initial.'
+  })[m] || mpErrorText(e);
+}
+
+/* ---- pure helpers on a room snapshot ---- */
+const roomPlayers = (room) => Object.entries((room && room.pl) || {}).map(([id, p]) => ({ id, ...p })).sort((a, b) => (a.o || 0) - (b.o || 0));
+const mpNightRoles = (players) => Array.from(new Set(players.map((p) => p.r).filter((r) => MP_ACTIVE.includes(r)))).sort((a, b) => ROLES_DATA[a].nightOrder - ROLES_DATA[b].nightOrder);
+function mpWinner(players) {
+  const live = players.filter((p) => p.a === 1 && p.r);
+  if (!players.some((p) => p.r)) return '';
+  const wolves = live.filter((p) => p.r === 'werewolf').length;
+  const others = live.length - wolves;
+  if (wolves === 0) return 'village';
+  if (wolves >= others) return 'werewolf';
+  return '';
+}
+// What the wolf pack has chosen so far (most votes wins; ties go to the earliest joined target).
+function mpWolfVictim(players) {
+  const byId = Object.fromEntries(players.map((p) => [p.id, p]));
+  const tally = {};
+  players.filter((p) => p.a === 1 && p.r === 'werewolf' && p.t && byId[p.t]).forEach((p) => { tally[p.t] = (tally[p.t] || 0) + 1; });
+  const ids = Object.keys(tally).sort((x, y) => tally[y] - tally[x] || (byId[x].o || 0) - (byId[y].o || 0));
+  return ids[0] || '';
+}
+
+function mpDealPatch(room, deck) {
+  const players = roomPlayers(room);
+  const cards = [];
+  ROLE_IDS.forEach((id) => { for (let i = 0; i < (deck[id] || 0); i++) cards.push(id); });
+  const mix = shuffle(cards);
+  const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0 };
+  players.forEach((p, i) => {
+    const b = `pl/${p.id}/`;
+    Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0 });
+  });
+  return patch;
+}
+function mpLobbyPatch(room) {
+  const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0 };
+  roomPlayers(room).forEach((p) => {
+    const b = `pl/${p.id}/`;
+    ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'lf'].forEach((f) => { patch[b + f] = null; });
+    patch[b + 'a'] = 1; patch[b + 'd'] = 0;
+  });
+  return patch;
+}
+function mpNightPatch(room) {
+  const patch = { ph: 'night', k: (room.k || 0) + 1 };
+  roomPlayers(room).forEach((p) => {
+    const b = `pl/${p.id}/`;
+    patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0;
+  });
+  return patch;
+}
+
+// Works out the night from everyone's secret choices and returns the patch that opens the day.
+function mpResolveNight(room) {
+  const ps = roomPlayers(room);
+  const byId = Object.fromEntries(ps.map((p) => [p.id, p]));
+  const alive = ps.filter((p) => p.a === 1);
+  const victim = mpWolfVictim(ps);
+  const bg = alive.find((p) => p.r === 'bodyguard' && p.t && byId[p.t]);
+  const guarded = bg ? bg.t : '';
+  const witch = alive.find((p) => p.r === 'witch');
+  const witchSaves = !!(witch && witch.ws === 1 && !witch.wsu && victim);
+  const poison = witch && witch.t && !witch.wpu && byId[witch.t] ? witch.t : '';
+  const sc = alive.find((p) => p.r === 'spellcaster' && p.t && byId[p.t]);
+  const silenced = sc ? sc.t : '';
+
+  const dead = [];
+  let saved = false;
+  if (victim) { if (victim === guarded || witchSaves) saved = true; else dead.push(victim); }
+  if (poison && poison !== guarded && !dead.includes(poison)) dead.push(poison);
+
+  const lines = dead.map((id) => `${byId[id].n} was eliminated in the night.`);
+  if (saved) lines.push('The werewolves struck, but their victim was saved.');
+  if (!dead.length && !saved) lines.push('The night passed quietly. No one was eliminated.');
+  const an = { k: room.k || 0, l: Object.fromEntries(lines.map((t, i) => [i, t])), sv: saved ? 1 : 0, si: silenced };
+  const patch = { ph: 'day', an };
+  ps.forEach((p) => { patch[`pl/${p.id}/s`] = p.id === silenced ? 1 : 0; });
+  dead.forEach((id) => { patch[`pl/${id}/a`] = 0; });
+  if (witch && witch.ws === 1 && victim && !witch.wsu) patch[`pl/${witch.id}/wsu`] = 1;
+  if (poison) patch[`pl/${witch.id}/wpu`] = 1;
+  if (bg) patch[`pl/${bg.id}/lp`] = guarded;
+  return { patch, dead, saved, victim, guarded, silenced };
+}
+
+/* ------------------------------------------------------------------ */
+/* Multi-Device screens                                                */
+/* ------------------------------------------------------------------ */
+const MP_PURPLE = '#6D28D9';
+const loadSession = () => { try { const v = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); return v && v.code && v.pid ? v : null; } catch (e) { return null; } };
+const saveSession = (s) => { try { if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s)); else localStorage.removeItem(SESSION_KEY); } catch (e) { /* storage unavailable */ } };
+const NAME_KEY = 'nightfall.mp.name';
+const loadName = () => { try { return localStorage.getItem(NAME_KEY) || ''; } catch (e) { return ''; } };
+const saveName = (n) => { try { localStorage.setItem(NAME_KEY, n); } catch (e) { /* ignore */ } };
+
+function copyText(text) {
+  try { if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text); } catch (e) { /* fall through */ }
+  return new Promise((ok, no) => {
+    try {
+      const t = document.createElement('textarea');
+      t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select();
+      const done = document.execCommand('copy'); document.body.removeChild(t);
+      done ? ok() : no(new Error('copy'));
+    } catch (e) { no(e); }
+  });
+}
+
+// Polls the room every 1.5 seconds and cleans up when the screen goes away.
+function useRoom(code) {
+  const [room, setRoom] = useState(undefined); // undefined = loading, null = room is gone
+  const [err, setErr] = useState('');
+  const busy = useRef(false);
+  const again = useRef(false);
+  const live = useRef(true);
+  const refresh = useCallback(async () => {
+    if (busy.current) { again.current = true; return; }
+    busy.current = true;
+    try {
+      const r = await Mp.get(`rooms/${code}`);
+      if (live.current) { setRoom(r); setErr(''); }
+    } catch (e) { if (live.current) setErr(mpErrorText(e)); }
+    busy.current = false;
+    if (again.current && live.current) { again.current = false; refresh(); }
+  }, [code]);
+  useEffect(() => {
+    live.current = true;
+    refresh();
+    const t = setInterval(() => { if (!document.hidden) refresh(); }, 1500);
+    const vis = () => { if (!document.hidden) refresh(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { live.current = false; clearInterval(t); document.removeEventListener('visibilitychange', vis); };
+  }, [refresh]);
+  return { room, err, refresh };
+}
+
+function RoleChip({ role }) {
+  const r = ROLES_DATA[role];
+  if (!r) return null;
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold" style={{ color: r.color, background: r.color + '1A', border: `1px solid ${r.color}55` }}>
+      <RoleEmblem role={role} size={14} />{r.name}
+    </span>
+  );
+}
+
+function Panel({ children, className = '', style }) {
+  return <section className={`rounded-2xl p-4 ${className}`} style={{ background: 'var(--card)', border: '1px solid var(--line)', ...style }}>{children}</section>;
+}
+
+function MpHeader({ code, onLeave, leaveLabel }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => { copyText(code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1600); }, () => {}); };
+  return (
+    <header className="relative flex items-center justify-between gap-2 pb-3">
+      <ExitButton onClick={onLeave} aria-label={leaveLabel} />
+      <div className="text-center">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-400">Room Code</div>
+        <div className="font-display text-4xl font-black leading-none tracking-[0.28em] text-white" style={{ paddingLeft: '0.28em', textShadow: '0 0 24px rgba(167,139,250,0.45)' }} aria-label={`Room code ${code.split('').join(' ')}`}>{code}</div>
+      </div>
+      <button onClick={copy} className="min-h-[40px] rounded-xl px-3 text-xs font-bold text-violet-100 transition active:scale-95"
+        style={{ background: 'rgba(109,40,217,0.35)', border: '1px solid rgba(167,139,250,0.5)' }}>{copied ? 'Copied!' : 'Copy Code'}</button>
+    </header>
+  );
+}
+
+function PlayerList({ players, meId, hostId, onRemove, ready }) {
+  return (
+    <ul className="flex flex-col gap-2">
+      {players.map((p) => (
+        <li key={p.id} className="flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>
+          <span className="flex min-w-0 items-center gap-2.5">
+            <WolfBadge tint={p.id === hostId ? '#A78BFA' : '#94A3B8'} size={30} />
+            <span className="truncate text-[15px] font-semibold text-slate-100">{p.n}{p.id === meId ? ' (you)' : ''}</span>
+            {p.id === hostId && <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-200" style={{ background: 'rgba(109,40,217,0.35)' }}>Host</span>}
+          </span>
+          <span className="flex shrink-0 items-center gap-2">
+            {ready && <span className={`text-xs font-semibold ${p.d === 1 ? 'text-emerald-300' : 'text-slate-500'}`}>{p.d === 1 ? 'Ready ✓' : 'Viewing…'}</span>}
+            {onRemove && p.id !== meId && <button onClick={() => onRemove(p.id)} aria-label={`Remove ${p.n}`} className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-white/10">✕</button>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/* ---------- entry screens ---------- */
+function MpConfigCard({ onBack, onOpenSettings }) {
+  const rules = '{ "rules": { ".read": true, ".write": true } }';
+  const [copied, setCopied] = useState(false);
+  const steps = [
+    ['Create a free project', 'Open console.firebase.google.com and add a project (Google Analytics can be off).'],
+    ['Add a Realtime Database', 'Build → Realtime Database → Create Database. Any region is fine.'],
+    ['Allow read and write', 'Open the Rules tab, paste the rules below, then Publish.'],
+    ['Copy the database URL', 'It looks like https://your-project-default-rtdb.firebaseio.com'],
+    ['Paste it in Settings', 'Settings → Multiplayer Server URL → Save.']
+  ];
+  return (
+    <div className="flex flex-col gap-4">
+      <Panel>
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'rgba(109,40,217,0.25)', border: '1px solid rgba(167,139,250,0.5)' }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C4B5FD" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3" /><path d="M4 6 V18 C4 19.7 7.6 21 12 21 S20 19.7 20 18 V6 M4 12 C4 13.7 7.6 15 12 15 S20 13.7 20 12" /></svg>
+        </div>
+        <h2 className="font-display mt-3 text-center text-xl font-bold">Connect a multiplayer server</h2>
+        <p className="mt-2 text-center text-sm leading-relaxed text-slate-300">Multi-Device rooms need a small free database so phones can share the game. It takes about two minutes and only the host has to do it once.</p>
+        <ol className="mt-4 flex flex-col gap-3">
+          {steps.map(([t, d], i) => (
+            <li key={i} className="flex gap-3">
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-violet-100" style={{ background: MP_PURPLE }}>{i + 1}</span>
+              <span><span className="block text-sm font-semibold text-slate-100">{t}</span><span className="block text-xs leading-snug text-slate-400">{d}</span></span>
+            </li>
+          ))}
+        </ol>
+        <div className="mt-4 rounded-xl p-3" style={{ background: '#0B0E14', border: '1px solid var(--line)' }}>
+          <code className="block break-all text-xs text-slate-300">{rules}</code>
+          <button onClick={() => copyText(rules).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }, () => {})}
+            className="mt-2 text-xs font-semibold text-violet-300">{copied ? 'Copied!' : 'Copy rules'}</button>
+        </div>
+        <p className="mt-3 text-xs leading-snug text-slate-500">These open rules suit a casual game among friends. Anyone with the URL could read the data, so do not store anything private there.</p>
+      </Panel>
+      <Btn onClick={onOpenSettings} style={{ background: 'linear-gradient(180deg, #7C3AED, #5B21B6)' }}>Open Settings</Btn>
+      <Btn variant="ghost" onClick={onBack}>Back</Btn>
+    </div>
+  );
+}
+
+function MpField({ label, children }) {
+  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</span>{children}</label>;
+}
+const mpInputStyle = { background: 'var(--card)', border: '1px solid rgba(203,213,225,0.3)' };
+
+function MpEntry({ onHost, onJoin, onBack }) {
+  const card = (title, sub, onClick, icon, accent) => (
+    <button onClick={onClick} className="flex w-full items-center gap-4 rounded-2xl p-5 text-left transition hover:brightness-125 active:scale-[0.99]"
+      style={{ background: `linear-gradient(135deg, ${accent}2E, rgba(21,26,36,0.95))`, border: `1px solid ${accent}77` }}>
+      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full" style={{ background: accent + '33', border: `1px solid ${accent}99` }}>{icon}</span>
+      <span className="min-w-0 flex-1"><span className="font-display block text-xl font-bold uppercase tracking-wide text-slate-50">{title}</span><span className="mt-0.5 block text-sm text-slate-300">{sub}</span></span>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-slate-400"><path d="M9 5 L16 12 L9 19" /></svg>
+    </button>
+  );
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm leading-relaxed text-slate-300">Everyone plays on their own phone. The host shares a 4-letter code and each player sees only their own card.</p>
+      {card('Host a Room', 'Create a code and run the game', onHost, <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#C4B5FD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4 V20 M4 12 H20" /></svg>, '#8B5CF6')}
+      {card('Join a Room', 'Enter a code from your host', onJoin, <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FCA5A5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12 H19 M13 6 L19 12 L13 18" /></svg>, '#EF4444')}
+      <Btn variant="ghost" className="mt-2" onClick={onBack}>Back</Btn>
+    </div>
+  );
+}
+
+function MpHostForm({ onBack, onCreated }) {
+  const [name, setName] = useState(loadName);
+  const [plays, setPlays] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const go = async () => {
+    const n = name.trim();
+    if (!n) { setErr('Enter your name first.'); return; }
+    setBusy(true); setErr('');
+    try { saveName(n); onCreated(await mpCreateRoom(n, plays), n); }
+    catch (e) { setErr(e.message === 'no-code' ? 'Could not find a free room code. Try again.' : mpErrorText(e)); setBusy(false); }
+  };
+  const opt = (val, title, sub) => (
+    <button type="button" role="radio" aria-checked={plays === val} onClick={() => setPlays(val)} className="flex-1 rounded-xl p-3 text-left transition"
+      style={{ background: plays === val ? 'rgba(109,40,217,0.3)' : 'var(--card)', border: `1px solid ${plays === val ? '#A78BFA' : 'var(--line)'}` }}>
+      <span className="block text-sm font-bold text-slate-50">{title}</span><span className="mt-0.5 block text-xs leading-snug text-slate-400">{sub}</span>
+    </button>
+  );
+  return (
+    <div className="flex flex-col gap-4">
+      <h2 className="font-display text-2xl font-bold">Host a Room</h2>
+      <MpField label="Your name">
+        <input value={name} maxLength={14} onChange={(e) => setName(e.target.value)} placeholder="Enter your name..." autoComplete="off"
+          className="h-14 w-full rounded-xl px-4 text-lg text-slate-100 placeholder-slate-500" style={mpInputStyle} />
+      </MpField>
+      <div role="radiogroup" aria-label="Host role" className="flex gap-2.5">
+        {opt(true, 'Playing + Hosting', 'You get a card and run the game.')}
+        {opt(false, 'Moderator Only', 'You run the game without a card.')}
+      </div>
+      {err && <p role="alert" className="text-sm text-amber-300">{err}</p>}
+      <Btn disabled={busy} onClick={go}>{busy ? 'Creating room...' : 'Create Room'}</Btn>
+      <Btn variant="ghost" disabled={busy} onClick={onBack}>Back</Btn>
+    </div>
+  );
+}
+
+function MpJoinForm({ onBack, onJoined }) {
+  const [code, setCode] = useState('');
+  const [name, setName] = useState(loadName);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const go = async () => {
+    const n = name.trim();
+    if (cleanCode(code).length !== 4) { setErr('Enter the 4-letter room code.'); return; }
+    if (!n) { setErr('Enter your name first.'); return; }
+    setBusy(true); setErr('');
+    try { saveName(n); onJoined(await mpJoinRoom(code, n), n); }
+    catch (e) { setErr(mpJoinErrorText(e)); setBusy(false); }
+  };
+  return (
+    <div className="flex flex-col gap-4">
+      <h2 className="font-display text-2xl font-bold">Join a Room</h2>
+      <MpField label="Room code">
+        <input value={code} maxLength={4} onChange={(e) => setCode(cleanCode(e.target.value))} placeholder="WOLF" autoComplete="off" autoCapitalize="characters" spellCheck={false}
+          className="font-display h-16 w-full rounded-xl text-center text-3xl font-black uppercase tracking-[0.4em] text-white placeholder-slate-600" style={{ ...mpInputStyle, paddingLeft: '0.4em' }} />
+      </MpField>
+      <MpField label="Your name">
+        <input value={name} maxLength={14} onChange={(e) => setName(e.target.value)} placeholder="Enter your name..." autoComplete="off"
+          className="h-14 w-full rounded-xl px-4 text-lg text-slate-100 placeholder-slate-500" style={mpInputStyle} />
+      </MpField>
+      {err && <p role="alert" className="text-sm text-amber-300">{err}</p>}
+      <Btn disabled={busy} onClick={go}>{busy ? 'Joining...' : 'Join Room'}</Btn>
+      <Btn variant="ghost" disabled={busy} onClick={onBack}>Back</Btn>
+    </div>
+  );
+}
+
+/* ---------- player-side views ---------- */
+function MpReveal({ me, ready, readyCount, total, onReady }) {
+  const [phase, setPhase] = useState('idle'); // idle | lift | flipping | open
+  const [sent, setSent] = useState(false);
+  const [showAbility, setShowAbility] = useState(false);
+  const timers = useRef([]);
+  useEffect(() => { Sfx.preload(); return () => timers.current.forEach(clearTimeout); }, []);
+  const hasImg = !!useCardImage(me.r);
+  const reveal = () => {
+    if (phase !== 'idle') return;
+    Sfx.flip();
+    setPhase('lift');
+    timers.current.push(setTimeout(() => setPhase('flipping'), 300));
+    timers.current.push(setTimeout(() => setPhase('open'), 1500));
+  };
+  const done = ready || sent;
+  if (done) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+        <RoleChip role={me.r} />
+        <p className="font-display text-2xl font-bold">You&rsquo;re ready</p>
+        <p className="text-sm text-slate-300">Waiting for the others to look at their cards.</p>
+        <p className="text-sm font-semibold tabular-nums text-violet-200">{readyCount} of {total} ready</p>
+        <button onClick={() => setShowAbility(true)} className="min-h-[44px] rounded-xl px-5 text-sm font-semibold text-slate-200 hover:bg-white/5" style={{ border: '1px solid var(--line)' }}>View my role</button>
+        {showAbility && <AbilityModal role={me.r} onClose={() => setShowAbility(false)} />}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-1 flex-col items-center">
+      <div role="note" className="mt-1 flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left text-sm leading-snug"
+        style={{ color: '#FDE68A', background: 'linear-gradient(135deg, rgba(220,38,38,0.16), rgba(245,158,11,0.12))', border: '1px solid rgba(245,158,11,0.55)' }}>
+        <span><strong className="font-bold text-amber-200">Eyes only!</strong> Make sure nobody can see your screen before you reveal your card.</span>
+      </div>
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 py-3">
+        <div role="button" tabIndex={phase === 'idle' ? 0 : -1} onClick={reveal} aria-label="Tap the card to reveal your role"
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); reveal(); } }}
+          className={phase === 'idle' ? 'cursor-pointer' : ''}>
+          <RoleCard role={me.r} phase={phase} />
+        </div>
+        <div className="relative w-full text-center" style={{ minHeight: '3.5rem' }}>
+          {phase === 'idle' && <p className="hint-pulse pt-1 text-sm font-semibold tracking-wide text-slate-300">Tap the card to reveal</p>}
+          <div className={`absolute inset-x-0 top-0 mx-auto text-center transition-opacity duration-500 ${phase === 'open' ? 'opacity-100' : 'opacity-0'}`} style={{ width: 'min(19rem, 86vw)' }}>
+            <TeamBadge team={ROLES_DATA[me.r].team} />
+            {!hasImg && <p className="mt-2 text-xs leading-snug text-slate-300">{ROLES_DATA[me.r].ability}</p>}
+          </div>
+        </div>
+      </div>
+      <div className={`flex w-full flex-col gap-3 pb-2 ${phase === 'open' ? '' : 'invisible'}`}>
+        <button onClick={() => setShowAbility(true)} disabled={phase !== 'open'}
+          className="flex min-h-[48px] w-full items-center justify-center rounded-xl text-sm font-semibold text-slate-200 hover:bg-white/5" style={{ border: '1px solid var(--line)' }}>View Ability</button>
+        <Btn disabled={phase !== 'open'} onClick={() => { setSent(true); onReady(); }}>I&rsquo;m Ready</Btn>
+      </div>
+      {showAbility && <AbilityModal role={me.r} onClose={() => setShowAbility(false)} />}
+    </div>
+  );
+}
+
+function PickList({ players, value, onChange, disabled = [], locked }) {
+  return (
+    <ul className="flex flex-col gap-2" role="listbox">
+      {players.map((p) => {
+        const off = locked || disabled.includes(p.id);
+        const sel = value === p.id;
+        return (
+          <li key={p.id}>
+            <button role="option" aria-selected={sel} disabled={off} onClick={() => onChange(sel ? '' : p.id)}
+              className="flex min-h-[52px] w-full items-center justify-between rounded-xl px-4 text-left text-[15px] font-semibold transition active:scale-[0.99] disabled:opacity-40"
+              style={{ background: sel ? 'rgba(109,40,217,0.35)' : 'var(--card-2)', border: `1px solid ${sel ? '#A78BFA' : 'var(--line)'}`, color: '#E6EAF2' }}>
+              {p.n}{sel && <span aria-hidden="true">✓</span>}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function SleepPanel({ me, text }) {
+  const r = ROLES_DATA[me.r];
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-5 text-center">
+      <MoonIcon width="88" height="88" className="hint-pulse text-slate-300" />
+      <div>
+        <p className="font-display text-2xl font-bold">Night falls</p>
+        <p className="mt-2 max-w-xs text-sm leading-relaxed text-slate-300">{text}</p>
+      </div>
+      {r && <RoleChip role={me.r} />}
+    </div>
+  );
+}
+
+function MpNight({ me, players, room, write }) {
+  const [pick, setPick] = useState('');
+  const [save, setSave] = useState(false);
+  const role = me.r;
+  const alive = players.filter((p) => p.a === 1);
+  const done = me.nd === 1;
+  const name = (id) => (players.find((p) => p.id === id) || {}).n || '?';
+  const lock = (extra) => write({ [`pl/${me.id}/t`]: pick || '', [`pl/${me.id}/nd`]: 1, ...(extra || {}) });
+
+  if (me.a !== 1) return <SleepPanel me={me} text="You have been eliminated. Keep quiet and keep your eyes closed." />;
+  if (!MP_ACTIVE.includes(role)) return <SleepPanel me={me} text="Close your eyes and stay silent. The night roles are at work." />;
+
+  const header = (title, sub) => (
+    <div className="mb-4 text-center">
+      <RoleChip role={role} />
+      <h2 className="font-display mt-3 text-2xl font-bold">{title}</h2>
+      <p className="mt-1 text-sm text-slate-300">{sub}</p>
+    </div>
+  );
+  const lockedNote = (
+    <div className="mt-4 rounded-xl px-4 py-3 text-center text-sm font-semibold text-emerald-200" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.4)' }}>
+      Choice locked in. Wait for dawn.
+    </div>
+  );
+
+  if (role === 'werewolf') {
+    const pack = players.filter((p) => p.r === 'werewolf' && p.id !== me.id);
+    return (
+      <div className="flex flex-1 flex-col">
+        {header('Choose your victim', 'Agree silently with your pack. The most votes wins.')}
+        <PickList players={alive.filter((p) => p.r !== 'werewolf')} value={done ? me.t : pick} onChange={setPick} locked={done} />
+        {pack.length > 0 && (
+          <div className="mt-3 rounded-xl p-3 text-xs text-slate-300" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+            <div className="mb-1 font-semibold uppercase tracking-widest text-slate-400">Your pack</div>
+            {pack.map((p) => <div key={p.id}>{p.n}: {p.t ? `votes ${name(p.t)}` : 'deciding...'}</div>)}
+          </div>
+        )}
+        {done ? lockedNote : <Btn className="mt-4" disabled={!pick} onClick={() => lock()}>Lock In Victim</Btn>}
+      </div>
+    );
+  }
+  if (role === 'seer') {
+    const target = done ? players.find((p) => p.id === me.t) : null;
+    return (
+      <div className="flex flex-1 flex-col">
+        {header('Inspect a player', 'Learn whether one player is a werewolf.')}
+        <PickList players={alive.filter((p) => p.id !== me.id)} value={done ? me.t : pick} onChange={setPick} locked={done} />
+        {done ? (
+          <>
+            {target && (
+              <div className="mt-4 rounded-xl px-4 py-4 text-center" style={{ background: target.r === 'werewolf' ? 'rgba(220,38,38,0.18)' : 'rgba(16,185,129,0.14)', border: `1px solid ${target.r === 'werewolf' ? '#EF4444' : '#34D399'}` }}>
+                <div className="font-display text-xl font-bold">{target.n}</div>
+                <div className="mt-1 text-sm font-semibold" style={{ color: target.r === 'werewolf' ? '#FCA5A5' : '#6EE7B7' }}>{target.r === 'werewolf' ? 'is a Werewolf' : 'is not a Werewolf'}</div>
+              </div>
+            )}
+            {lockedNote}
+          </>
+        ) : <Btn className="mt-4" disabled={!pick} onClick={() => lock()}>Inspect</Btn>}
+      </div>
+    );
+  }
+  if (role === 'bodyguard') {
+    return (
+      <div className="flex flex-1 flex-col">
+        {header('Protect a player', me.lp ? `You cannot guard ${name(me.lp)} again tonight.` : 'They cannot be eliminated tonight.')}
+        <PickList players={alive} value={done ? me.t : pick} onChange={setPick} disabled={me.lp ? [me.lp] : []} locked={done} />
+        {done ? lockedNote : <Btn className="mt-4" disabled={!pick} onClick={() => lock()}>Protect</Btn>}
+      </div>
+    );
+  }
+  if (role === 'spellcaster') {
+    return (
+      <div className="flex flex-1 flex-col">
+        {header('Silence a player', 'They may not speak during tomorrow’s discussion.')}
+        <PickList players={alive.filter((p) => p.id !== me.id)} value={done ? me.t : pick} onChange={setPick} locked={done} />
+        {done ? lockedNote : <Btn className="mt-4" disabled={!pick} onClick={() => lock()}>Cast Silence</Btn>}
+      </div>
+    );
+  }
+  // witch
+  const victimId = mpWolfVictim(players);
+  const canSave = !me.wsu && !!victimId;
+  return (
+    <div className="flex flex-1 flex-col">
+      {header('Brew your potions', 'Each potion can only be used once in the whole game.')}
+      <Panel className="text-sm">
+        <div className="text-xs font-semibold uppercase tracking-widest text-slate-400">Tonight&rsquo;s victim</div>
+        <div className="mt-1 font-display text-lg font-bold">{victimId ? name(victimId) : 'The wolves have not chosen yet'}</div>
+        {me.wsu === 1
+          ? <p className="mt-2 text-xs text-slate-500">Healing potion already used.</p>
+          : <button disabled={!canSave || done} onClick={() => setSave(!save)} aria-pressed={save}
+              className="mt-3 flex min-h-[48px] w-full items-center justify-center rounded-xl text-sm font-bold transition disabled:opacity-40"
+              style={{ background: (done ? me.ws === 1 : save) ? 'rgba(16,185,129,0.25)' : 'var(--card-2)', border: `1px solid ${(done ? me.ws === 1 : save) ? '#34D399' : 'var(--line)'}`, color: '#E6EAF2' }}>
+              {(done ? me.ws === 1 : save) ? `Saving ${victimId ? name(victimId) : ''} ✓` : 'Use healing potion'}
+            </button>}
+      </Panel>
+      {me.wpu === 1
+        ? <p className="mt-3 text-center text-xs text-slate-500">Poison already used.</p>
+        : <>
+            <div className="mb-2 mt-4 text-xs font-semibold uppercase tracking-widest text-slate-400">Poison a player (optional)</div>
+            <PickList players={alive.filter((p) => p.id !== me.id)} value={done ? me.t : pick} onChange={setPick} locked={done} />
+          </>}
+      {done ? lockedNote : <Btn className="mt-4" onClick={() => lock({ [`pl/${me.id}/ws`]: save && canSave ? 1 : 0 })}>{pick || (save && canSave) ? 'Confirm' : 'Do Nothing Tonight'}</Btn>}
+    </div>
+  );
+}
+
+function AnnounceCard({ room, players }) {
+  const an = room.an;
+  if (!an) return null;
+  const lines = Object.values(an.l || {});
+  const extra = Object.entries(an.x || {}).sort((a, b) => a[0].localeCompare(b[0])).map((e) => e[1]);
+  const si = an.si && players.find((p) => p.id === an.si);
+  return (
+    <Panel className="text-center" style={{ background: 'linear-gradient(160deg, rgba(251,191,36,0.1), rgba(21,26,36,0.95))', border: '1px solid rgba(251,191,36,0.4)' }}>
+      <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-amber-300">Morning of day {an.k}</div>
+      <div className="mt-2 flex flex-col gap-1.5">
+        {lines.map((t, i) => <p key={i} className="font-display text-lg font-bold leading-snug text-slate-50">{t}</p>)}
+        {si && <p className="text-sm text-violet-200">{si.n} has been silenced for today&rsquo;s discussion.</p>}
+        {extra.map((t, i) => <p key={'x' + i} className="text-sm text-slate-300">{t}</p>)}
+      </div>
+    </Panel>
+  );
+}
+
+function StatusBadges({ players, meId }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {players.map((p) => (
+        <span key={p.id} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold"
+          style={p.a === 1 ? { background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.4)', color: '#A7F3D0' } : { background: 'rgba(100,116,139,0.12)', border: '1px solid rgba(100,116,139,0.35)', color: '#94A3B8', textDecoration: 'line-through' }}>
+          {p.n}{p.id === meId ? ' (you)' : ''}{p.s === 1 && p.a === 1 ? ' 🤐' : ''}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function MpDay({ me, players, room, write }) {
+  const alive = players.filter((p) => p.a === 1);
+  const hunterShot = me.r === 'hunter' && me.a !== 1 && me.hs !== 1;
+  const [target, setTarget] = useState('');
+  const shoot = () => {
+    const t = players.find((p) => p.id === target);
+    if (!t) return;
+    write({ [`pl/${t.id}/a`]: 0, [`pl/${me.id}/hs`]: 1, [`an/x/${String(Date.now())}`]: `${me.n} fired a last shot and took ${t.n} down.` });
+  };
+  return (
+    <div className="flex flex-1 flex-col gap-4">
+      <AnnounceCard room={room} players={players} />
+      {me.a !== 1
+        ? <Panel className="text-center text-sm text-slate-300">You are eliminated. You can still watch, but keep quiet.</Panel>
+        : me.s === 1
+          ? <Panel className="text-center text-sm font-semibold text-violet-200" style={{ border: '1px solid rgba(167,139,250,0.5)' }}>You are silenced today. Do not speak during the discussion.</Panel>
+          : <Panel className="text-center text-sm text-slate-300">You are alive. Discuss and find the werewolves.</Panel>}
+      {hunterShot && (
+        <Panel style={{ border: '1px solid rgba(245,158,11,0.6)' }}>
+          <h3 className="font-display text-lg font-bold text-amber-300">Take your last shot</h3>
+          <p className="mb-3 mt-1 text-xs text-slate-300">You were eliminated. Choose one player to take down with you.</p>
+          <PickList players={alive} value={target} onChange={setTarget} />
+          <Btn className="mt-3" disabled={!target} onClick={shoot}>Fire</Btn>
+        </Panel>
+      )}
+      <div>
+        <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Players</div>
+        <StatusBadges players={players} meId={me.id} />
+      </div>
+    </div>
+  );
+}
+
+function MpOver({ room, players, meId }) {
+  const village = room.w === 'village';
+  return (
+    <div className="flex flex-1 flex-col gap-4">
+      <Panel className="text-center" style={{ border: `1px solid ${village ? '#34D399' : '#EF4444'}`, background: village ? 'rgba(16,185,129,0.1)' : 'rgba(220,38,38,0.12)' }}>
+        <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-300">Game over</div>
+        <h2 className="font-display mt-1 text-3xl font-black" style={{ color: village ? '#6EE7B7' : '#FCA5A5' }}>{village ? 'The Village wins' : 'The Werewolves win'}</h2>
+      </Panel>
+      <ul className="flex flex-col gap-2">
+        {players.map((p) => (
+          <li key={p.id} className="flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5" style={{ background: 'var(--card-2)', border: '1px solid var(--line)', opacity: p.a === 1 ? 1 : 0.65 }}>
+            <span className="truncate text-[15px] font-semibold">{p.n}{p.id === meId ? ' (you)' : ''}{p.a !== 1 ? ' · out' : ''}</span>
+            <RoleChip role={p.r} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/* ---------- host / moderator view ---------- */
+function MpMod({ room, players, me, write, narrator }) {
+  const ph = room.ph;
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const byId = Object.fromEntries(players.map((p) => [p.id, p]));
+  const nm = (id) => (byId[id] || {}).n || '?';
+  const nightRoles = useMemo(() => mpNightRoles(players), [players]);
+  const alive = players.filter((p) => p.a === 1);
+  const winner = mpWinner(players);
+  const actors = alive.filter((p) => MP_ACTIVE.includes(p.r));
+  const pending = actors.filter((p) => p.nd !== 1);
+  const allReady = players.length > 0 && players.every((p) => p.d === 1);
+  const victim = mpWolfVictim(players);
+
+  const startNight = () => write(mpNightPatch(room));
+  const dawn = () => { const r = mpResolveNight(room); write(r.patch); };
+  const toggleAlive = (p) => {
+    const patch = { [`pl/${p.id}/a`]: p.a === 1 ? 0 : 1 };
+    if (p.a === 1) patch[`an/x/${String(Date.now())}`] = `${p.n} was eliminated by the village.`;
+    write(patch);
+  };
+  const endGame = (w) => write({ ph: 'over', w });
+  const playAgain = () => write(mpLobbyPatch(room));
+
+  const winBanner = winner && (ph === 'night' || ph === 'day') && (
+    <Panel style={{ border: `1px solid ${winner === 'village' ? '#34D399' : '#EF4444'}`, background: winner === 'village' ? 'rgba(16,185,129,0.1)' : 'rgba(220,38,38,0.12)' }}>
+      <p className="text-sm font-semibold text-slate-100">{winner === 'village' ? 'No werewolves are left. The Village wins.' : 'The werewolves match or outnumber the Village.'}</p>
+      <Btn className="mt-3" onClick={() => endGame(winner)}>End Game: {winner === 'village' ? 'Village Wins' : 'Werewolves Win'}</Btn>
+    </Panel>
+  );
+
+  const grimoire = (
+    <ul className="flex flex-col gap-2">
+      {players.map((p) => {
+        const actor = MP_ACTIVE.includes(p.r);
+        let detail = '';
+        if (ph === 'night' && p.a === 1 && actor) detail = p.nd === 1 ? (p.t ? `→ ${nm(p.t)}` : 'no target') + (p.r === 'witch' && p.ws === 1 ? ' · saves victim' : '') : 'waiting...';
+        const tags = [];
+        if (p.r === 'witch') tags.push(`heal ${p.wsu === 1 ? 'used' : 'ready'}`, `poison ${p.wpu === 1 ? 'used' : 'ready'}`);
+        if (p.s === 1 && ph === 'day') tags.push('silenced');
+        if (p.r === 'bodyguard' && p.lp) tags.push(`last guarded ${nm(p.lp)}`);
+        return (
+          <li key={p.id} className="rounded-xl px-3.5 py-2.5" style={{ background: 'var(--card-2)', border: '1px solid var(--line)', opacity: p.a === 1 ? 1 : 0.6 }}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="min-w-0 truncate text-[15px] font-semibold" style={p.a === 1 ? undefined : { textDecoration: 'line-through' }}>{p.n}{me && p.id === me.id ? ' (you)' : ''}</span>
+              <span className="flex shrink-0 items-center gap-2">
+                {ph === 'reveal' && <span className={`text-xs font-semibold ${p.d === 1 ? 'text-emerald-300' : 'text-slate-500'}`}>{p.d === 1 ? 'Ready ✓' : 'Viewing…'}</span>}
+                <RoleChip role={p.r} />
+                {ph === 'day' && <button onClick={() => toggleAlive(p)} className="min-h-[36px] rounded-lg px-2.5 text-xs font-bold text-slate-200" style={{ border: '1px solid var(--line)' }}>{p.a === 1 ? 'Eliminate' : 'Restore'}</button>}
+              </span>
+            </div>
+            {(detail || tags.length > 0) && <div className="mt-1 text-xs text-slate-400">{[detail, ...tags].filter(Boolean).join(' · ')}</div>}
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  if (ph === 'over') {
+    return (
+      <div className="flex flex-1 flex-col gap-4">
+        <MpOver room={room} players={players} meId={me && me.id} />
+        <Btn onClick={playAgain}>Play Again With This Room</Btn>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-1 flex-col gap-4">
+      <div>
+        <h2 className="font-display text-2xl font-bold">Grimoire</h2>
+        <p className="text-sm text-slate-400">Moderator view. Keep this screen turned away from the players.</p>
+      </div>
+      {ph === 'reveal' && (
+        <Panel className="text-sm text-slate-300">{players.filter((p) => p.d === 1).length} of {players.length} players have seen their card.</Panel>
+      )}
+      {ph === 'night' && (
+        <>
+          <Panel>
+            <div className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-widest text-slate-400">Night {room.k}</span>
+              <span className="text-xs tabular-nums text-slate-400">{actors.length - pending.length} of {actors.length} acted</span></div>
+            <p className="mt-2 text-sm text-slate-300">{victim ? `Wolves are targeting ${nm(victim)}.` : 'The wolves have not chosen yet.'}</p>
+          </Panel>
+          {narrator && <div className="-mt-4"><NarratorPanel roles={nightRoles} /></div>}
+        </>
+      )}
+      {ph === 'day' && <AnnounceCard room={room} players={players} />}
+      {ph === 'day' && room.an && room.an.sv === 1 && <p className="-mt-2 text-xs text-slate-400">Grimoire note: the wolves&rsquo; victim was saved overnight.</p>}
+      {winBanner}
+      {grimoire}
+      <div className="mt-auto flex flex-col gap-2.5 pt-2">
+        {ph === 'reveal' && <Btn onClick={startNight}>{allReady ? 'Begin Night 1' : 'Begin Night 1 Anyway'}</Btn>}
+        {ph === 'night' && <Btn onClick={dawn}>{pending.length ? `Break Dawn (${pending.length} still waiting)` : 'Break Dawn'}</Btn>}
+        {ph === 'day' && <Btn onClick={startNight}>Start Night {(room.k || 0) + 1}</Btn>}
+        {(ph === 'night' || ph === 'day') && (
+          confirmEnd
+            ? <div className="flex gap-2"><Btn variant="secondary" onClick={() => endGame('village')}>Village wins</Btn><Btn variant="secondary" onClick={() => endGame('werewolf')}>Wolves win</Btn><Btn variant="ghost" onClick={() => setConfirmEnd(false)}>Cancel</Btn></div>
+            : <Btn variant="ghost" onClick={() => setConfirmEnd(true)}>End Game Early</Btn>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- the room (everything after joining) ---------- */
+function MpRoom({ session, onExit, onPhase }) {
+  const { code, pid } = session;
+  const { room, err, refresh } = useRoom(code);
+  const [cardsStep, setCardsStep] = useState(false);
+  const [deck, setDeck] = useState(emptyDeck);
+  const [tab, setTab] = useState('mod');
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [wErr, setWErr] = useState('');
+  const players = useMemo(() => roomPlayers(room), [room]);
+  const me = players.find((p) => p.id === pid);
+  const isHost = !!room && room.host === pid;
+  const ph = room ? room.ph : '';
+
+  useEffect(() => { onPhase(cardsStep ? 'cards' : ph); }, [ph, cardsStep]);
+  useEffect(() => () => onPhase(''), []);
+  useEffect(() => { if (isHost && me) setTab(ph === 'reveal' ? 'player' : 'mod'); }, [ph, isHost, !!me]);
+  useEffect(() => { if (cardsStep) setDeck(autoFill(players.length)); }, [cardsStep, players.length]);
+  useEffect(() => { if (ph !== 'lobby' && cardsStep) setCardsStep(false); }, [ph]);
+
+  const write = async (patch) => {
+    try { await Mp.patch(`rooms/${code}`, patch); setWErr(''); }
+    catch (e) { setWErr(mpErrorText(e)); }
+    refresh();
+  };
+  const leave = async () => {
+    setBusy(true);
+    try {
+      if (isHost) await Mp.del(`rooms/${code}`);
+      else if (ph === 'lobby') await Mp.del(`rooms/${code}/pl/${pid}`);
+      else await Mp.patch(`rooms/${code}/pl/${pid}`, { a: 0, lf: 1 });
+    } catch (e) { /* leaving anyway */ }
+    saveSession(null);
+    onExit();
+  };
+  const closeNow = () => { saveSession(null); onExit(); };
+  const openCards = () => { setCardsStep(true); write({ lk: 1 }); };
+  const closeCards = () => { setCardsStep(false); write({ lk: 0 }); };
+  const deal = () => write(mpDealPatch(room, deck));
+
+  if (room === undefined) {
+    return <Screen className="items-center justify-center"><p className="hint-pulse text-slate-300">Connecting to the room...</p>{err && <p className="mt-3 max-w-xs text-center text-sm text-amber-300">{err}</p>}<Btn variant="ghost" className="mt-6" onClick={closeNow}>Cancel</Btn></Screen>;
+  }
+  if (room === null || (!isHost && !me)) {
+    return (
+      <Screen className="items-center justify-center text-center">
+        <h2 className="font-display text-2xl font-bold">{room === null ? 'This room has closed' : 'You are no longer in this room'}</h2>
+        <p className="mt-2 max-w-xs text-sm text-slate-300">{room === null ? 'The host ended the session.' : 'The host may have removed you.'}</p>
+        <div className="mt-6 w-full max-w-xs"><Btn onClick={closeNow}>Back</Btn></div>
+      </Screen>
+    );
+  }
+  if (cardsStep && isHost) {
+    return <ChooseCards count={players.length} deck={deck} setDeck={setDeck} onBack={closeCards} onStart={deal} startLabel="Deal Cards & Start" showBalance />;
+  }
+
+  const narratorOn = true;
+  const showPlayer = !!me && (!isHost || tab === 'player');
+  let body = null;
+  if (ph === 'lobby') {
+    body = (
+      <div className="flex flex-1 flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-bold">Lobby</h2>
+          <span className="rounded-full px-3 py-1 text-xs font-semibold tabular-nums text-slate-300" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>{players.length} / {MP_MAX} players</span>
+        </div>
+        {players.length === 0 && <Panel className="text-center text-sm text-slate-400">No players yet. Share the room code.</Panel>}
+        <PlayerList players={players} meId={pid} hostId={room.host} onRemove={isHost ? (id) => write({ [`pl/${id}`]: null }) : null} />
+        {isHost ? (
+          <div className="mt-auto flex flex-col gap-2">
+            {players.length < MP_MIN && <p className="text-center text-xs text-slate-400">Need at least {MP_MIN} players to start. Ask friends to join with the code above.</p>}
+            <Btn disabled={players.length < MP_MIN} onClick={openCards}>Choose Cards</Btn>
+            <p className="text-center text-xs text-slate-500">{room.hp ? 'You are playing and hosting.' : 'You are moderating only.'}</p>
+          </div>
+        ) : (
+          <p className="hint-pulse mt-auto pb-2 text-center text-sm text-slate-300">Waiting for the host to start the game...</p>
+        )}
+      </div>
+    );
+  } else if (showPlayer) {
+    if (ph === 'reveal') body = <MpReveal me={me} ready={me.d === 1} readyCount={players.filter((p) => p.d === 1).length} total={players.length} onReady={() => write({ [`pl/${pid}/d`]: 1 })} />;
+    else if (ph === 'night') body = <MpNight key={`n${room.k}`} me={me} players={players} room={room} write={write} />;
+    else if (ph === 'day') body = <MpDay key={`d${room.k}`} me={me} players={players} room={room} write={write} />;
+    else body = <MpOver room={room} players={players} meId={pid} />;
+  } else {
+    body = <MpMod room={room} players={players} me={me} write={write} narrator={narratorOn} />;
+  }
+
+  return (
+    <Screen>
+      <MpHeader code={code} onLeave={() => setConfirmLeave(true)} leaveLabel="Leave room" />
+      {isHost && me && ph !== 'lobby' && (
+        <div role="tablist" className="mb-3 flex gap-1 rounded-xl p-1" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+          {[['mod', 'Moderator'], ['player', 'My Role']].map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className="min-h-[40px] flex-1 rounded-lg text-sm font-bold transition"
+              style={tab === k ? { background: 'rgba(109,40,217,0.5)', color: '#fff' } : { color: '#94A3B8' }}>{label}</button>
+          ))}
+        </div>
+      )}
+      {(err || wErr) && <p role="alert" className="mb-3 rounded-xl px-3 py-2 text-center text-xs font-semibold text-amber-200" style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)' }}>{wErr || `${err} Retrying...`}</p>}
+      {body}
+      {confirmLeave && (
+        <ConfirmExit confirmLabel={isHost ? 'Close room' : 'Leave room'}
+          body={isHost ? 'This closes the room for everyone. Players will be sent back out.' : 'You will leave this room. You can rejoin with the code only while the game has not started.'}
+          onCancel={() => setConfirmLeave(false)} onConfirm={leave} />
+      )}
+    </Screen>
+  );
+}
+
+/* ---------- entry point ---------- */
+function MultiScreen({ onBack, onPhase, gameCount, onClearGames }) {
+  const st = useSettings();
+  const hasUrl = !!(normalizeDbUrl(st.fbUrl) || normalizeDbUrl(DEFAULT_FIREBASE_URL));
+  const [view, setView] = useState('entry'); // entry | host | join | room
+  const [session, setSession] = useState(loadSession);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [checking, setChecking] = useState(() => !!loadSession());
+
+  // Rejoin after a refresh, if the room is still there.
+  useEffect(() => {
+    const s = loadSession();
+    if (!s || !hasUrl) { setChecking(false); return; }
+    let live = true;
+    Mp.get(`rooms/${s.code}`).then((r) => {
+      if (!live) return;
+      if (r && (r.host === s.pid || (r.pl && r.pl[s.pid]))) { setSession(s); setView('room'); }
+      else saveSession(null);
+      setChecking(false);
+    }, () => { if (live) setChecking(false); });
+    return () => { live = false; };
+  }, []);
+
+  const enter = (s) => { saveSession(s); setSession(s); setView('room'); };
+  const exitRoom = () => { setSession(null); setView('entry'); };
+
+  if (view === 'room' && session) return <MpRoom session={session} onExit={exitRoom} onPhase={onPhase} />;
+
+  return (
+    <Screen>
+      <header className="flex items-center gap-1 pb-5">
+        <button onClick={onBack} aria-label="Back to start" className="flex h-11 w-11 items-center justify-center rounded-full text-slate-300 hover:bg-white/10">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5 L8 12 L15 19" /></svg>
+        </button>
+        <h1 className="font-display text-lg font-bold tracking-wide">MULTI-DEVICE</h1>
+        <span className="ml-auto rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-violet-200" style={{ background: 'rgba(109,40,217,0.3)' }}>Room code</span>
+      </header>
+      {checking
+        ? <p className="hint-pulse mt-16 text-center text-slate-300">Looking for your room...</p>
+        : !hasUrl
+          ? <MpConfigCard onBack={onBack} onOpenSettings={() => setSettingsOpen(true)} />
+          : view === 'host'
+            ? <MpHostForm onBack={() => setView('entry')} onCreated={enter} />
+            : view === 'join'
+              ? <MpJoinForm onBack={() => setView('entry')} onJoined={enter} />
+              : <MpEntry onHost={() => setView('host')} onJoin={() => setView('join')} onBack={onBack} />}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} gameCount={gameCount} onClearGames={onClearGames} />}
+    </Screen>
+  );
+}
+
+
 function loadGames() {
   try {
     const v = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
@@ -2424,6 +3403,7 @@ function AppInner() {
   const [curId, setCurId] = useState(null);
   const [players, setPlayers] = useState([]);
   const [round, setRound] = useState(0);
+  const [mpPhase, setMpPhase] = useState('');
 
   useEffect(() => { saveGames(games); }, [games]);
 
@@ -2512,15 +3492,19 @@ function AppInner() {
 
   const { sound: soundOn, music: musicOn } = useSettings();
   useEffect(() => {
-    const tense = (screen === 'setup' || screen === 'cards' || screen === 'reveal') && musicOn;
-    tensionScreen = screen === 'setup' || screen === 'cards' || screen === 'reveal';
+    const isTense = screen === 'setup' || screen === 'cards' || screen === 'reveal' || (screen === 'multi' && (mpPhase === 'lobby' || mpPhase === 'cards' || mpPhase === 'reveal'));
+    const tense = isTense && musicOn;
+    tensionScreen = isTense;
     if (!soundOn) { Ambience.stop(); Tension.stop(); return; }
     if (tense) { Ambience.stop(true); Tension.start(); return; }
     Tension.stop();
     if (screen !== 'start' && Ambience.unlocked()) Ambience.start();
-  }, [screen, soundOn, musicOn]);
+  }, [screen, soundOn, musicOn, mpPhase]);
   if (screen === 'start') {
-    return <StartScreen onPlay={() => setScreen('home')} gameCount={games.length} onClearGames={() => setGames([])} />;
+    return <StartScreen onPlay={() => setScreen('home')} onMulti={() => setScreen('multi')} gameCount={games.length} onClearGames={() => setGames([])} />;
+  }
+  if (screen === 'multi') {
+    return <MultiScreen onBack={() => setScreen('start')} onPhase={setMpPhase} gameCount={games.length} onClearGames={() => setGames([])} />;
   }
   if (screen === 'home') {
     return (

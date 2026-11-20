@@ -3,6 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0E14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="WEREWOLF">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <title>WEREWOLF</title>
 <link rel="preload" as="image" href="images/loading-bg.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -54,6 +59,15 @@
   button:focus-visible, input:focus-visible {
     outline: 2px solid #CBD5E1;
     outline-offset: 2px;
+  }
+  .flip-scene { width: max(11rem, min(17rem, 78vw, calc((100vh - 27rem) * 0.75))); }
+  .atmos-wrap { align-items: center; }
+  @media (min-width: 768px) {
+    .flip-scene { width: max(14rem, min(23rem, calc((100vh - 26rem) * 0.75))); }
+  }
+  @media (min-aspect-ratio: 1/1) {
+    .atmos-wrap { align-items: flex-start; }
+    .atmos-box { margin-top: calc(max(100vh, 100vw * 1.7768) * -0.06); }
   }
   .flip-scene { perspective: 1200px; border-radius: 20px; transition: transform 0.3s ease-out, box-shadow 0.3s ease-out; }
   .flip-scene.is-lifted { transform: scale(1.04); box-shadow: 0 0 42px 6px rgba(220,38,38,0.65), 0 0 16px 3px rgba(226,232,240,0.5); }
@@ -649,9 +663,9 @@ function Btn({ variant = 'primary', className = '', style, ...rest }) {
   return <button className={`${base} ${variants[variant]} ${className}`} style={{ ...styles[variant], ...style }} {...rest} />;
 }
 
-function Screen({ children, className = '' }) {
+function Screen({ children, className = '', wide = false }) {
   return (
-    <main className={`screen-in mx-auto flex min-h-full w-full max-w-md flex-col px-4 ${className}`}
+    <main className={`screen-in mx-auto flex min-h-full w-full max-w-md ${wide ? 'md:max-w-4xl' : 'md:max-w-xl'} flex-col px-4 md:px-8 ${className}`}
       style={{ paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
       {children}
     </main>
@@ -729,7 +743,7 @@ function RoleGuide({ onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label="Role Guide">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="screen-in relative flex max-h-[88%] w-full max-w-md flex-col rounded-t-3xl sm:rounded-3xl"
+      <div className="screen-in relative flex max-h-[88%] w-full max-w-md flex-col rounded-t-3xl sm:rounded-3xl md:max-w-xl"
         style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between px-5 pb-3 pt-5">
           <h2 className="font-display text-2xl font-bold tracking-wide">{view === 'art' ? 'Custom Card Art' : 'Role Guide'}</h2>
@@ -907,7 +921,7 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label="Settings">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="screen-in relative flex max-h-[88%] w-full max-w-md flex-col rounded-t-3xl sm:rounded-3xl"
+      <div className="screen-in relative flex max-h-[88%] w-full max-w-md flex-col rounded-t-3xl sm:rounded-3xl md:max-w-xl"
         style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between px-5 pb-3 pt-5">
           <h2 className="font-display text-2xl font-bold tracking-wide">{view === 'art' ? 'Custom Card Art' : 'Settings'}</h2>
@@ -1003,8 +1017,8 @@ function StartScreen({ onPlay, gameCount, onClearGames }) {
     <div className="relative min-h-full w-full" onPointerDown={spawn}>
       <div className="fixed inset-0 z-0 overflow-hidden" style={{ background: '#0B0E14' }} aria-hidden="true">
         <DefaultBackdrop />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="atmos-drift relative shrink-0" style={{ width: 'max(100vw, calc(100vh * 0.5628))', height: 'max(100vh, calc(100vw * 1.7768))' }}>
+        <div className="atmos-wrap absolute inset-0 flex justify-center">
+          <div className="atmos-drift atmos-box relative shrink-0" style={{ width: 'max(100vw, calc(100vh * 0.5628))', height: 'max(100vh, calc(100vw * 1.7768))' }}>
             {imgOk && <img src={src} alt="" onError={() => setImgOk(false)} className="absolute inset-0 h-full w-full object-cover" style={{ filter: 'brightness(1.2) saturate(1.1)' }} />}
             <div className="blood-moon-glow pointer-events-none absolute" style={{ left: '68.8%', top: '15.7%', width: '62%', aspectRatio: '1 / 1' }} />
           </div>
@@ -1024,7 +1038,7 @@ function StartScreen({ onPlay, gameCount, onClearGames }) {
         </div>
       </div>
 
-      <main className="screen-in relative z-10 mx-auto flex min-h-full w-full max-w-md flex-col px-4"
+      <main className="screen-in relative z-10 mx-auto flex min-h-full w-full max-w-md flex-col px-4 md:max-w-xl md:px-8"
         style={{ paddingTop: 'max(16px, env(safe-area-inset-top))', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
         <header className="flex items-center justify-between">
           <button onClick={() => setSettingsOpen(true)} aria-label="Settings"
@@ -1037,18 +1051,18 @@ function StartScreen({ onPlay, gameCount, onClearGames }) {
         <div className="flex-1" style={{ minHeight: '34vh' }} />
 
         <div className="text-center">
-          <h1 className="font-display text-5xl font-black tracking-[0.12em] text-slate-50" style={{ textShadow: '0 2px 24px rgba(0,0,0,0.8), 0 0 40px rgba(203,213,225,0.2)' }}>WEREWOLF</h1>
-          <p className="mt-3 text-sm italic tracking-[0.2em] text-slate-300" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>At Nightfall</p>
+          <h1 className="font-display text-5xl font-black tracking-[0.12em] text-slate-50 md:text-7xl" style={{ textShadow: '0 2px 24px rgba(0,0,0,0.8), 0 0 40px rgba(203,213,225,0.2)' }}>WEREWOLF</h1>
+          <p className="mt-3 text-sm italic tracking-[0.2em] text-slate-300 md:mt-4 md:text-lg" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>At Nightfall</p>
         </div>
 
         <div className="mt-8 flex flex-col items-center gap-3.5">
           <button onClick={onPlay}
-            className="breathe mx-auto flex w-full max-w-[260px] items-center justify-center gap-3 rounded-2xl py-4 text-xl font-bold tracking-wide text-white transition active:scale-[0.98]">
+            className="breathe mx-auto flex w-full max-w-[260px] items-center justify-center gap-3 rounded-2xl py-4 text-xl md:max-w-[340px] md:py-5 md:text-2xl font-bold tracking-wide text-white transition active:scale-[0.98]">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M7 4 L20 12 L7 20Z" /></svg>
             Pass &amp; Play
           </button>
           <button onClick={() => setLobby(true)} aria-label="Multi-Device, coming in version 2"
-            className="relative mx-auto flex w-full max-w-[260px] items-center justify-center gap-3 overflow-hidden rounded-2xl py-4 text-xl font-bold tracking-wide text-white transition hover:brightness-110 active:scale-[0.98]"
+            className="relative mx-auto flex w-full max-w-[260px] items-center justify-center gap-3 overflow-hidden rounded-2xl py-4 text-xl md:max-w-[340px] md:py-5 md:text-2xl font-bold tracking-wide text-white transition hover:brightness-110 active:scale-[0.98]"
             style={{ background: '#6D28D9', border: '1px solid rgba(167,139,250,0.4)', boxShadow: '0 8px 26px -8px rgba(109,40,217,0.6)' }}>
             <span className="absolute left-0 top-0 rounded-br-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-100"
               style={{ background: 'rgba(11,14,20,0.5)' }} aria-hidden="true">V2</span>
@@ -1144,7 +1158,7 @@ function Home({ games, onBack, onCreate, onResume, onRedeal, onEdit, onDelete })
   const [sheetId, setSheetId] = useState(null);
   const sheetGame = games.find((g) => g.id === sheetId);
   return (
-    <Screen>
+    <Screen wide>
       <header className="flex items-center justify-between pb-5">
         <div className="flex items-center gap-1">
           <button onClick={onBack} aria-label="Back to home screen"
@@ -1159,7 +1173,7 @@ function Home({ games, onBack, onCreate, onResume, onRedeal, onEdit, onDelete })
           style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>Role Guide</button>
       </header>
 
-      <div className="grid grid-cols-2 gap-3.5">
+      <div className="grid grid-cols-2 gap-3.5 md:grid-cols-3 md:gap-5 lg:grid-cols-4">
         <button onClick={onCreate}
           className="flex aspect-[3/4] flex-col items-center justify-center gap-3 rounded-2xl p-3 text-center transition hover:brightness-125 active:scale-[0.98]"
           style={{ background: '#181D27', border: '2px dashed #2E3646' }}>
@@ -1270,8 +1284,8 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart }) {
   const ruleColor = ruleOk ? '#34D399' : '#F59E0B';
 
   return (
-    <Screen>
-      <div className="sticky top-0 z-10 -mx-4 px-4 pb-3 pt-1" style={{ background: 'linear-gradient(180deg, var(--bg) 85%, rgba(11,14,20,0))' }}>
+    <Screen wide>
+      <div className="sticky top-0 z-10 -mx-4 px-4 pb-3 pt-1 md:-mx-8 md:px-8" style={{ background: 'linear-gradient(180deg, var(--bg) 85%, rgba(11,14,20,0))' }}>
         <header className="flex items-center gap-2">
           <button onClick={onBack} aria-label="Back to game setup" className="flex h-11 w-11 items-center justify-center rounded-full text-slate-300 hover:bg-white/10">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5 L8 12 L15 19" /></svg>
@@ -1302,7 +1316,7 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart }) {
           style={{ background: 'var(--card)', border: '1px solid var(--line)' }} />
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3.5">
+      <div className="mt-4 grid grid-cols-2 gap-3.5 md:grid-cols-3 md:gap-5 lg:grid-cols-4">
         {visible.map((id) => {
           const r = ROLES_DATA[id];
           const n = deck[id];
@@ -1321,7 +1335,7 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart }) {
       </div>
       {visible.length === 0 && <p className="mt-6 text-center text-sm text-slate-400">No roles match &ldquo;{q.trim()}&rdquo;.</p>}
 
-      <div className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-1 pt-6" style={{ background: 'linear-gradient(0deg, var(--bg) 70%, rgba(11,14,20,0))' }}>
+      <div className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-1 pt-6 md:-mx-8 md:px-8" style={{ background: 'linear-gradient(0deg, var(--bg) 70%, rgba(11,14,20,0))' }}>
         {!canStart && (
           <p className="mb-2 text-center text-xs text-slate-400">
             {slotsLeft > 0 ? `Fill ${slotsLeft} more ${slotsLeft === 1 ? 'slot' : 'slots'}` : ''}{slotsLeft > 0 && !ruleOk ? ' and add ' : ''}{!ruleOk ? (slotsLeft > 0 ? 'a Werewolf' : 'Add a Werewolf') : ''} to continue.
@@ -1344,7 +1358,7 @@ function RoleCard({ role, phase }) {
   const edge = r.team === 'werewolf' ? '#EF4444' : '#E2E8F0';
   const glow = `0 0 44px -8px ${r.team === 'werewolf' ? 'rgba(220,38,38,0.8)' : 'rgba(226,232,240,0.45)'}`;
   return (
-    <div className={`flip-scene aspect-[3/4] ${lifted ? 'is-lifted' : ''}`} style={{ width: 'max(11rem, min(17rem, 78vw, calc((100vh - 27rem) * 0.75)))' }}>
+    <div className={`flip-scene aspect-[3/4] ${lifted ? 'is-lifted' : ''}`}>
       <div className={`flip-card ${flipped ? 'is-flipped' : ''}`}>
         <div className="face" style={{ background: 'linear-gradient(160deg, #1B2230, #10141D)', border: '1px solid rgba(203,213,225,0.28)' }}>
           <div className="absolute inset-3 rounded-2xl" style={{ border: '1px solid rgba(203,213,225,0.16)' }} />
@@ -1572,7 +1586,7 @@ function Moderator({ players, setPlayers, onAgain, onNew, onHome }) {
   else if (wolvesAlive >= villageAlive) status = { text: 'Werewolves match or outnumber the Village.', color: '#F87171' };
 
   return (
-    <Screen>
+    <Screen wide>
       <header className="flex items-start justify-between gap-3 pb-4">
         <div>
           <h1 className="font-display text-3xl font-bold tracking-wide">Grimoire</h1>
@@ -1602,7 +1616,7 @@ function Moderator({ players, setPlayers, onAgain, onNew, onHome }) {
       {/* Roster */}
       <section className="mt-5">
         <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Player Roster</h2>
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-2 md:grid md:grid-cols-2 md:items-start md:gap-3">
           {players.map((p) => {
             const r = ROLES_DATA[p.role];
             return (

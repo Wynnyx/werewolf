@@ -1567,6 +1567,15 @@ function GameSheet({ game, onClose, onResume, onRedeal, onEdit }) {
   );
 }
 
+function WolfBadge({ tint = '#EF4444', size = 36 }) {
+  return (
+    <span className="flex shrink-0 items-center justify-center rounded-full"
+      style={{ width: size, height: size, background: tint + '1F', border: `1px solid ${tint}66` }} aria-hidden="true">
+      <RoleEmblem role="werewolf" size={Math.round(size * 0.58)} />
+    </span>
+  );
+}
+
 function GameCard({ game, confirming, onOpen, onAskDelete, onCancelDelete, onDelete }) {
   const active = game.status === 'active' && game.players;
   const tag = active ? { text: 'Active', c: '#34D399' } : { text: 'Saved Setup', c: '#94A3B8' };
@@ -1577,11 +1586,14 @@ function GameCard({ game, confirming, onOpen, onAskDelete, onCancelDelete, onDel
         style={{ background: '#151A24', border: '1px solid var(--line)' }}
         aria-label={`Open ${game.name}`}>
         <span className="pointer-events-none absolute -bottom-6 -right-6 opacity-[0.07]"><MoonIcon width="120" height="120" className="text-slate-200" /></span>
-        <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-          style={{ color: tag.c, background: tag.c + '1F', border: `1px solid ${tag.c}55` }}>{tag.text}</span>
-        <span className="font-display mt-3 line-clamp-2 break-words pr-1 text-lg font-bold leading-tight">{game.name}</span>
-        <span className="mt-2 rounded-md px-2 py-0.5 text-xs font-semibold text-slate-200 tabular-nums"
-          style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>{game.count} Players</span>
+        <WolfBadge tint={active ? '#34D399' : '#EF4444'} />
+        <span className="font-display mt-2.5 line-clamp-2 break-words pr-1 text-base font-bold leading-tight">{game.name}</span>
+        <span className="mt-1.5 flex flex-wrap gap-1">
+          <span className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-slate-200 tabular-nums"
+            style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>{game.count} Players</span>
+          <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+            style={{ color: tag.c, background: tag.c + '1F', border: `1px solid ${tag.c}55` }}>{tag.text}</span>
+        </span>
         <span className="mt-auto line-clamp-3 text-xs leading-snug text-slate-400">{summarizeDeck(game.deck)}</span>
       </button>
       <button onClick={onAskDelete} aria-label={`Delete ${game.name}`}
@@ -1607,8 +1619,11 @@ function PresetCard({ count, deck, onPick }) {
       className="relative flex aspect-[3/4] w-full flex-col items-start overflow-hidden rounded-2xl p-3.5 text-left transition active:scale-[0.98]"
       style={{ background: 'linear-gradient(160deg, #1B2230, #121722)', border: '1px solid var(--line)' }}>
       <span className="pointer-events-none absolute -bottom-6 -right-6 opacity-[0.07]"><MoonIcon width="120" height="120" className="text-slate-200" /></span>
-      <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: '#FBBF24', background: '#FBBF241F', border: '1px solid #FBBF2455' }}>Popular</span>
-      <span className="font-display mt-3 text-5xl font-black leading-none tabular-nums">{count}</span>
+      <span className="flex w-full items-center justify-between">
+        <WolfBadge tint="#FBBF24" />
+        <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: '#FBBF24', background: '#FBBF241F', border: '1px solid #FBBF2455' }}>Popular</span>
+      </span>
+      <span className="font-display mt-2.5 text-5xl font-black leading-none tabular-nums">{count}</span>
       <span className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Players</span>
       <span className="mt-auto line-clamp-4 text-xs leading-snug text-slate-400">{summarizeDeck(deck)}</span>
     </button>
@@ -1637,32 +1652,39 @@ function Home({ games, onBack, onCreate, onPreset, onResume, onRedeal, onEdit, o
           style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>Role Guide</button>
       </header>
 
-      <section>
+      <button onClick={onCreate}
+        className="flex w-full items-center gap-4 rounded-2xl p-4 text-left transition hover:brightness-125 active:scale-[0.99]"
+        style={{ background: 'linear-gradient(135deg, rgba(220,38,38,0.2), rgba(21,26,36,0.9))', border: '1px solid rgba(239,68,68,0.5)' }}>
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full" style={{ background: 'rgba(220,38,38,0.25)', border: '1px solid rgba(239,68,68,0.6)' }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FCA5A5" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M12 4 V20 M4 12 H20" /></svg>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="font-display block text-lg font-bold leading-tight">Create a new game</span>
+          <span className="block text-xs text-slate-400">Choose players and cards from scratch</span>
+        </span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 5 L16 12 L9 19" /></svg>
+      </button>
+
+      <section className="mt-6">
         <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Recently Played</h2>
-        <div className="hscroll -mx-4 flex snap-x gap-3.5 overflow-x-auto px-4 pb-3 md:-mx-8 md:gap-5 md:px-8">
-          <div className="w-[42vw] max-w-[12rem] shrink-0 snap-start md:w-48">
-            <button onClick={onCreate}
-              className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-3 rounded-2xl p-3 text-center transition hover:brightness-125 active:scale-[0.98]"
-              style={{ background: '#181D27', border: '2px dashed #2E3646' }}>
-              <span className="flex h-14 w-14 items-center justify-center rounded-full" style={{ border: '1px solid #2E3646' }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="2" strokeLinecap="round"><path d="M12 4 V20 M4 12 H20" /></svg>
-              </span>
-              <span className="text-sm font-semibold leading-tight text-slate-300">Create a new game</span>
-            </button>
+        {games.length === 0 ? (
+          <p className="rounded-2xl px-4 py-5 text-center text-sm text-slate-500" style={{ border: '1px dashed #2E3646' }}>Your games will show up here.</p>
+        ) : (
+          <div className="hscroll -mx-4 flex snap-x gap-3.5 overflow-x-auto px-4 pb-3 md:-mx-8 md:gap-5 md:px-8">
+            {games.map((g) => (
+              <div key={g.id} className="w-[42vw] max-w-[12rem] shrink-0 snap-start md:w-48">
+                <GameCard game={g} confirming={confirmId === g.id}
+                  onOpen={() => setSheetId(g.id)}
+                  onAskDelete={() => setConfirmId(g.id)}
+                  onCancelDelete={() => setConfirmId(null)}
+                  onDelete={() => { onDelete(g.id); setConfirmId(null); }} />
+              </div>
+            ))}
           </div>
-          {games.map((g) => (
-            <div key={g.id} className="w-[42vw] max-w-[12rem] shrink-0 snap-start md:w-48">
-              <GameCard game={g} confirming={confirmId === g.id}
-                onOpen={() => setSheetId(g.id)}
-                onAskDelete={() => setConfirmId(g.id)}
-                onCancelDelete={() => setConfirmId(null)}
-                onDelete={() => { onDelete(g.id); setConfirmId(null); }} />
-            </div>
-          ))}
-        </div>
+        )}
       </section>
 
-      <section className="mt-3">
+      <section className="mt-4">
         <h2 className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Popular Setups</h2>
         <p className="mb-2.5 text-xs text-slate-500">Cards are picked for you. Tap one, then change any card you like.</p>
         <div className="hscroll -mx-4 flex snap-x gap-3.5 overflow-x-auto px-4 pb-3 md:-mx-8 md:gap-5 md:px-8">

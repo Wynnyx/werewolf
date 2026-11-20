@@ -881,8 +881,8 @@ function DotBurst({ b }) {
 /* ------------------------------------------------------------------ */
 const SET_KEY = 'nightfall.settings.v1';
 let settings = (() => {
-  try { const v = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); return { blood: !(v && v.blood === false), sound: !(v && v.sound === false) }; }
-  catch (e) { return { blood: true, sound: true }; }
+  try { const v = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); return { blood: !(v && v.blood === false), sound: false }; }
+  catch (e) { return { blood: true, sound: false }; }
 })();
 const setListeners = new Set();
 const subscribeSet = (fn) => { setListeners.add(fn); return () => setListeners.delete(fn); };
@@ -1092,6 +1092,13 @@ const Ambience = (() => {
   return { start, stop, preload: () => { getEl(); return Promise.resolve(); }, unlocked: () => unlockedFlag, isRunning: () => running };
 })();
 
+// Browsers only allow sound after a tap, so sound starts off and the speaker button turns it on.
+function toggleSound() {
+  const on = !getSettings().sound;
+  updateSettings({ sound: on });
+  if (on) Ambience.start(); else Ambience.stop();
+}
+
 function SpeakerIcon({ on }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1136,9 +1143,9 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
             <div className="flex items-center justify-between gap-4 rounded-2xl p-4" style={rowStyle}>
               <div>
                 <div className="text-[15px] font-semibold" id="sound-label">Ambient Sound</div>
-                <p className="mt-0.5 text-xs leading-snug text-slate-400">Night forest sounds on the home screen.</p>
+                <p className="mt-0.5 text-xs leading-snug text-slate-400">Night forest sounds on the home screen. Tap the speaker to start.</p>
               </div>
-              <button role="switch" aria-checked={st.sound} aria-labelledby="sound-label" onClick={() => updateSettings({ sound: !st.sound })}
+              <button role="switch" aria-checked={st.sound} aria-labelledby="sound-label" onClick={toggleSound}
                 className="relative h-8 w-14 shrink-0 rounded-full transition-colors"
                 style={{ background: st.sound ? '#B91C1C' : '#2E3646', border: '1px solid rgba(203,213,225,0.3)' }}>
                 <span className="absolute top-0.5 h-6 w-6 rounded-full bg-white transition-all" style={{ left: st.sound ? 'calc(100% - 1.625rem)' : '0.125rem' }} />
@@ -1208,14 +1215,10 @@ function StartScreen({ onPlay, gameCount, onClearGames }) {
   const [lobby, setLobby] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => setImgOk(true), [src]);
+  useEffect(() => { Ambience.preload(); }, []);
   useEffect(() => {
     if (!st.sound) { Ambience.stop(); return; }
-    Ambience.preload().catch(() => {});
     if (Ambience.unlocked()) Ambience.start();
-    const go = () => { if (getSettings().sound) Ambience.start(); };
-    const evs = ['touchend', 'click', 'keydown'];
-    evs.forEach((e) => window.addEventListener(e, go, { passive: true }));
-    return () => evs.forEach((e) => window.removeEventListener(e, go));
   }, [st.sound]);
   useEffect(() => () => Ambience.stop(), []);
   const [splats, setSplats] = useState([]);
@@ -1261,7 +1264,7 @@ function StartScreen({ onPlay, gameCount, onClearGames }) {
             <GearIcon />
           </button>
           <div className="flex items-center gap-2">
-            <button onClick={() => updateSettings({ sound: !st.sound })} aria-label={st.sound ? 'Mute ambient sound' : 'Turn on ambient sound'} aria-pressed={st.sound}
+            <button onClick={toggleSound} aria-label={st.sound ? 'Mute ambient sound' : 'Turn on ambient sound'} aria-pressed={st.sound}
               className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-200 hover:bg-white/10" style={glassBtn}>
               <SpeakerIcon on={st.sound} />
             </button>

@@ -1214,25 +1214,45 @@ const Tension = (() => {
 })();
 
 const Sfx = (() => {
-  let a = null, c = null;
-  const pool = {};
-  const play = (src) => {
-    if (!getSettings().sound) return;
+  // Short effects play through Web Audio (decoded once, starts instantly); an <audio> element is the fallback.
+  const FILES = ['audio/card-flip.mp3', 'audio/create.mp3', 'audio/select.mp3', 'audio/deselect.mp3'];
+  let ctx = null, started = false;
+  const bufs = {}, pool = {};
+  const getCtx = () => {
+    if (!ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) ctx = new AC(); }
+    return ctx;
+  };
+  const load = (f) => {
+    const c = getCtx();
+    if (!c || bufs[f] !== undefined) return;
+    bufs[f] = null;
+    fetch(f).then((r) => r.arrayBuffer()).then((ab) => new Promise((ok, no) => c.decodeAudioData(ab, ok, no)))
+      .then((b) => { bufs[f] = b; }).catch(() => { bufs[f] = false; });
+  };
+  const fallback = (f) => {
     try {
-      if (!pool[src]) { pool[src] = new Audio(src); pool[src].preload = 'auto'; pool[src].setAttribute('playsinline', ''); }
-      const x = pool[src]; x.currentTime = 0; const p = x.play(); if (p && p.catch) p.catch(() => {});
+      if (!pool[f]) { pool[f] = new Audio(f); pool[f].preload = 'auto'; pool[f].setAttribute('playsinline', ''); }
+      const x = pool[f]; x.currentTime = 0; const p = x.play(); if (p && p.catch) p.catch(() => {});
     } catch (e) { /* ignore */ }
   };
-  const get = () => {
-    if (!a) { a = new Audio('audio/card-flip.mp3'); a.preload = 'auto'; a.setAttribute('playsinline', ''); }
-    return a;
+  const play = (f) => {
+    if (!getSettings().sound) return;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* unsupported */ }
+    const c = getCtx();
+    if (c && bufs[f]) {
+      try {
+        if (c.state !== 'running') { const r = c.resume(); if (r && r.catch) r.catch(() => {}); }
+        const src = c.createBufferSource(); src.buffer = bufs[f]; src.connect(c.destination); src.start(0);
+        return;
+      } catch (e) { /* fall through */ }
+    }
+    if (bufs[f] === undefined) load(f);
+    fallback(f);
   };
   return {
-    preload: () => { try { get(); ['audio/create.mp3', 'audio/select.mp3', 'audio/deselect.mp3'].forEach((f) => { if (!pool[f]) { pool[f] = new Audio(f); pool[f].preload = 'auto'; } }); } catch (e) { /* ignore */ } },
-    flip: () => {
-      if (!getSettings().sound) return;
-      try { const x = get(); x.currentTime = 0; const p = x.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ }
-    },
+    preload: () => { try { FILES.forEach(load); } catch (e) { /* ignore */ } },
+    unlock: () => { try { const c = getCtx(); if (c && c.state !== 'running') { const r = c.resume(); if (r && r.catch) r.catch(() => {}); } } catch (e) { /* ignore */ } },
+    flip: () => play('audio/card-flip.mp3'),
     enter: () => play('audio/create.mp3'),
     select: () => play('audio/select.mp3'),
     deselect: () => play('audio/deselect.mp3')
@@ -1506,12 +1526,13 @@ function StartScreen({ onPlay, gameCount, onClearGames }) {
   const [lobby, setLobby] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => setImgOk(true), [src]);
-  useEffect(() => { Ambience.preload(); Tension.preload(); }, []);
+  useEffect(() => { Ambience.preload(); Tension.preload(); Sfx.preload(); }, []);
   useEffect(() => {
     if (!st.sound) { Ambience.stop(); return; }
     if (Ambience.unlocked()) Ambience.start();
     const go = (e) => {
       if (e.target && e.target.closest && e.target.closest('[data-sound-toggle]')) return;
+      Sfx.unlock();
       if (getSettings().sound) { Ambience.start(); Tension.prime(); }
     };
     const evs = ['touchend', 'click', 'keydown'];
@@ -1862,6 +1883,14 @@ function QtyPill({ role, n, canAdd, onChange }) {
 function ChooseCards({ count, deck, setDeck, onBack, onStart }) {
   const [q, setQ] = useState('');
   useEffect(() => { Sfx.preload(); }, []);
+  const [notice, setNotice] = useState('');
+  const noticeT = useRef(null);
+  useEffect(() => () => clearTimeout(noticeT.current), []);
+  const warn = (msg) => {
+    setNotice(msg + '\u200B'.repeat(Math.floor(Math.random() * 3)));
+    clearTimeout(noticeT.current);
+    noticeT.current = setTimeout(() => setNotice(''), 2600);
+  };
   const total = deckTotal(deck);
   const slotsLeft = count - total;
   const wolves = deck.werewolf;
@@ -1929,7 +1958,12 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart }) {
           return (
             <div key={id} className="relative aspect-[3/4] overflow-hidden rounded-2xl transition-[box-shadow,opacity] duration-300"
               style={{ boxShadow: ring, opacity: n === 0 && slotsLeft === 0 ? 0.6 : 1, cursor: n === 0 && slotsLeft > 0 ? 'pointer' : 'default' }}
-              onClick={(e) => { if (e.target.closest && e.target.closest('button')) return; if (n === 0) change(id, 1); }}>
+              onClick={(e) => {
+                if (e.target.closest && e.target.closest('button')) return;
+                if (n === 0 && slotsLeft > 0) change(id, 1);
+                else if (slotsLeft <= 0 && (n === 0 || n < r.max)) warn(`All ${count} slots are filled. Remove a card with \u2212 to make room for ${r.name}.`);
+                else if (n >= r.max) warn(`Only ${r.max} ${r.name} ${r.max === 1 ? 'card is' : 'cards are'} allowed per game.`);
+              }}>
               <div className="h-full w-full transition-[filter] duration-300"
                 style={{ filter: n === 0 ? 'grayscale(0.5) brightness(0.78)' : 'none' }}>
                 <PlayingCard role={id} />
@@ -1941,6 +1975,12 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart }) {
       </div>
       {visible.length === 0 && <p className="mt-6 text-center text-sm text-slate-400">No roles match &ldquo;{q.trim()}&rdquo;.</p>}
 
+      {notice && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-32 z-30 flex justify-center px-6" role="status">
+          <div key={notice} className="nudge max-w-sm rounded-2xl px-4 py-3 text-center text-sm font-semibold"
+            style={{ background: 'rgba(30,18,12,0.96)', color: '#FBBF24', border: '1px solid #F59E0B88', boxShadow: '0 8px 30px rgba(0,0,0,0.6)' }}>{notice.replace(/\u200B/g, '')}</div>
+        </div>
+      )}
       <div className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-1 pt-6 md:-mx-8 md:px-8" style={{ background: 'linear-gradient(0deg, var(--bg) 70%, rgba(11,14,20,0))' }}>
         {!canStart && (
           <p className="mb-2 text-center text-xs text-slate-400">

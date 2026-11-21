@@ -798,7 +798,7 @@ const ROLES_DATA = {
     id: 'werewolf', balance: -6, Art: WerewolfArt, imageUrl: 'images/werewolf-card.jpg', blurb: 'Wake at night and choose a victim.', name: 'Werewolf', team: 'werewolf', max: 4, color: '#DC2626', Icon: WolfIcon,
     nightOrder: 1, nightPrompt: 'Werewolves wake and agree on one victim.',
     short: 'Wakes each night to choose a victim.',
-    ability: 'Wakes each night (together with the other Werewolf, if there is one) to choose a victim. Wins when Werewolves outnumber the Village.'
+    ability: 'Wakes each night (together with the other Werewolf, if there is one) to choose a victim. Wins when Werewolves outnumber the Village, or when it comes down to one Werewolf against one Villager.'
   },
   seer: {
     id: 'seer', balance: 7, Art: SeerArt, imageUrl: 'images/seer-card.jpg', blurb: 'Inspect one player\u2019s alignment each night.', name: 'Seer', team: 'village', max: 2, color: '#A78BFA', Icon: EyeIcon,
@@ -918,7 +918,7 @@ function threeWay(items) {
   if (zombies > 0 && zombies > live.length - zombies) return 'zombie'; // strict majority of the living
   if (realZ > 0) return '';
   if (wolves === 0) return 'village';
-  if (evil > rest) return 'werewolf'; // equal numbers (2 v 2) play on: the Werewolves need strictly more
+  if (evil > rest || (evil === 1 && rest === 1)) return 'werewolf'; // equal numbers (2 v 2) play on, but a lone wolf against a lone villager is already over
   return '';
 }
 // Plague Doctor allegiance from the serums used: more cures = Village, more infections = Zombie Horde, ties follow the last serum, none = Unaligned.
@@ -933,7 +933,7 @@ function plagueLine(items, w) {
 const winText = (w, hadZ) => (w === 'village' && hadZ ? 'No Werewolves or Zombies are left. The Village wins!' : WIN_UI[w].text);
 const WIN_UI = {
   village: { name: 'The Village wins', btn: 'Village Wins', color: '#34D399', title: '#6EE7B7', bg: 'rgba(16,185,129,0.1)', text: 'No Werewolves are left. The Village wins!', banner: 'No werewolves are left. The Village wins.' },
-  werewolf: { name: 'The Werewolves win', btn: 'Werewolves Win', color: '#EF4444', title: '#FCA5A5', bg: 'rgba(220,38,38,0.12)', text: 'The Werewolves outnumber the Village. The Werewolves win!', banner: 'The werewolves outnumber the Village.' },
+  werewolf: { name: 'The Werewolves win', btn: 'Werewolves Win', color: '#EF4444', title: '#FCA5A5', bg: 'rgba(220,38,38,0.12)', text: 'The Werewolves outnumber the Village, or it is one against one. The Werewolves win!', banner: 'The werewolves outnumber the Village, or it is one against one.' },
   lovers: { name: 'The Lovers win', btn: 'Lovers Win', color: '#F472B6', title: '#F9A8D4', bg: 'rgba(244,114,182,0.12)', text: 'The Lovers win! Only the bound pair is left.', banner: 'Only the bound Lovers are left.' },
   zombie: { name: 'The Zombies win', btn: 'Zombies Win', color: '#2DD4BF', title: '#5EEAD4', bg: 'rgba(13,148,136,0.18)', text: 'The Zombie horde holds the majority. The Zombies win!', banner: 'The Zombie horde holds a majority of the living.' }
 };
@@ -4270,7 +4270,7 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
   else {
     const tw3 = threeWay(players.map((p) => ({ role: p.role, alive: p.alive, side: pdSide(p.pdCures, p.pdInfects, p.pdLast) })));
     if (tw3 === 'village') status = { text: 'No Werewolves left. The Village wins.', color: '#34D399' };
-    else if (tw3 === 'werewolf') status = { text: 'Werewolves outnumber the Village.', color: '#F87171' };
+    else if (tw3 === 'werewolf') status = { text: 'Werewolves outnumber the Village, or it is one against one.', color: '#F87171' };
     else if (tw3 === 'zombie') status = { text: 'The Zombie horde holds the majority. The Zombies win.', color: '#2DD4BF' };
   }
 

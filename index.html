@@ -5639,9 +5639,10 @@ function useNightDirector({ room, players, write }) {
       try {
         const base = mpNightPatch(room0);
         if (opts && opts.again) { base.k = room0.k || 1; base.bm = base.k >= 2 && Math.random() < 0.2 ? 1 : 0; }
-        base.ns = 'w:1'; base.nk = 1; // no intro splash: everyone's night screen opens at once
-        setDir({ on: true, label: 'Night: everyone acts' });
-        await write(base); if (!live()) return;
+        setDir({ on: true, label: 'Night begins' });
+        await write(base); if (!live()) return; // base opens on the intro screen: "Night Two Begins..." (plus the Blood Moon banner when it rises)
+        await wait(base.bm ? 5200 : 4200); if (!live()) return;
+        await stepO('w:1', 'Night: everyone acts'); if (!live()) return; // then everyone's night screen opens at once
         const w1 = roles.filter((r) => r !== 'shadow' && r !== 'infected' && r !== 'cured');
         { // Wave 1: everyone at once. The Witch joins the moment the Werewolves have chosen and gets her own 30 seconds.
           const idleOthers = () => latest.current.players.filter((p) => p.a === 1 && ((w1.includes(p.r) && p.r !== 'witch' && p.nd !== 1) || p.jt === 1 || p.cj === 1));
@@ -5822,6 +5823,32 @@ function StatusBadges({ players, meId }) {
           {p.n}{p.id === meId ? ' (you)' : ''}{p.s === 1 && p.a === 1 ? ' 🤐' : ''}{p.x === 1 && p.a === 1 ? ' 🗿 STONED' : ''}{p.sn === 1 && p.a === 1 ? ' 🎯 NO VOTE' : ''}
         </span>
       ))}
+    </div>
+  );
+}
+
+const ELIM_SEEN = { key: '' };
+// Full-screen notice for a player who was just eliminated, so nobody is left guessing.
+function ElimGate({ me, room, code }) {
+  const key = `${code}:${me.id}:${room.dl || 0}`;
+  const [, bump] = useState(0);
+  if (me.a !== 0 || !me.r || !ROLES_DATA[me.r] || ELIM_SEEN.key === key) return null;
+  const lines = Object.values((room.an && room.an.l) || {});
+  const xs = Object.values((room.an && room.an.x) || {});
+  const has = (t) => lines.concat(xs).some((l) => String(l).indexOf(t) >= 0);
+  const why = has(`${me.n} was found dead`) ? 'The werewolves found you in the night.'
+    : has(`${me.n} was voted out`) ? 'The village voted you out.'
+    : has(`took ${me.n} down`) ? 'The Hunter took you down with a last shot.'
+    : has(`${me.n} died of heartbreak`) ? 'You died of heartbreak.'
+    : 'You are out of the game.';
+  const r = ROLES_DATA[me.r];
+  return (
+    <div role="dialog" aria-modal="true" aria-label="You have been eliminated" className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-5 px-6 text-center screen-in" style={{ background: 'radial-gradient(ellipse at 50% 35%, rgba(127,29,29,0.55), rgba(5,7,12,0.97) 70%)' }}>
+      <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-red-300">Eliminated</div>
+      <h2 className="font-display text-4xl font-black text-slate-50" style={{ textShadow: '0 0 28px rgba(220,38,38,0.7)' }}>You&rsquo;re Eliminated</h2>
+      <p className="max-w-xs text-base font-semibold text-red-100">{why}</p>
+      <p className="max-w-xs text-sm text-slate-300">You were the <b style={{ color: r.color }}>{r.name}</b>. You can keep watching, but you can no longer speak, vote or use your role. Keep your eyes on the screen and stay quiet.</p>
+      <div className="mt-2 w-full max-w-xs"><Btn onClick={() => { ELIM_SEEN.key = key; bump((x) => x + 1); }}>Keep Watching</Btn></div>
     </div>
   );
 }
@@ -6316,6 +6343,7 @@ function MpRoom({ session, onExit, onPhase }) {
   return (
     <>
     {ph === 'day' && <DayBackdrop />}
+    {showPlayer && me && ph === 'day' && <ElimGate me={me} room={room} code={code} />}
     {fullHost && session.ai && (ph === 'day' || (ph === 'reveal' && !(me && me.d === 1))) && (
       <ExitButton onClick={() => setConfirmLeave(true)} className="fixed left-3 z-50" style={{ top: 'max(10px, env(safe-area-inset-top))' }} />
     )}

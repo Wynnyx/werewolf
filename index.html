@@ -1916,6 +1916,19 @@ function ConfirmExit({ body, title = 'Exit game?', confirmLabel = 'Exit game', c
 // and the speaker button mutes / unmutes.
 // Screens where the tension music plays instead of the forest ambience (set by AppInner).
 let tensionScreen = false;
+// Ambient forest sound starts on the very first tap, click or key press anywhere (loading screen, Classic / Outbreak, any button).
+// Browsers refuse audio before a gesture, so this one-time starter runs in the capture phase and stays armed until the sound really plays.
+(() => {
+  const arm = (e) => {
+    if (e && e.target && e.target.closest && e.target.closest('[data-sound-toggle]')) return; // the speaker button handles itself
+    Sfx.unlock();
+    const st = getSettings();
+    if (st.sound && !Ambience.unlocked() && !Ambience.isRunning() && !(tensionScreen && st.music)) Ambience.start();
+    if (st.music) Tension.prime();
+  };
+  ['touchend', 'pointerup', 'click', 'keydown'].forEach((n) => window.addEventListener(n, arm, { capture: true, passive: true }));
+  if (getSettings().sound) { try { Ambience.start(); } catch (e) { /* needs a tap first */ } } // desktop browsers may allow this straight away
+})();
 function toggleSound() {
   const cur = getSettings().sound;
   if (cur && !Ambience.isRunning() && !Tension.isRunning()) { if (tensionScreen && getSettings().music) Tension.start(); else Ambience.start(); return; }

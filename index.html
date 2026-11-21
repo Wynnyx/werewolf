@@ -6471,22 +6471,62 @@ const AI_L = {
   villAccuse: (n) => aiPick([`I think ${n} is acting strange today.`, `My gut says ${n}. Anyone else?`, `${n}, you haven't explained yourself. Care to?`]),
   death: (n) => aiPick([`${n} is gone... the wolves are among us.`, `Rest easy, ${n}. We have to be careful now.`]),
   quiet: () => aiPick(['A quiet night. Maybe someone was protected.', 'No one died. Interesting.']),
-  claim: (r) => aiPick([`I'm ${r}, I swear.`, `I'm ${r}, check someone else!`, `Why me? I'm literally ${r}.`])
+  claim: (r) => aiPick([`I'm ${r}, I swear.`, `I'm ${r}, check someone else!`, `Why me? I'm literally ${r}.`]),
+  claimAgain: (r) => aiPick([`Like I said, I'm ${r}. Check someone else.`, `I'm ${r}. I'm not changing my story.`, `Still ${r}. You're wasting the vote on me.`]),
+  seerClash: (n) => aiPick([`Wait, I'm the Seer. ${n}, who did you check?`, `Two Seers? ${n}, tell us who you looked at.`]),
+  claimAck: (n, r) => aiPick([`Okay ${n}, ${r}. We'll see if that holds up.`, `Noted, ${n}. Let's see how you vote.`, `${r}, huh. Prove it, ${n}.`]),
+  doubt: (n) => aiPick([`That's a convenient claim, ${n}.`, `Anyone can say that, ${n}.`]),
+  skeptic: (n) => aiPick([`That's what everyone says, ${n}. We'll see how you vote.`, `Maybe, ${n}. Words are cheap.`, `Fair enough. Your vote will tell us more.`]),
+  askWhy: (n) => aiPick([`What makes you say that, ${n}?`, `${n}, got anything solid, or just a feeling?`, `Hmm. Why that one, ${n}?`]),
+  agree: (n) => aiPick([`${n} did seem a bit off. Let's hear their side.`, `I noticed ${n} too. Let's see how they answer.`]),
+  answer: () => aiPick(["Honestly, I can't say yet.", "Good question. I don't have a clear answer.", 'Hard to know this early.']),
+  chat: (n) => aiPick([`Fair point, ${n}.`, `Hmm, go on, ${n}. I'm listening.`, `Could be. Let's see who else weighs in.`, `I hear you, ${n}.`]),
+  wolfDefend: (n) => aiPick([`Leave ${n} alone. There is no proof against them.`, `Why are we piling on ${n}? That is exactly what a wolf would want.`])
 };
 
 // "a Villager" / "the Doctor": roles with several copies in a deck read better with "a".
 const aiRoleTxt = (id) => { const R = ROLES_DATA[id]; return id === 'villager' ? 'a Villager' : `${R && R.max > 1 ? 'a' : 'the'} ${R ? R.name : id}`; };
 
-// When accused, a bot answers with its real role (good team) or a bluff taken from the deck (wolves and the like).
-function aiDefense(b, ctx) {
+// When accused, a bot answers with its real role (good team) or a bluff taken from the deck (wolves and the like), and then sticks to that story.
+function aiDefense(b, ctx, M) {
   const { room } = ctx;
   const R = ROLES_DATA[b.r];
-  let claim = b.r;
-  if (!(R && R.team === 'village' && Math.random() < 0.85)) {
-    const pool = ROLE_IDS.filter((id) => ROLES_DATA[id] && ROLES_DATA[id].team === 'village' && (room.dk ? (room.dk[id] || 0) > 0 : ['villager', 'doctor', 'medusa', 'seer'].includes(id)));
-    claim = pool.length ? aiPick(pool) : 'villager';
+  const again = !!M.myClaim[b.id];
+  let claim = M.myClaim[b.id];
+  if (!claim) {
+    claim = b.r;
+    if (!(R && R.team === 'village' && Math.random() < 0.85)) {
+      const pool = ROLE_IDS.filter((id) => ROLES_DATA[id] && ROLES_DATA[id].team === 'village' && (room.dk ? (room.dk[id] || 0) > 0 : ['villager', 'doctor', 'medusa', 'seer'].includes(id)));
+      claim = pool.length ? aiPick(pool) : 'villager';
+    }
+    M.myClaim[b.id] = claim;
   }
-  return { m: AI_L.claim(aiRoleTxt(claim)), c: claim };
+  return { m: again ? AI_L.claimAgain(aiRoleTxt(claim)) : AI_L.claim(aiRoleTxt(claim)), c: claim };
+}
+
+// A bot answers a message the human just wrote in the chat.
+function aiReply(b, m, ctx, M) {
+  const { players } = ctx;
+  const hu = players.find((p) => p.id === m.i);
+  const hn = hu ? hu.n : 'friend';
+  const low = String(m.m || '').toLowerCase();
+  const acc = m.a ? players.find((p) => p.id === m.a && p.a === 1) : null;
+  if (m.c && ROLES_DATA[m.c]) { // the human claimed a role
+    M.sus[m.i] = (M.sus[m.i] || 0) + (b.r === 'werewolf' ? 0.8 : 0.2);
+    if (m.c === 'seer' && b.r === 'seer') return { m: AI_L.seerClash(hn) };
+    if (m.c === 'seer' && b.r === 'werewolf') return { m: AI_L.wolfVsSeer(hn), a: m.i };
+    if (b.r === 'werewolf' && Math.random() < 0.4) return { m: AI_L.doubt(hn) };
+    return { m: AI_L.claimAck(hn, aiRoleTxt(m.c)) };
+  }
+  if (acc && acc.id !== b.id) { // the human pointed at somebody else
+    if (b.r === 'werewolf' && acc.r === 'werewolf') return { m: AI_L.wolfDefend(acc.n) };
+    if (Math.random() < 0.5) { M.sus[acc.id] = (M.sus[acc.id] || 0) + 0.6; return { m: AI_L.agree(acc.n) }; }
+    return { m: AI_L.askWhy(hn) };
+  }
+  if (/role|who are you|what are you|claim|seer|doctor|medusa|werewolf|wolf|villager|hunter|witch|mayor|bodyguard|sniper|cupid|spellcaster|shadow|zombie|infect/.test(low) && (low.includes(String(b.n).toLowerCase()) || /who are you|your role|what are you/.test(low))) return aiDefense(b, ctx, M); // asked what it is: it answers truthfully or bluffs
+  if (/trust me|on your side|not a wolf|not a werewolf|innocent/.test(low)) return { m: AI_L.skeptic(hn) };
+  if (low.indexOf('?') >= 0) return { m: AI_L.answer() };
+  return { m: AI_L.chat(hn) };
 }
 
 function aiSpeak(b, ctx, M) {
@@ -6545,7 +6585,7 @@ function aiTick(ctx, M) {
   const humans = players.filter((p) => p.bot !== 1);
   const k = room.k || 0;
   if (room.ph === 'reveal') {
-    if (M.gameTs !== room.ts + ':' + (room.dl || 0)) { Object.assign(M, { gameTs: room.ts + ':' + (room.dl || 0), sus: {}, claims: {}, seen: {}, due: {}, done: {}, proc: {}, defend: [], said: {}, dayK: -1 }); }
+    if (M.gameTs !== room.ts + ':' + (room.dl || 0)) { Object.assign(M, { gameTs: room.ts + ':' + (room.dl || 0), sus: {}, claims: {}, seen: {}, due: {}, done: {}, proc: {}, defend: [], said: {}, myClaim: {}, inbox: [], dayK: -1 }); }
     bots.filter((p) => p.d !== 1).forEach((p) => { if (go('rev' + p.id, 500, 3500)) write({ [`pl/${p.id}/d`]: 1 }); });
     return;
   }
@@ -6578,7 +6618,7 @@ function aiTick(ctx, M) {
   }
   if (room.ph !== 'day') return;
   const alive = players.filter((p) => p.a === 1);
-  if (M.dayK !== k) { M.dayK = k; M.defend = []; M.said = {}; M.defended = {}; M.dayStart = now; M.sent = {}; M.fake = 0; M.nextChat = 0; M.plan = {};
+  if (M.dayK !== k) { M.dayK = k; M.defend = []; M.said = {}; M.defended = {}; M.dayStart = now; M.sent = {}; M.fake = 0; M.nextChat = 0; M.plan = {}; M.inbox = []; M.myClaim = M.myClaim || {};
     const cand = bots.filter((b) => b.a === 1 && b.s !== 1 && b.x !== 1 && b.sn !== 1); // each bot speaks on its own once (about 2 in 3 of them), spread over the first ~25s
     cand.forEach((b) => { const sure = b.r === 'seer' && alive.some((p) => p.id !== b.id && (M.seen[b.id] || {})[p.id] === true); if (sure || Math.random() < 0.65) M.plan[b.id] = now + 3000 + Math.random() * 22000; });
     if (!Object.keys(M.plan).length && cand.length) M.plan[aiPick(cand).id] = now + 6000 + Math.random() * 12000; Object.keys(M.sus).forEach((id) => { M.sus[id] *= 0.7; }); }
@@ -6597,7 +6637,13 @@ function aiTick(ctx, M) {
     if (m.c) M.claims[m.i] = m.c;
     if (m.a) {
       M.sus[m.a] = (M.sus[m.a] || 0) + (bots.some((b) => b.id === m.i) ? 0.9 : 1.4);
-      if (bots.some((b) => b.id === m.a && b.a === 1) && !M.defended[m.a]) { M.defended[m.a] = 1; M.defend.push({ id: m.a, by: m.i, at: now + 2000 + Math.random() * 2500 }); }
+      const fromHuman = !bots.some((b) => b.id === m.i);
+      if (bots.some((b) => b.id === m.a && b.a === 1) && (fromHuman || !M.defended[m.a])) { M.defended[m.a] = 1; M.defend.push({ id: m.a, by: m.i, human: fromHuman, at: now + 1800 + Math.random() * 2500 }); }
+    }
+    if (!bots.some((b) => b.id === m.i) && !m.q && now - Number(String(key).slice(0, 13)) < 20000 && M.inbox.length < 3) { // the human said something: a bot answers it, whether it tells the truth or not
+      const low = String(m.m || '').toLowerCase();
+      const named = bots.find((b) => b.a === 1 && low.includes(String(b.n).toLowerCase()));
+      if (!(named && m.a === named.id)) M.inbox.push({ msg: m, id: named ? named.id : '', at: now + 1500 + Math.random() * 2300 }); // an accusation of a bot is answered by the defense instead
     }
   });
   const speakers = bots.filter((b) => b.a === 1 && b.s !== 1 && b.x !== 1 && b.sn !== 1); // silenced and stoned bots stay mute
@@ -6606,7 +6652,13 @@ function aiTick(ctx, M) {
   if (df) { // an accused bot answers right away with a role claim (at most 2 messages per bot per day)
     M.defend = M.defend.filter((d) => d !== df);
     const b = speakers.find((x) => x.id === df.id);
-    if (b && (M.sent[b.id] || 0) < 2) { M.sent[b.id] = (M.sent[b.id] || 0) + 1; post(b, aiDefense(b, ctx)); }
+    if (b && (df.human || (M.sent[b.id] || 0) < 2)) { if (!df.human) M.sent[b.id] = (M.sent[b.id] || 0) + 1; post(b, aiDefense(b, ctx, M)); } // answering the human is never capped
+  } else if (M.inbox.some((r) => now >= r.at)) { // a bot replies to what the human wrote
+    const r = M.inbox.find((x) => now >= x.at);
+    M.inbox = M.inbox.filter((x) => x !== r);
+    const pool = speakers.filter((x) => x.id !== M.lastReply);
+    const b = r.id ? speakers.find((x) => x.id === r.id) : aiPick(pool.length ? pool : speakers);
+    if (b && Math.random() < 0.92) { M.lastReply = b.id; post(b, aiReply(b, r.msg, ctx, M)); }
   } else if (now >= M.nextChat) {
     const due = Object.keys(M.plan).find((id) => now >= M.plan[id]);
     if (due) {
@@ -6626,7 +6678,7 @@ function aiTick(ctx, M) {
 function useAiDriver({ enabled, room, players, write }) {
   const latest = useRef({});
   latest.current = { room, players, write };
-  const mem = useRef({ gameTs: '', sus: {}, claims: {}, seen: {}, due: {}, done: {}, proc: {}, defend: [], said: {}, defended: {}, dayK: -1 });
+  const mem = useRef({ gameTs: '', sus: {}, claims: {}, seen: {}, due: {}, done: {}, proc: {}, defend: [], said: {}, defended: {}, myClaim: {}, inbox: [], dayK: -1 });
   useEffect(() => {
     if (!enabled) return;
     const t = setInterval(() => { try { aiTick(latest.current, mem.current); } catch (e) { /* a bad tick must never stop the game */ } }, 900);

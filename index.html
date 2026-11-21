@@ -4991,8 +4991,9 @@ function MpHostForm({ onBack, onCreated, cfg }) {
   const [roomName, setRoomName] = useState('');
   const [plays, setPlays] = useState(true);
   const [isPublic, setIsPublic] = useState(false);
-  const [nightStyle, setNightStyle] = useState('eyes_closed');
-  const [styleTouched, setStyleTouched] = useState(false); // until the host picks one, Public defaults to Eyes Open and Private to Eyes Closed
+  const [campfire, setCampfire] = useState(false); // Campfire Mode ON = eyes_closed (in-person), OFF = eyes_open (silent / online); Private rooms only
+  const [campHelp, setCampHelp] = useState(false);
+  const nightStyle = campfire && !isPublic ? 'eyes_closed' : 'eyes_open';
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const go = async () => {
@@ -5025,17 +5026,31 @@ function MpHostForm({ onBack, onCreated, cfg }) {
       </div>
       <div role="radiogroup" aria-label="Room visibility" className="flex gap-2.5">
         {[[false, 'Private', 'Friends join with the 4-letter code.'], [true, 'Public', 'Also listed so anyone can join.']].map(([v, t, sub]) => (
-          <button key={t} type="button" role="radio" aria-checked={isPublic === v} onClick={() => { setIsPublic(v); if (!styleTouched) setNightStyle(v ? 'eyes_open' : 'eyes_closed'); }} className="flex-1 rounded-xl p-3 text-left transition"
+          <button key={t} type="button" role="radio" aria-checked={isPublic === v} onClick={() => { setIsPublic(v); if (v) setCampfire(false); }} className="flex-1 rounded-xl p-3 text-left transition"
             style={{ background: isPublic === v ? 'rgba(109,40,217,0.3)' : 'var(--card)', border: `1px solid ${isPublic === v ? '#A78BFA' : 'var(--line)'}` }}>
             <span className="block text-sm font-bold text-slate-50">{t}</span><span className="mt-0.5 block text-xs leading-snug text-slate-400">{sub}</span>
           </button>))}
       </div>
-      <div role="radiogroup" aria-label="Night style" className="flex gap-2.5">
-        {[['eyes_closed', 'Eyes Closed', 'In-person circle \u2014 close eyes & wake by role'], ['eyes_open', 'Eyes Open', 'Silent / online \u2014 act on your phone, keep screen hidden']].map(([v, t, sub]) => (
-          <button key={v} type="button" role="radio" aria-checked={nightStyle === v} onClick={() => { setNightStyle(v); setStyleTouched(true); }} className="flex-1 rounded-xl p-3 text-left transition"
-            style={{ background: nightStyle === v ? 'rgba(109,40,217,0.3)' : 'var(--card)', border: `1px solid ${nightStyle === v ? '#A78BFA' : 'var(--line)'}` }}>
-            <span className="block text-sm font-bold text-slate-50">{t}</span><span className="mt-0.5 block text-xs leading-snug text-slate-400">{sub}</span>
-          </button>))}
+      <div className="rounded-xl p-3" style={{ background: 'var(--card)', border: '1px solid var(--line)', opacity: isPublic ? 0.6 : 1 }}>
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-slate-50">Campfire Mode</span>
+              <button type="button" aria-label="What is Campfire Mode?" onClick={() => setCampHelp((v) => !v)} className="flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-violet-200" style={{ border: '1px solid #A78BFA' }}>?</button>
+            </div>
+            <span className="mt-0.5 block text-xs text-slate-400">{isPublic ? 'Available in Private rooms only' : campfire ? 'On \u2014 In-person eyes closed' : 'Off \u2014 Silent / online phones'}</span>
+          </div>
+          <button type="button" role="switch" aria-checked={campfire && !isPublic} aria-label="Campfire Mode" disabled={isPublic} onClick={() => setCampfire((v) => !v)}
+            className="relative h-7 w-12 shrink-0 rounded-full transition" style={{ background: campfire && !isPublic ? '#7C3AED' : 'rgba(148,163,184,0.35)', cursor: isPublic ? 'not-allowed' : 'pointer' }}>
+            <span className="absolute top-0.5 h-6 w-6 rounded-full bg-white transition-all" style={{ left: campfire && !isPublic ? 22 : 2 }} />
+          </button>
+        </div>
+        {campHelp && (
+          <div role="note" className="mt-3 space-y-2 rounded-lg p-3 text-xs leading-snug text-slate-300" style={{ background: 'rgba(109,40,217,0.18)', border: '1px solid rgba(167,139,250,0.4)' }}>
+            <p><b className="text-slate-50">Campfire Mode ON:</b> In-person circle mode — everyone closes their eyes at night and wakes up one role at a time.</p>
+            <p><b className="text-slate-50">Campfire Mode OFF:</b> Silent / online mode — keep your eyes open, hide your screen from others, and act simultaneously on your phones.</p>
+          </div>
+        )}
       </div>
       {plays && (
         <MpField label="Your name">
@@ -6131,7 +6146,7 @@ function MpRoom({ session, onExit, onPhase }) {
   const closeCards = () => { setCardsStep(false); write({ lk: 0 }); };
   const deal = () => write(mpDealPatch(room, deck));
   const saveDeck = async () => { await write({ dk: deck, lk: 0 }); setCardsStep(false); };
-  const makePublic = async () => { setConfirmPublic(false); await write({ pub: 1 }); try { await Mp.put(`publicRooms/${code}`, { rn: room.rn, hn: room.hn, ts: room.ts || Date.now() }); } catch (e) { /* the room is still marked public */ } };
+  const makePublic = async () => { setConfirmPublic(false); await write({ pub: 1, nightStyle: 'eyes_open' }); try { await Mp.put(`publicRooms/${code}`, { rn: room.rn, hn: room.hn, ts: room.ts || Date.now() }); } catch (e) { /* the room is still marked public */ } };
 
   if (room === undefined) {
     return <Screen className="items-center justify-center"><p className="hint-pulse text-slate-300">Connecting to the room...</p>{err && <p className="mt-3 max-w-xs text-center text-sm text-amber-300">{err}</p>}<Btn variant="ghost" className="mt-6" onClick={closeNow}>Cancel</Btn></Screen>;

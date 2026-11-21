@@ -701,12 +701,6 @@ const ROLES_DATA = {
     short: 'Wakes each night to choose a victim.',
     ability: 'Wakes each night (together with the other Werewolf, if there is one) to choose a victim. Wins when Werewolves match or outnumber the Village.'
   },
-  shadow: {
-    id: 'shadow', balance: -4, Art: ShadowArt, get imageUrl() { return shadowArtStore.get(); }, blurb: 'Redirect one night action to a new target.', name: 'Shadow Figure', team: 'werewolf', max: 1, color: '#FB7185', Icon: ShadowIcon,
-    nightOrder: 6, nightPrompt: 'Shadow Figure wakes last. Show the Werewolves\u2019 victim and the other night targets without saying who chose them. They may redirect one action to a new target, or skip.',
-    short: 'Redirects one night action to a new target.',
-    ability: 'Each night, you may redirect one night action to a new target.'
-  },
   seer: {
     id: 'seer', balance: 7, Art: SeerArt, imageUrl: 'images/seer-card.jpg', blurb: 'Inspect one player\u2019s alignment each night.', name: 'Seer', team: 'village', max: 1, color: '#A78BFA', Icon: EyeIcon,
     nightOrder: 3, nightPrompt: 'Seer wakes and points at one player. Show a thumb up (Village) or down (Werewolf).',
@@ -748,6 +742,12 @@ const ROLES_DATA = {
     nightOrder: 0.5, nightPrompt: 'Medusa wakes and may turn one player to stone until dusk, or skips. Not the same player as last night.',
     short: 'Turns one player to stone until dusk.',
     ability: 'Each night, you may turn one player to stone until dusk, blocking their action.'
+  },
+  shadow: {
+    id: 'shadow', balance: -4, Art: ShadowArt, get imageUrl() { return shadowArtStore.get(); }, blurb: 'Redirect one night action to a new target.', name: 'Shadow Figure', team: 'werewolf', max: 1, color: '#FB7185', Icon: ShadowIcon,
+    nightOrder: 6, nightPrompt: 'Shadow Figure wakes last. Show the Werewolves\u2019 victim and the other night targets without saying who chose them. They may redirect one action to a new target, or skip.',
+    short: 'Redirects one night action to a new target.',
+    ability: 'Each night, you may redirect one night action to a new target.'
   },
   villager: {
     id: 'villager', balance: 1, Art: VillagerArt, imageUrl: 'images/villager-card.jpg', blurb: 'No night power. Use deduction to find the wolves.', name: 'Villager', team: 'village', max: 1, color: '#CBD5E1', Icon: HouseIcon,

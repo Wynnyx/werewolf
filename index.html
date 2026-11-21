@@ -6345,10 +6345,10 @@ function MpRoom({ session, onExit, onPhase }) {
 /* ------------------------------------------------------------------ */
 const AI_NAMES = ['Darren', 'Jenna', 'Charlie', 'James', 'Ava', 'Stacy', 'Mira', 'Bram', 'Ivy', 'Corvin', 'Sable', 'Thorn', 'Wren', 'Dax', 'Lysa', 'Odin', 'Pia', 'Rook', 'Nyx', 'Hale', 'Juno', 'Kade', 'Vera', 'Finn'];
 
-// The six house names come first (in order), then the rest at random; never a name already in the room.
+// The six house names come first (in random order), then the rest at random; never a name already in the room.
 function aiPickNames(used, n) {
   const free = AI_NAMES.filter((x) => !used.has(x.toLowerCase()));
-  const front = free.slice(0, 6).filter((x) => AI_NAMES.indexOf(x) < 6);
+  const front = shuffle(free.filter((x) => AI_NAMES.indexOf(x) < 6)); // house names first, in random order
   return [...front, ...shuffle(free.filter((x) => !front.includes(x)))].slice(0, n);
 }
 

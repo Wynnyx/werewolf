@@ -1492,6 +1492,7 @@ const TH_PAIRS = [
   ['Shadow Figure Card Art', 'ภาพไพ่ร่างเงา'], ['Your own picture for the Shadow Figure card. A portrait 3:4 image fits best.', 'ภาพของคุณเองสำหรับไพ่ร่างเงา ภาพแนวตั้งอัตราส่วน 3:4 เหมาะที่สุด'], ['Shadow Figure card art updated.', 'อัปเดตภาพไพ่ร่างเงาแล้ว'], ['Back to the default Shadow Figure card.', 'กลับไปใช้ไพ่ร่างเงาแบบเริ่มต้น'],
   ['Shadow Figure, choose an action to redirect.', 'ร่างเงา เลือกการกระทำที่จะเปลี่ยนเป้าหมาย'], ['Seer, here is your vision.', 'ผู้หยั่งรู้ นี่คือนิมิตของคุณ'], ['Your vision will come at the end of the night.', 'นิมิตของคุณจะมาถึงเมื่อสิ้นสุดคืนนี้'],
   ['Your shadows were turned to stone tonight. Your redirect is blocked.', 'เงาของคุณถูกสาปเป็นหินในคืนนี้ คุณเปลี่ยนเป้าหมายไม่ได้'],
+  ['Medusa turns {} to stone', 'เมดูซ่าเปลี่ยน {1} เป็นหิน'], ['Bodyguard protects {}', 'บอดี้การ์ดปกป้อง {1}'], ['Seer inspects {}', 'ผู้หยั่งรู้ตรวจ {1}'], ['Witch heals {}', 'แม่มดช่วยชีวิต {1}'], ['Witch poisons {}', 'แม่มดวางยาพิษ {1}'], ['Spellcaster silences {}', 'จอมเวทใบ้ปิดปาก {1}'], ['Werewolf team', 'ทีมมนุษย์หมาป่า'],
   ['Werewolf Target: {}', 'เป้าหมายของมนุษย์หมาป่า: {1}'], ['No other night actions to redirect tonight', 'คืนนี้ไม่มีการกระทำอื่นให้เปลี่ยนเป้าหมาย'], ['Pick one action to redirect', 'เลือกการกระทำหนึ่งอย่างที่จะเปลี่ยนเป้าหมาย'],
   ['Unknown Night Action #{#} → Targeting {}', 'การกระทำลึกลับยามค่ำคืน #{1} → เล็งไปที่ {2}'], ['Choose a new target for that action', 'เลือกเป้าหมายใหม่สำหรับการกระทำนั้น'], ['Pending night actions', 'การกระทำยามค่ำคืนที่รออยู่'],
   ['Skip / Leave Actions Unchanged', 'ข้าม / ไม่เปลี่ยนการกระทำใด ๆ'], ['Confirm Redirect', 'ยืนยันการเปลี่ยนเป้าหมาย'], ['Select an action and a new target', 'เลือกการกระทำและเป้าหมายใหม่'],
@@ -2674,10 +2675,21 @@ function HoldButton({ onComplete, ms = 1500, aria = 'Press and hold for one and 
   );
 }
 
+function NightBackdrop() {
+  const src = useNightBg();
+  return (
+    <div className="pointer-events-none fixed inset-0" style={{ zIndex: 0, background: '#03050A' }} aria-hidden="true">
+      <img src={src} alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover" />
+      <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 38%, rgba(10,10,18,0) 35%, rgba(10,10,18,0.45) 100%), linear-gradient(rgba(10,10,18,0.55), rgba(10,10,18,0.55))' }} />
+    </div>
+  );
+}
 function Shield({ narrator, onUnlock, onStartNight, onExit }) {
   const [confirmExit, setConfirmExit] = useState(false);
   return (
-    <Screen className="relative items-center justify-center text-center">
+    <>
+    <NightBackdrop />
+    <Screen className="relative z-10 items-center justify-center text-center">
       <ExitButton onClick={() => setConfirmExit(true)} className="absolute left-4" style={{ top: 'max(20px, env(safe-area-inset-top))' }} />
       <div className="flex h-28 w-28 items-center justify-center rounded-full" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
         <ShieldIcon width="56" height="56" className="text-slate-300" />
@@ -2704,6 +2716,7 @@ function Shield({ narrator, onUnlock, onStartNight, onExit }) {
           onCancel={() => setConfirmExit(false)} onConfirm={onExit} />
       )}
     </Screen>
+    </>
   );
 }
 
@@ -2727,7 +2740,7 @@ function StatusChip({ active, onClick, color, children }) {
 /* ------------------------------------------------------------------ */
 /* Automated night: shared pieces, Pass & Play loop, day trial        */
 /* ------------------------------------------------------------------ */
-const NIGHT_ORDER = ['medusa', 'werewolf', 'seer', 'bodyguard', 'witch', 'spellcaster', 'shadow'];
+const NIGHT_ORDER = ['werewolf', 'medusa', 'seer', 'bodyguard', 'witch', 'spellcaster', 'shadow'];
 const NIGHT_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 const nightWord = (n) => NIGHT_WORDS[n] || String(n);
 const roleLabel = (id) => (id === 'werewolf' ? 'Werewolves' : id === 'seerResult' ? 'Seer' : ROLES_DATA[id].name);
@@ -2929,6 +2942,8 @@ function NightCard({ player, line }) {
 }
 
 // The Shadow Figure's screen: anonymous action list, then a new target. Used by Pass & Play, Multi-Device auto and manual.
+const SHADOW_VERB = { medusa: 'Medusa turns {} to stone', bodyguard: 'Bodyguard protects {}', seer: 'Seer inspects {}', witchSave: 'Witch heals {}', witchPoison: 'Witch poisons {}', spellcaster: 'Spellcaster silences {}' };
+const shadowActionLabel = (key, name) => (SHADOW_VERB[key] || '{}').replace('{}', name);
 function ShadowAct({ actions, victimName, alive, nm, stoned, onDone, header }) {
   const order = useMemo(() => shuffle(actions.map((_, i) => i)), []);
   const [act, setAct] = useState(null);
@@ -2968,7 +2983,7 @@ function ShadowAct({ actions, victimName, alive, nm, stoned, onDone, header }) {
                   <button role="radio" aria-checked={sel} onClick={() => { setAct(sel ? null : ai); setSkip(false); setPick(null); }}
                     className="flex min-h-[52px] w-full items-center justify-between gap-2 rounded-xl px-4 text-left text-[15px] font-semibold text-slate-50 transition active:scale-[0.99]"
                     style={{ background: sel ? 'rgba(109,40,217,0.45)' : 'rgba(21,26,36,0.85)', border: `${sel ? 2 : 1}px solid ${sel ? '#C4B5FD' : 'var(--line)'}` }}>
-                    <span>{`Unknown Night Action #${n + 1} \u2192 Targeting ${nm(actions[ai].target)}`}</span>{sel && <span aria-hidden="true" className="text-lg">✓</span>}
+                    <span>{shadowActionLabel(actions[ai].key, nm(actions[ai].target))}</span>{sel && <span aria-hidden="true" className="text-lg">✓</span>}
                   </button>
                 </li>
               );
@@ -3003,7 +3018,7 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
     return (
       <div className="flex flex-1 flex-col">
         <ActHeader role={role} sub="Agree silently, then one of you taps the name." />
-        <PickList players={opts(alive.filter((p) => p.role !== 'werewolf'))} value={val} onChange={choose} />
+        <PickList players={opts(alive)} team={alive.filter((p) => p.role === 'werewolf' || p.role === 'shadow').map((p) => p.id)} value={val} onChange={choose} />
         <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ werewolf: pick })}>{pick === null ? 'Select a target' : 'Confirm Target'}</Btn>
       </div>
     );
@@ -3670,7 +3685,7 @@ const STORE_KEY = 'nightfall.games.v1';
 //  pl[pid]: { n name, o join order, r roleId, a alive 1/0, d ready 1/0, t night target pid, nd night action done,
 //             ws witch save this night, wsu / wpu potion used, lp bodyguard (or Medusa) last target, hs hunter shot used, s silenced, x stoned until dusk, sa Shadow Figure's chosen action, rd Seer saw the final vision, lf left }
 const SESSION_KEY = 'nightfall.mp.v1';
-const MP_ACTIVE = ['medusa', 'werewolf', 'seer', 'bodyguard', 'witch', 'spellcaster', 'shadow'];
+const MP_ACTIVE = ['werewolf', 'medusa', 'seer', 'bodyguard', 'witch', 'spellcaster', 'shadow'];
 const MP_MIN = 4;
 const MP_MAX = 8;
 const CODE_WORDS = ['WOLF', 'MOON', 'FANG', 'HOWL', 'PACK', 'CLAW', 'DARK', 'BONE', 'MIST', 'GRIM', 'CROW', 'BATS', 'DUSK', 'DAWN', 'HUNT', 'PREY', 'FEAR', 'GORE', 'MAUL', 'OMEN'];
@@ -4238,18 +4253,21 @@ function MpReveal({ me, ready, readyCount, total, onReady }) {
   );
 }
 
-function PickList({ players, value, onChange, disabled = [], locked }) {
+function PickList({ players, value, onChange, disabled = [], locked, team = [] }) {
   return (
     <ul className="flex flex-col gap-2" role="listbox">
       {players.map((p) => {
-        const off = locked || disabled.includes(p.id);
+        const mate = team.includes(p.id);
+        const off = locked || mate || disabled.includes(p.id);
         const sel = value === p.id;
         return (
           <li key={p.id}>
             <button role="option" aria-selected={sel} disabled={off} onClick={() => onChange(sel ? '' : p.id)}
-              className="flex min-h-[52px] w-full items-center justify-between rounded-xl px-4 text-left text-[15px] font-semibold transition active:scale-[0.99] disabled:opacity-40"
-              style={{ background: sel ? 'rgba(109,40,217,0.4)' : 'var(--card-2)', border: `${sel ? 2 : 1}px solid ${sel ? '#C4B5FD' : 'var(--line)'}`, boxShadow: sel ? '0 0 18px -4px rgba(167,139,250,0.7)' : 'none', color: '#E6EAF2' }}>
-              {p.n}{sel && <span aria-hidden="true" className="text-lg">✓</span>}
+              className={`flex min-h-[52px] w-full items-center justify-between rounded-xl px-4 text-left text-[15px] font-semibold transition active:scale-[0.99] ${mate ? '' : 'disabled:opacity-40'}`}
+              style={mate ? { background: 'rgba(127,29,29,0.25)', border: '1px solid rgba(239,68,68,0.55)', color: '#FCA5A5' }
+                : { background: sel ? 'rgba(109,40,217,0.4)' : 'var(--card-2)', border: `${sel ? 2 : 1}px solid ${sel ? '#C4B5FD' : 'var(--line)'}`, boxShadow: sel ? '0 0 18px -4px rgba(167,139,250,0.7)' : 'none', color: '#E6EAF2' }}>
+              {mate ? <><span>{p.n}</span><span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider"><WolfIcon width="18" height="18" aria-hidden="true" />Werewolf team</span></>
+                : <>{p.n}{sel && <span aria-hidden="true" className="text-lg">✓</span>}</>}
             </button>
           </li>
         );
@@ -4302,7 +4320,7 @@ function MpNightManual({ me, players, room, write }) {
     return (
       <div className="flex flex-1 flex-col">
         {header('Choose your victim', 'Agree silently with your pack. The most votes wins.')}
-        <PickList players={alive.filter((p) => p.r !== 'werewolf')} value={done ? me.t : pick} onChange={setPick} locked={done} />
+        <PickList players={alive} team={alive.filter((p) => p.r === 'werewolf' || p.r === 'shadow').map((p) => p.id)} value={done ? me.t : pick} onChange={setPick} locked={done} />
         {pack.length > 0 && (
           <div className="mt-3 rounded-xl p-3 text-xs text-slate-300" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
             <div className="mb-1 font-semibold uppercase tracking-widest text-slate-400">Your pack</div>

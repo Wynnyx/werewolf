@@ -2335,7 +2335,14 @@ function LobbyBackdrop({ mode }) {
 function StartScreen({ onPlay, onMulti, onAi, gameCount, onClearGames }) {
   const [step, setStep] = useState('mode'); // mode -> play
   const [pv, setPv] = useState('classic'); // which mode art the selector backdrop previews
-  const src = DEFAULT_BG;
+  const homeBgs = [DEFAULT_BG, LOBBY_BG.classic.src, LOBBY_BG.outbreak.src]; // the home backdrop rotates through these
+  const [bgI, setBgI] = useState(() => Math.floor(Math.random() * 3)); // a different one each time the app opens
+  useEffect(() => {
+    homeBgs.forEach((u) => preloadImage(u));
+    const t = setInterval(() => setBgI((i) => { const n = Math.floor(Math.random() * 2); return n >= i ? n + 1 : n; }), 15000); // every 15 seconds, never the same twice in a row
+    return () => clearInterval(t);
+  }, []);
+  const src = homeBgs[bgI];
   const st = useSettings();
   const atmos = useMemo(() => {
     const r = (a, b) => a + Math.random() * (b - a);
@@ -2386,8 +2393,8 @@ function StartScreen({ onPlay, onMulti, onAi, gameCount, onClearGames }) {
         <DefaultBackdrop />
         <div className="atmos-wrap absolute inset-0 flex justify-center">
           <div className="atmos-drift atmos-box relative shrink-0" style={{ width: 'max(100vw, calc(100vh * 0.5628))', height: 'max(100vh, calc(100vw * 1.7768))' }}>
-            {imgOk && <img src={src} alt="" onError={() => setImgOk(false)} className="absolute inset-0 h-full w-full object-cover" style={{ filter: 'brightness(1.2) saturate(1.1)' }} />}
-            <div className="blood-moon-glow pointer-events-none absolute" style={{ left: '68.8%', top: '15.7%', width: '62%', aspectRatio: '1 / 1' }} />
+            {imgOk && homeBgs.map((u, i) => <img key={u} src={u} alt="" onError={() => { if (i === 0) setImgOk(false); }} className="absolute inset-0 h-full w-full object-cover" style={{ filter: 'brightness(1.2) saturate(1.1)', opacity: i === bgI ? 1 : 0, transition: 'opacity 1.8s ease' }} />)}
+            <div className="pointer-events-none absolute inset-0" style={{ opacity: bgI === 0 ? 1 : 0, transition: 'opacity 1.8s ease' }}><div className="blood-moon-glow pointer-events-none absolute" style={{ left: '68.8%', top: '15.7%', width: '62%', aspectRatio: '1 / 1' }} /></div>
           </div>
         </div>
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-[#0B0E14]/10 via-40% to-[#0B0E14]/95" />

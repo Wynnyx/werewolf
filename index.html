@@ -2133,6 +2133,36 @@ const LOBBY_BG = {
   classic: { src: 'images/classic-bg.png', fallback: 'linear-gradient(180deg,#070B1E 0%,#16204F 48%,#0B0E14 100%)' },
   outbreak: { src: 'images/outbreak-bg.png', fallback: 'linear-gradient(180deg,#03100D 0%,#0B3B2E 48%,#050B09 100%)' }
 };
+// Falling leaves and embers/spores for the Step 2 screens, tinted per mode (same motion as the Step 1 Home Screen).
+const LOBBY_TINT = {
+  classic: { leaves: ['#94A3B8', '#A5B4FC', '#6366F1', '#CBD5E1'], embers: ['#FBBF24', '#F59E0B', '#FB923C'] },
+  outbreak: { leaves: ['#6EE7B7', '#34D399', '#86EFAC', '#4D7C0F'], embers: ['#A7F3D0', '#4ADE80', '#BEF264'] }
+};
+function LobbyParticles({ mode }) {
+  const atmos = useMemo(() => {
+    const t = LOBBY_TINT[mode] || LOBBY_TINT.classic;
+    const r = (a, b) => a + Math.random() * (b - a);
+    const leaves = Array.from({ length: 8 }, (_, i) => ({
+      left: r(3, 95), size: r(9, 16), dur: r(10, 17), delay: -r(0, 15), dx: r(30, 90), sway: r(3, 5.5), color: t.leaves[i % t.leaves.length]
+    }));
+    const embers = Array.from({ length: 8 }, () => ({
+      left: r(5, 95), size: r(3, 5.5), dur: r(8, 14), delay: -r(0, 12), dx: r(-30, 30), color: t.embers[Math.floor(Math.random() * t.embers.length)]
+    }));
+    return { leaves, embers };
+  }, [mode]);
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      {atmos.leaves.map((l, i) => (
+        <span key={'l' + i} className="leaf absolute" style={{ left: l.left + '%', top: '-4vh', animationDuration: l.dur + 's', animationDelay: l.delay + 's', '--dx': l.dx + 'px', opacity: 0.8 }}>
+          <span className="leaf-shape block" style={{ width: l.size, height: l.size * 0.8, background: l.color, animationDuration: l.sway + 's' }} />
+        </span>
+      ))}
+      {atmos.embers.map((e, i) => (
+        <span key={'e' + i} className="ember absolute" style={{ left: e.left + '%', bottom: '-2vh', width: e.size, height: e.size, background: e.color, boxShadow: `0 0 8px 2px ${e.color}99`, animationDuration: e.dur + 's', animationDelay: e.delay + 's', '--dx': e.dx + 'px' }} />
+      ))}
+    </div>
+  );
+}
 function LobbyBackdrop({ mode }) {
   const bg = LOBBY_BG[mode] || LOBBY_BG.classic;
   const [ok, setOk] = useState(true);
@@ -2143,6 +2173,7 @@ function LobbyBackdrop({ mode }) {
       <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(5,8,16,0.35) 0%, rgba(5,8,16,0) 24%, rgba(5,8,16,0) 52%, rgba(5,8,16,0.88) 100%)' }} />
       <div className="mist mist-a pointer-events-none" />
       <div className="mist mist-b pointer-events-none" />
+      <LobbyParticles mode={mode} />
     </div>
   );
 }
@@ -5727,6 +5758,7 @@ function AppInner() {
 /* ------------------------------------------------------------------ */
 function activeImageSources() {
   const list = [DEFAULT_BG, LOADING_BG, DEFAULT_BACK, nightPool.get()[0], dayPool.get()[0]];
+  list.push(LOBBY_BG.classic.src, LOBBY_BG.outbreak.src); // Step 2 mode backgrounds: cached before Classic / Outbreak is tapped
   list.push(mayorArtStore.get(), medusaArtStore.get(), shadowArtStore.get());
   ROLE_IDS.forEach((id) => {
     const src = ROLES_DATA[id].imageUrl;

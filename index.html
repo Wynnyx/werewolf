@@ -3088,7 +3088,19 @@ function DayTimer({ minutes = 3, startAt = 0, onEnd, disabled = false }) {
   );
 }
 
-function NightStage({ children, dawn = false, shake = false, flash = false, onExit, fixed = true, pitch = false, day = false }) {
+// Round sound on/off button for the night screens (same switch as Settings and the home screen).
+function NightSoundButton({ offset = false }) {
+  const st = useSettings();
+  return (
+    <button onClick={toggleSound} data-sound-toggle="1" aria-label={st.sound ? 'Mute ambient sound' : 'Turn on ambient sound'} aria-pressed={st.sound}
+      className="absolute z-30 flex h-10 w-10 items-center justify-center rounded-full text-slate-300/80 hover:text-slate-100"
+      style={{ top: 'max(14px, env(safe-area-inset-top))', right: offset ? 60 : 12, background: 'rgba(10,10,18,0.55)', border: '1px solid rgba(203,213,225,0.25)' }}>
+      <SpeakerIcon on={st.sound} />
+    </button>
+  );
+}
+
+function NightStage({ children, dawn = false, shake = false, flash = false, onExit, fixed = true, pitch = false, day = false, soundOffset = false }) {
   const nightSrc = useNightBg();
   return (
     <div className={`${fixed ? 'fixed inset-0 z-40' : 'relative min-h-[70vh] rounded-3xl'} overflow-hidden ${shake ? 'dawn-shake' : ''}`} style={{ background: pitch ? '#000' : '#03050A' }}>
@@ -3097,6 +3109,7 @@ function NightStage({ children, dawn = false, shake = false, flash = false, onEx
       {!pitch && !day && <div className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 38%, rgba(10,10,18,0) 35%, rgba(10,10,18,0.45) 100%), linear-gradient(rgba(10,10,18,${dawn ? 0.42 : 0.55}), rgba(10,10,18,${dawn ? 0.42 : 0.55}))`, transition: 'background 2s ease' }} />}
       {flash && <div className="dawn-flash pointer-events-none absolute inset-0 z-20" />}
       {onExit && <ExitButton onClick={onExit} className="absolute left-4 z-30" style={{ top: 'max(16px, env(safe-area-inset-top))' }} />}
+      {fixed && !pitch && <NightSoundButton offset={soundOffset} />}
       <div className={`relative z-10 flex w-full overflow-y-auto px-5 ${fixed ? 'h-full' : 'min-h-[70vh]'}`} style={{ paddingTop: fixed ? 'max(64px, calc(env(safe-area-inset-top) + 48px))' : '24px', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
         <div className="mx-auto flex min-h-full w-full max-w-md flex-col">{children}</div>
       </div>
@@ -3549,7 +3562,7 @@ function NightLoopPP({ players, night, onFinish, onExit }) {
     );
   }
   return (
-    <NightStage dawn={dawn} day={st.k === 'dawn'} shake={shake} flash={flash} onExit={() => setConfirmExit(true)}>
+    <NightStage dawn={dawn} day={st.k === 'dawn'} shake={shake} flash={flash} soundOffset onExit={() => setConfirmExit(true)}>
       {body}
       {confirmExit && (
         <ConfirmExit confirmLabel="Leave night" body="The night's choices so far are discarded. You can start the night again from the Grimoire."

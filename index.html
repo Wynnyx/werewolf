@@ -2128,6 +2128,25 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
   );
 }
 
+// Step 2 (mode lobby) background: its own art per mode, with a gradient that shows until the image loads (or if it is missing).
+const LOBBY_BG = {
+  classic: { src: 'images/classic-bg.png', fallback: 'linear-gradient(180deg,#070B1E 0%,#16204F 48%,#0B0E14 100%)' },
+  outbreak: { src: 'images/outbreak-bg.png', fallback: 'linear-gradient(180deg,#03100D 0%,#0B3B2E 48%,#050B09 100%)' }
+};
+function LobbyBackdrop({ mode }) {
+  const bg = LOBBY_BG[mode] || LOBBY_BG.classic;
+  const [ok, setOk] = useState(true);
+  useEffect(() => setOk(true), [bg.src]);
+  return (
+    <div className="fixed inset-0 z-0 overflow-hidden" style={{ background: bg.fallback }} aria-hidden="true">
+      {ok && <img src={bg.src} alt="" draggable={false} onError={() => setOk(false)} className="absolute inset-0 h-full w-full object-cover" />}
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(5,8,16,0.35) 0%, rgba(5,8,16,0) 24%, rgba(5,8,16,0) 52%, rgba(5,8,16,0.88) 100%)' }} />
+      <div className="mist mist-a pointer-events-none" />
+      <div className="mist mist-b pointer-events-none" />
+    </div>
+  );
+}
+
 function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
   const [step, setStep] = useState('mode'); // mode -> play
   const startMode = useGameMode();
@@ -2177,6 +2196,7 @@ function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
   };
   return (
     <div className="relative min-h-full w-full" onPointerDown={spawn}>
+      {step === 'play' ? <LobbyBackdrop mode={startMode} /> : (
       <div className="fixed inset-0 z-0 overflow-hidden" style={{ background: '#0B0E14' }} aria-hidden="true">
         <DefaultBackdrop />
         <div className="atmos-wrap absolute inset-0 flex justify-center">
@@ -2199,14 +2219,22 @@ function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
           ))}
         </div>
       </div>
+      )}
 
       <main className="screen-in relative z-10 mx-auto flex min-h-full w-full max-w-md flex-col px-4 md:max-w-xl md:px-8"
         style={{ paddingTop: 'max(16px, env(safe-area-inset-top))', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
         <header className="flex items-center justify-between">
-          <button onClick={() => setSettingsOpen(true)} aria-label="Settings"
-            className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-200 hover:bg-white/10" style={glassBtn}>
-            <GearIcon />
-          </button>
+          {step === 'play' ? (
+            <button onClick={() => setStep('mode')} aria-label="Back to mode choice"
+              className="flex h-11 items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold text-slate-100 hover:bg-white/10" style={glassBtn}>
+              <span aria-hidden="true">&larr;</span> Back
+            </button>
+          ) : (
+            <button onClick={() => setSettingsOpen(true)} aria-label="Settings"
+              className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-200 hover:bg-white/10" style={glassBtn}>
+              <GearIcon />
+            </button>
+          )}
           <div className="flex items-center gap-2">
             <button onClick={toggleSound} data-sound-toggle="1" aria-label={st.sound ? 'Mute ambient sound' : 'Turn on ambient sound'} aria-pressed={st.sound}
               className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-200 hover:bg-white/10" style={glassBtn}>
@@ -2218,16 +2246,53 @@ function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
           </div>
         </header>
 
-        <div className="flex-1" style={{ minHeight: '34vh' }} />
+        {step === 'play' ? (
+          <>
+            <div className="mt-[11vh] text-center">
+              <h1 className="font-display text-4xl font-black tracking-[0.1em] md:text-6xl"
+                style={{ color: startMode === 'outbreak' ? '#6EE7B7' : '#F1F5F9', textShadow: startMode === 'outbreak' ? '0 2px 22px rgba(0,0,0,0.9), 0 0 34px rgba(16,185,129,0.45)' : '0 2px 22px rgba(0,0,0,0.9), 0 0 34px rgba(148,163,255,0.35)' }}>
+                {startMode === 'outbreak' ? 'OUTBREAK MODE' : 'CLASSIC MODE'}
+              </h1>
+              <p className="mx-auto mt-3 max-w-xs text-sm font-semibold tracking-wide md:text-base" style={{ color: startMode === 'outbreak' ? '#A7F3D0' : '#CBD5E1', textShadow: '0 1px 10px rgba(0,0,0,0.95)' }}>
+                {startMode === 'outbreak' ? 'Villagers vs. Werewolves vs. Zombies' : 'Villagers vs. Werewolves'}
+              </p>
+            </div>
 
-        <div className="text-center">
-          <h1 className="font-display text-5xl font-black tracking-[0.12em] text-slate-50 md:text-7xl" style={{ textShadow: '0 2px 24px rgba(0,0,0,0.8), 0 0 40px rgba(203,213,225,0.2)' }}>WEREWOLF</h1>
-          <p className="mt-3 text-sm italic tracking-[0.2em] text-slate-300 md:mt-4 md:text-lg" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>At Nightfall</p>
-        </div>
+            <div className="flex-1" style={{ minHeight: '30vh' }} />
 
-        <div className="mt-8 flex flex-col items-center gap-3.5">
-          {step === 'mode' ? (
-            <>
+            <div className="grid grid-cols-2 gap-3 md:gap-4">
+              <button onClick={onPlay} aria-label="Pass & Play"
+                className="flex min-h-[150px] flex-col items-start justify-between rounded-2xl p-4 text-left text-white transition hover:brightness-110 active:scale-[0.98]"
+                style={startMode === 'outbreak'
+                  ? { background: 'linear-gradient(170deg,rgba(15,118,110,0.92),rgba(6,78,59,0.95))', border: '1px solid rgba(45,212,191,0.55)', boxShadow: '0 10px 30px -10px rgba(13,148,136,0.75)' }
+                  : { background: 'linear-gradient(170deg,rgba(185,28,28,0.92),rgba(110,16,16,0.95))', border: '1px solid rgba(252,165,165,0.45)', boxShadow: '0 10px 30px -10px rgba(220,38,38,0.7)' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M7 4 L20 12 L7 20Z" /></svg>
+                <span>
+                  <span className="block text-lg font-bold leading-tight tracking-wide md:text-xl">Pass &amp; Play</span>
+                  <span className="mt-1 block text-xs font-medium leading-snug text-white/80">Share one phone around the circle</span>
+                </span>
+              </button>
+              <button onClick={onMulti} aria-label="Multi-Device"
+                className="flex min-h-[150px] flex-col items-start justify-between rounded-2xl p-4 text-left text-white transition hover:brightness-110 active:scale-[0.98]"
+                style={{ background: 'linear-gradient(170deg,rgba(109,40,217,0.92),rgba(59,20,120,0.95))', border: '1px solid rgba(167,139,250,0.5)', boxShadow: '0 10px 30px -10px rgba(109,40,217,0.7)' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="6" width="9" height="15" rx="2" /><rect x="12" y="3" width="9" height="15" rx="2" /></svg>
+                <span>
+                  <span className="block text-lg font-bold leading-tight tracking-wide md:text-xl">Multi-Device</span>
+                  <span className="mt-1 block text-xs font-medium leading-snug text-white/80">Everyone joins on their own phone</span>
+                </span>
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex-1" style={{ minHeight: '34vh' }} />
+
+            <div className="text-center">
+              <h1 className="font-display text-5xl font-black tracking-[0.12em] text-slate-50 md:text-7xl" style={{ textShadow: '0 2px 24px rgba(0,0,0,0.8), 0 0 40px rgba(203,213,225,0.2)' }}>WEREWOLF</h1>
+              <p className="mt-3 text-sm italic tracking-[0.2em] text-slate-300 md:mt-4 md:text-lg" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>At Nightfall</p>
+            </div>
+
+            <div className="mt-8 flex flex-col items-center gap-3.5">
               <button onClick={() => { setGameMode('classic'); setStep('play'); }} aria-label="Classic"
                 className="breathe mx-auto flex w-full max-w-[260px] flex-col items-center justify-center rounded-2xl py-3.5 text-white transition active:scale-[0.98] md:max-w-[340px] md:py-4">
                 <span className="text-xl font-bold tracking-wide md:text-2xl">Classic</span>
@@ -2239,26 +2304,9 @@ function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
                 <span className="text-xl font-bold tracking-wide md:text-2xl">Outbreak</span>
                 <span className="mt-0.5 px-2 text-center text-xs font-semibold opacity-85">Villagers vs. Werewolves vs. Zombies</span>
               </button>
-            </>
-          ) : (
-            <>
-              <p className="text-[11px] font-bold uppercase tracking-[0.28em]" style={{ color: startMode === 'outbreak' ? '#5EEAD4' : '#FCA5A5', textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>{startMode === 'outbreak' ? 'Outbreak mode' : 'Classic mode'}</p>
-          <button onClick={onPlay}
-            className="breathe mx-auto flex w-full max-w-[260px] items-center justify-center gap-3 rounded-2xl py-4 text-xl md:max-w-[340px] md:py-5 md:text-2xl font-bold tracking-wide text-white transition active:scale-[0.98]">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M7 4 L20 12 L7 20Z" /></svg>
-            Pass &amp; Play
-          </button>
-          <button onClick={onMulti} aria-label="Multi-Device"
-            className="relative mx-auto flex w-full max-w-[260px] items-center justify-center gap-3 overflow-hidden rounded-2xl py-4 text-xl md:max-w-[340px] md:py-5 md:text-2xl font-bold tracking-wide text-white transition hover:brightness-110 active:scale-[0.98]"
-            style={{ background: '#6D28D9', border: '1px solid rgba(167,139,250,0.4)', boxShadow: '0 8px 26px -8px rgba(109,40,217,0.6)' }}>
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="6" width="9" height="15" rx="2" /><rect x="12" y="3" width="9" height="15" rx="2" /></svg>
-            Multi-Device
-          </button>
-              <button onClick={() => setStep('mode')} aria-label="Back to mode choice"
-                className="flex min-h-[44px] items-center rounded-xl px-4 text-sm font-semibold text-slate-200 hover:bg-white/10" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>&larr; Back</button>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </main>
 
       <div className="pointer-events-none fixed inset-0 z-30 overflow-hidden" aria-hidden="true">

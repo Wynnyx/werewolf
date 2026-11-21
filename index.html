@@ -995,7 +995,7 @@ function Btn({ variant = 'primary', className = '', style, ...rest }) {
     secondary: { background: 'var(--card)', border: '1px solid var(--line)' },
     ghost: { background: 'transparent', border: '1px solid var(--line)' }
   };
-  return <button className={`${base} ${variants[variant]} ${className}`} style={{ ...styles[variant], ...style }} {...rest} />;
+  return <button data-ui-sound={variant === 'primary' ? 'primary' : undefined} className={`${base} ${variants[variant]} ${className}`} style={{ ...styles[variant], ...style }} {...rest} />;
 }
 
 function Screen({ children, className = '', wide = false }) {
@@ -1407,8 +1407,10 @@ const Sfx = (() => {
       const x = pool[f]; x.currentTime = 0; const p = x.play(); if (p && p.catch) p.catch(() => {});
     } catch (e) { /* ignore */ }
   };
+  let lastAt = 0; // when any sound effect last fired: the generic UI click stays quiet if a button already made its own sound
   const play = (f) => {
     if (!getSettings().sound) return;
+    lastAt = Date.now();
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* unsupported */ }
     const c = getCtx();
     if (c && bufs[f]) {
@@ -1424,6 +1426,7 @@ const Sfx = (() => {
   /* Built-in synthesizer effects (no audio files): the discussion bell and the faction victory sounds. */
   const synth = (build) => {
     if (!getSettings().sound) return;
+    lastAt = Date.now();
     try {
       if (navigator.audioSession) navigator.audioSession.type = 'playback';
       const c = getCtx(); if (!c) return;
@@ -1472,8 +1475,30 @@ const Sfx = (() => {
       [659.25, 830.61, 987.77].forEach((f, i) => bellNote(c, out, t + i * 0.28, f, 0.22, 2.2));
     }
   });
+  /* UI taps (synthesized, no files): 'primary' = deep thud + crisp stone click, 'tap' = light muted click. */
+  let noiseBuf = null;
+  const click = (kind) => {
+    if (!getSettings().sound || Date.now() - lastAt < 50) return;
+    synth((c, out, t) => {
+      if (kind === 'primary') {
+        voice(c, out, { type: 'sine', f0: 180, f1: 90, glide: 0.045, t0: t, dur: 0.06, gain: 0.55, attack: 0.004 });
+        if (!noiseBuf || noiseBuf.sampleRate !== c.sampleRate) {
+          noiseBuf = c.createBuffer(1, Math.ceil(c.sampleRate * 0.03), c.sampleRate);
+          const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        }
+        const n = c.createBufferSource(); n.buffer = noiseBuf;
+        const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2800;
+        const g = c.createGain(); g.gain.setValueAtTime(0.22, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
+        n.connect(hp); hp.connect(g); g.connect(out); n.start(t); n.stop(t + 0.03);
+      } else {
+        voice(c, out, { type: 'triangle', f0: 320, f1: 160, glide: 0.03, t0: t, dur: 0.04, gain: 0.3, attack: 0.003, filter: 'lowpass', ff: 1800 });
+      }
+    });
+    lastAt = Date.now();
+  };
+  const chime = () => { synth((c, out, t) => { voice(c, out, { type: 'sine', f0: 880, t0: t, dur: 0.4, gain: 0.14, attack: 0.01 }); voice(c, out, { type: 'sine', f0: 1318.5, t0: t + 0.09, dur: 0.5, gain: 0.12, attack: 0.01 }); }); };
   return {
-    bell, win,
+    bell, win, click, chime,
     preload: () => { try { FILES.forEach(load); } catch (e) { /* ignore */ } },
     unlock: () => { try { const c = getCtx(); if (c && c.state !== 'running') { const r = c.resume(); if (r && r.catch) r.catch(() => {}); } } catch (e) { /* ignore */ } },
     flip: () => play('audio/card-flip.mp3'),
@@ -1482,6 +1507,16 @@ const Sfx = (() => {
     deselect: () => play('audio/deselect.mp3')
   };
 })();
+
+// Global UI click sound: one delegated listener covers every current and future button.
+// It runs after React's own handlers, so a button that plays its own sound (stamped in Sfx) or carries data-no-ui-sound stays single-voiced.
+document.addEventListener('pointerdown', () => Sfx.unlock(), { passive: true, capture: true }); // wake the AudioContext on the first touch (iOS)
+document.addEventListener('click', (e) => {
+  if (!e.isTrusted || !e.target || !e.target.closest) return;
+  const el = e.target.closest('button, [role="button"]');
+  if (!el || el.disabled || el.getAttribute('aria-disabled') === 'true' || el.closest('[data-no-ui-sound]')) return;
+  Sfx.click(el.closest('[data-ui-sound="primary"]') ? 'primary' : 'tap');
+});
 
 ['pagehide', 'freeze'].forEach((n) => window.addEventListener(n, () => { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }));
 document.addEventListener('visibilitychange', () => { if (document.hidden) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } } });
@@ -1882,7 +1917,7 @@ function toggleSound() {
   if (cur && !Ambience.isRunning() && !Tension.isRunning()) { if (tensionScreen && getSettings().music) Tension.start(); else Ambience.start(); return; }
   updateSettings({ sound: !cur });
   // Sound covers the forest ambience and effects. Game Music is its own switch and keeps playing.
-  if (!cur) { if (!(tensionScreen && getSettings().music)) Ambience.start(); } else Ambience.stop();
+  if (!cur) { Sfx.chime(); if (!(tensionScreen && getSettings().music)) Ambience.start(); } else Ambience.stop();
 }
 
 function SpeakerIcon({ on }) {
@@ -2292,7 +2327,7 @@ function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
             <div className="flex-1" style={{ minHeight: '30vh' }} />
 
             <div className="grid grid-cols-2 gap-3 md:gap-4">
-              <button onClick={onPlay} aria-label="Pass & Play"
+              <button data-ui-sound="primary" onClick={onPlay} aria-label="Pass & Play"
                 className="flex min-h-[150px] flex-col items-start justify-between rounded-2xl p-4 text-left text-white transition hover:brightness-110 active:scale-[0.98]"
                 style={startMode === 'outbreak'
                   ? { background: 'linear-gradient(170deg,rgba(15,118,110,0.92),rgba(6,78,59,0.95))', border: '1px solid rgba(45,212,191,0.55)', boxShadow: '0 10px 30px -10px rgba(13,148,136,0.75)' }
@@ -2303,7 +2338,7 @@ function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
                   <span className="mt-1 block text-xs font-medium leading-snug text-white/80">Share one phone around the circle</span>
                 </span>
               </button>
-              <button onClick={onMulti} aria-label="Multi-Device"
+              <button data-ui-sound="primary" onClick={onMulti} aria-label="Multi-Device"
                 className="flex min-h-[150px] flex-col items-start justify-between rounded-2xl p-4 text-left text-white transition hover:brightness-110 active:scale-[0.98]"
                 style={{ background: 'linear-gradient(170deg,rgba(109,40,217,0.92),rgba(59,20,120,0.95))', border: '1px solid rgba(167,139,250,0.5)', boxShadow: '0 10px 30px -10px rgba(109,40,217,0.7)' }}>
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="6" width="9" height="15" rx="2" /><rect x="12" y="3" width="9" height="15" rx="2" /></svg>
@@ -2324,12 +2359,12 @@ function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
             </div>
 
             <div className="mt-8 flex flex-col items-center gap-3.5">
-              <button onClick={() => { setGameMode('classic'); setStep('play'); }} aria-label="Classic"
+              <button data-ui-sound="primary" onClick={() => { setGameMode('classic'); setStep('play'); }} aria-label="Classic"
                 className="breathe mx-auto flex w-full max-w-[260px] flex-col items-center justify-center rounded-2xl py-3.5 text-white transition active:scale-[0.98] md:max-w-[340px] md:py-4">
                 <span className="text-xl font-bold tracking-wide md:text-2xl">Classic</span>
                 <span className="mt-0.5 text-xs font-semibold opacity-85">Villagers vs. Werewolves</span>
               </button>
-              <button onClick={() => { setGameMode('outbreak'); setStep('play'); }} aria-label="Outbreak"
+              <button data-ui-sound="primary" onClick={() => { setGameMode('outbreak'); setStep('play'); }} aria-label="Outbreak"
                 className="mx-auto flex w-full max-w-[260px] flex-col items-center justify-center rounded-2xl py-3.5 text-white transition active:scale-[0.98] md:max-w-[340px] md:py-4"
                 style={{ background: 'linear-gradient(180deg,#0F766E,#065F46)', border: '1px solid rgba(45,212,191,0.55)', boxShadow: '0 8px 26px -8px rgba(13,148,136,0.7)' }}>
                 <span className="text-xl font-bold tracking-wide md:text-2xl">Outbreak</span>
@@ -2400,7 +2435,7 @@ function GameCard({ game, confirming, onOpen, onAskDelete, onCancelDelete, onDel
   const tag = active ? { text: 'Active', c: '#34D399' } : { text: 'Saved Setup', c: '#94A3B8' };
   return (
     <div className="relative aspect-[3/4]">
-      <button onClick={() => { Sfx.enter(); onOpen(); }}
+      <button data-no-ui-sound onClick={() => { Sfx.enter(); onOpen(); }}
         className="absolute inset-0 flex flex-col items-start overflow-hidden rounded-2xl p-3.5 text-left transition active:scale-[0.98]"
         style={{ background: '#151A24', border: '1px solid var(--line)' }}
         aria-label={`Open ${game.name}`}>
@@ -2434,7 +2469,7 @@ function GameCard({ game, confirming, onOpen, onAskDelete, onCancelDelete, onDel
 const POPULAR_COUNTS = [4, 5, 6, 7, 8, 10, 12, 15];
 function PresetCard({ count, deck, onPick }) {
   return (
-    <button onClick={() => { Sfx.enter(); onPick(); }} aria-label={`Popular ${count} player setup`}
+    <button data-no-ui-sound onClick={() => { Sfx.enter(); onPick(); }} aria-label={`Popular ${count} player setup`}
       className="relative flex aspect-[3/4] w-full flex-col items-start overflow-hidden rounded-2xl p-3.5 text-left transition active:scale-[0.98]"
       style={{ background: 'linear-gradient(160deg, #1B2230, #121722)', border: '1px solid var(--line)' }}>
       <img src={ROLES_DATA.werewolf.imageUrl} alt="" draggable="false" onError={(e) => { e.currentTarget.style.display = 'none'; }}
@@ -2478,7 +2513,7 @@ function Home({ games, onBack, onCreate, onPreset, onResume, onRedeal, onEdit, o
         </button>
       </header>
 
-      <button onClick={() => { Sfx.enter(); onCreate(); }}
+      <button data-no-ui-sound onClick={() => { Sfx.enter(); onCreate(); }}
         className="flex w-full items-center gap-4 rounded-2xl p-4 text-left transition hover:brightness-125 active:scale-[0.99]"
         style={{ background: 'linear-gradient(135deg, rgba(220,38,38,0.2), rgba(21,26,36,0.9))', border: '1px solid rgba(239,68,68,0.5)' }}>
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full" style={{ background: 'rgba(220,38,38,0.25)', border: '1px solid rgba(239,68,68,0.6)' }}>

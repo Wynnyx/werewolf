@@ -3105,10 +3105,10 @@ function nightActions(c) {
   if (hasV(c.zombie)) out.push({ key: 'zombie', target: c.zombie });
   return out;
 }
-// Applies the Shadow Figure's redirect { key, to } to the choices. A Shadow Figure that Medusa's gaze lands on is blocked.
+// Applies the Shadow Figure's redirect { key, to } to the choices. Medusa's stone never stops the Shadow Figure from acting:
+// redirecting the stone moves it to the new target; redirecting any other action leaves the stone on the Shadow Figure.
 function applyShadow(c, sh, shadowId) {
   if (!sh || !hasV(sh.to) || !sh.key || !hasV(shadowId)) return c;
-  if (hasV(c.medusa) && c.medusa === shadowId) return c;
   if (!nightActions(c).some((a) => a.key === sh.key)) return c;
   const out = { ...c };
   if (sh.key === 'witchSave') out.witchSaveTo = sh.to; else out[sh.key] = sh.to;
@@ -3340,18 +3340,14 @@ function ShadowAct({ actions, victimName, alive, wolves = [], selfId = null, nm,
   const chosen = act === null ? null : actions[act];
   const ready = skip || (act !== null && pick !== null);
   const finish = () => onDone(skip || act === null ? null : { key: chosen.key, to: pick });
-  if (stoned) {
-    return (
-      <div className="flex flex-1 flex-col">
-        {header}
-        <StoneVision text="Your shadows were turned to stone tonight. Your redirect is blocked." />
-        <Btn className="mt-5" onClick={() => onDone(null)}>Continue</Btn>
-      </div>
-    );
-  }
   return (
     <div className="flex flex-1 flex-col">
       {header}
+      {stoned && (
+        <Panel className="mb-3 text-center text-sm leading-snug text-teal-100" style={{ border: '1px solid rgba(45,212,191,0.6)', background: 'rgba(13,148,136,0.18)' }}>
+          Medusa has turned you to stone. Redirect that action onto someone else to free yourself, or redirect a different action and stay stoned.
+        </Panel>
+      )}
       <Panel className="text-center" style={{ border: '1px solid rgba(239,68,68,0.6)', background: 'rgba(127,29,29,0.22)' }}>
         <div className="font-display text-lg font-bold text-slate-50">{`Werewolf Target: ${victimName}`}</div>
       </Panel>

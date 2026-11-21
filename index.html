@@ -6290,7 +6290,10 @@ function MpRoom({ session, onExit, onPhase }) {
   return (
     <>
     {ph === 'day' && <DayBackdrop />}
-    {fullHost && (
+    {fullHost && session.ai && (ph === 'day' || (ph === 'reveal' && !(me && me.d === 1))) && (
+      <ExitButton onClick={() => setConfirmLeave(true)} className="fixed left-3 z-50" style={{ top: 'max(10px, env(safe-area-inset-top))' }} />
+    )}
+    {fullHost && !session.ai && (
       <div className="fixed right-3 z-50 flex flex-col items-end gap-2" style={{ top: 'max(10px, env(safe-area-inset-top))' }}>
         <button type="button" onClick={() => setHostInfo((v) => !v)} aria-expanded={hostInfo} aria-label="Room info" className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold tracking-widest text-violet-100" style={{ background: 'rgba(10,10,18,0.72)', border: '1px solid rgba(167,139,250,0.5)' }}>
           {code}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: hostInfo ? 'rotate(180deg)' : 'none' }}><path d="M6 9l6 6 6-6" /></svg>

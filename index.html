@@ -3477,7 +3477,8 @@ function PlagueScan({ header, alive, isInfected, value, setValue, onDone }) {
 // The Shadow Figure's screen: anonymous action list, then a new target. Used by Pass & Play, Multi-Device auto and manual.
 const SHADOW_VERB = { medusa: 'Medusa turns {} to stone', bodyguard: 'Bodyguard protects {}', seer: 'Seer inspects {}', witchSave: 'Witch heals {}', witchPoison: 'Witch poisons {}', spellcaster: 'Spellcaster silences {}', sniper: 'Sniper Action \u2192 {}', doctor: 'Doctor Action \u2192 {}', plaguedoctor: 'Plague Doctor Action \u2192 {}', wolf1: 'Werewolf Target 1 \u2192 {}', wolf2: 'Werewolf Target 2 \u2192 {}', zombie: 'Zombie Infect \u2192 {}', infector: 'Infected Bite \u2192 {}' };
 const shadowActionLabel = (key, name) => (SHADOW_VERB[key] || '{}').replace('{}', name);
-function ShadowAct({ actions, victimName, alive, wolves = [], selfId = null, nm, stoned, onDone, header }) {
+function ShadowAct({ actions: allActions, victimName, alive, wolves = [], selfId = null, nm, stoned, onDone, header }) {
+  const actions = allActions.filter((a) => hasV(a.target) && nm(a.target) !== '?'); // only actions that really happened tonight, with a known target
   const order = useMemo(() => shuffle(actions.map((_, i) => i)), []);
   const [act, setAct] = useState(null);
   const [skip, setSkip] = useState(false);

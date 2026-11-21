@@ -43,6 +43,8 @@
     color-scheme: dark;
   }
   html, body, #root { height: 100%; }
+  @supports (height: 100dvh) { html, body, #root { height: 100dvh; } }
+  #root { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); box-sizing: border-box; }
   html, body { overscroll-behavior: none; }
   .hscroll { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .hscroll::-webkit-scrollbar { display: none; }
@@ -1089,7 +1091,7 @@ function RoleGuide({ onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label="Role Guide">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="screen-in relative flex max-h-[88%] w-full max-w-md flex-col rounded-t-3xl sm:rounded-3xl md:max-w-xl"
+      <div className="screen-in relative flex max-h-[88%] w-full max-w-md flex-col rounded-t-3xl sm:rounded-3xl md:max-w-3xl lg:max-w-5xl"
         style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between px-5 pb-3 pt-5">
           <h2 className="font-display text-2xl font-bold tracking-wide">Role Guide</h2>
@@ -1099,7 +1101,7 @@ function RoleGuide({ onClose }) {
           </button>
         </div>
         {(
-          <ul className="flex flex-col gap-3 overflow-y-auto px-5 pb-6">
+          <ul className="flex flex-col gap-3 overflow-y-auto px-5 pb-6 md:grid md:grid-cols-2 lg:grid-cols-3">
             {ROLE_IDS.map((id) => {
               const r = ROLES_DATA[id];
               return (
@@ -3318,7 +3320,7 @@ function NightStage({ children, dawn = false, shake = false, flash = false, onEx
       {onExit && <ExitButton onClick={onExit} className="absolute left-4 z-30" style={{ top: 'max(16px, env(safe-area-inset-top))' }} />}
       {fixed && !pitch && <NightSoundButton offset={soundOffset} />}
       <div className={`relative z-10 flex w-full overflow-y-auto px-5 ${fixed ? 'h-full' : 'min-h-[70vh]'}`} style={{ paddingTop: fixed ? 'max(64px, calc(env(safe-area-inset-top) + 48px))' : '24px', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
-        <div className="mx-auto flex min-h-full w-full max-w-md flex-col">{children}</div>
+        <div className="mx-auto flex min-h-full w-full max-w-md flex-col md:max-w-lg">{children}</div>
       </div>
     </div>
   );
@@ -5641,9 +5643,12 @@ function useNightDirector({ room, players, write }) {
       await write(base);
       await Narrator.say('Night begins. Everyone, close your eyes.'); if (!live()) return;
       await step('c', 'Everyone closes their eyes'); await wait(5200); if (!live()) return;
+      const holdersOf = (r) => (r === 'infected' ? latest.current.players.filter((p) => p.a === 1 && p.jt === 1) : r === 'cured' ? latest.current.players.filter((p) => p.a === 1 && p.cj === 1) : latest.current.players.filter((p) => p.a === 1 && p.r === r));
+      const botsOnly = (r) => { const h = holdersOf(r); return h.length > 0 && h.every((p) => p.bot === 1); }; // AI turns run silently, so nobody can tell which roles are bots
       for (const r of roles) {
+        const quiet = botsOnly(r);
         await step('z', `${roleLabel(r)} waking`);
-        await Narrator.say(`${roleLabel(r)}, open your eyes.`); if (!live()) return;
+        if (!quiet) { await Narrator.say(`${roleLabel(r)}, open your eyes.`); if (!live()) return; }
         await step('r:' + r, `${roleLabel(r)} choosing`);
         skip.current = false;
         const t0 = Date.now();
@@ -5655,12 +5660,13 @@ function useNightDirector({ room, players, write }) {
         }
         if (!live()) return;
         await step('z', `${roleLabel(r)} sleeping`);
-        await Narrator.say(`${roleLabel(r)}, close your eyes.`); if (!live()) return;
-        await wait(2200); if (!live()) return;
+        if (!quiet) { await Narrator.say(`${roleLabel(r)}, close your eyes.`); if (!live()) return; }
+        await wait(quiet ? 900 : 2200); if (!live()) return;
       }
       if (roles.includes('seer') && (roles.includes('shadow') || roles.includes('medusa') || latest.current.players.filter((p) => p.a === 1 && p.r === 'seer').length > 1)) {
+        const seerQuiet = botsOnly('seer');
         await step('z', 'Seer waking for the final vision');
-        await Narrator.say('Seer, open your eyes.'); if (!live()) return;
+        if (!seerQuiet) { await Narrator.say('Seer, open your eyes.'); if (!live()) return; }
         await step('v:seer', 'Seer viewing');
         skip.current = false;
         const t1 = Date.now();
@@ -5671,8 +5677,8 @@ function useNightDirector({ room, players, write }) {
         }
         if (!live()) return;
         await step('z', 'Seer sleeping');
-        await Narrator.say('Seer, close your eyes.'); if (!live()) return;
-        await wait(2200); if (!live()) return;
+        if (!seerQuiet) { await Narrator.say('Seer, close your eyes.'); if (!live()) return; }
+        await wait(seerQuiet ? 900 : 2200); if (!live()) return;
       }
       setDir({ on: true, label: 'Dawn' });
       await Narrator.say('Everyone, open your eyes. Morning has broken.'); if (!live()) return;
@@ -6078,6 +6084,7 @@ function MpRoom({ session, onExit, onPhase }) {
   const [deck, setDeck] = useState(emptyDeck);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmPublic, setConfirmPublic] = useState(false);
+  const [confirmAi, setConfirmAi] = useState(false);
   const [hostInfo, setHostInfo] = useState(false);
   const [busy, setBusy] = useState(false);
   const [wErr, setWErr] = useState('');
@@ -6147,6 +6154,19 @@ function MpRoom({ session, onExit, onPhase }) {
   const closeCards = () => { setCardsStep(false); write({ lk: 0 }); };
   const deal = () => write(mpDealPatch(room, deck));
   const saveDeck = async () => { await write({ dk: deck, lk: 0 }); setCardsStep(false); };
+  // Host only: fill the open seats with named AI players, deal to everyone and start now.
+  const startWithAi = async () => {
+    setConfirmAi(false);
+    const need = mx - players.length;
+    if (need <= 0 || !room.dk) return;
+    const used = new Set(players.map((p) => p.n.toLowerCase()));
+    const o0 = players.reduce((m, p) => Math.max(m, p.o || 0), 0);
+    const add = {};
+    shuffle(AI_NAMES.filter((x) => !used.has(x.toLowerCase()))).slice(0, need).forEach((nm, i) => { const id = randId(); add[`pl/${id}/n`] = nm; add[`pl/${id}/o`] = o0 + i + 1; add[`pl/${id}/bot`] = 1; });
+    const withBots = { ...room, pl: { ...(room.pl || {}) } };
+    Object.keys(add).forEach((k) => { const [, id, f] = k.split('/'); withBots.pl[id] = { ...(withBots.pl[id] || {}), [f]: add[k] }; });
+    await write({ ...add, ai: 1, ...mpDealPatch(withBots, { ...emptyDeck(), ...room.dk }) });
+  };
   const makePublic = async () => { setConfirmPublic(false); await write({ pub: 1, nightStyle: 'eyes_open' }); try { await Mp.put(`publicRooms/${code}`, { rn: room.rn, hn: room.hn, ts: room.ts || Date.now() }); } catch (e) { /* the room is still marked public */ } };
 
   if (room === undefined) {
@@ -6186,6 +6206,7 @@ function MpRoom({ session, onExit, onPhase }) {
             {room.dk
               ? <>
                 <Btn disabled={players.length !== mx} onClick={() => write(mpDealPatch(room, { ...emptyDeck(), ...room.dk }))}>{players.length === mx ? 'Start Game' : `Waiting for players (${players.length} / ${mx})`}</Btn>
+                {players.length >= 1 && players.length < mx && <Btn variant="secondary" onClick={() => setConfirmAi(true)}>{`Start with AI (+${mx - players.length} Bot${mx - players.length === 1 ? '' : 's'})`}</Btn>}
                 <Btn variant="secondary" onClick={openCards}>Edit Deck</Btn>
               </>
               : <Btn disabled={players.length < MP_MIN} onClick={openCards}>Choose Cards</Btn>}
@@ -6233,6 +6254,14 @@ function MpRoom({ session, onExit, onPhase }) {
           <div className="w-full max-w-sm rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid rgba(139,92,246,0.55)' }}>
             <p className="text-base font-semibold text-slate-100">Make this room Public so anyone can join and fill the remaining seats?</p>
             <div className="mt-4 flex gap-2.5"><Btn variant="secondary" onClick={() => setConfirmPublic(false)}>Cancel</Btn><Btn onClick={makePublic}>Confirm</Btn></div>
+          </div>
+        </div>
+      )}
+      {confirmAi && (
+        <div role="dialog" aria-modal="true" aria-label="Start with AI" className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: 'rgba(5,7,12,0.86)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid rgba(139,92,246,0.55)' }}>
+            <p className="text-base font-semibold text-slate-100">{`Fill the remaining ${mx - players.length} open slot${mx - players.length === 1 ? '' : 's'} with AI players and start the match now?`}</p>
+            <div className="mt-4 flex gap-2.5"><Btn variant="secondary" onClick={() => setConfirmAi(false)}>Cancel</Btn><Btn onClick={startWithAi}>Confirm &amp; Start</Btn></div>
           </div>
         </div>
       )}
@@ -6418,9 +6447,11 @@ function aiTick(ctx, M) {
   }
   if (room.ph === 'night') {
     const ns = room.ns || '';
-    if (!(ns.indexOf('w:') === 0 || ns === 'v:seer')) return;
+    const sq = ns.indexOf('r:') === 0 ? ns.slice(2) : ''; // Campfire Mode: one role wakes at a time
+    if (!(ns.indexOf('w:') === 0 || ns === 'v:seer' || sq)) return;
     const tag = `${k}:${room.nk}`;
     const roleOf = (p) => {
+      if (sq) return sq === 'infected' ? (p.jt === 1 ? 'infected' : '') : sq === 'cured' ? (p.cj === 1 ? 'cured' : '') : (p.r === sq ? sq : '');
       if (ns === 'v:seer') return p.r === 'seer' ? 'seer' : '';
       if (ns === 'w:1') return p.jt === 1 ? 'infected' : p.cj === 1 ? 'cured' : (mpActive(p.r, k) && p.r !== 'witch' && p.r !== 'shadow' ? p.r : '');
       if (ns === 'w:2') return p.r === 'witch' ? 'witch' : '';
@@ -6478,7 +6509,7 @@ function aiTick(ctx, M) {
   }
   // Votes: once the human has voted (or cannot), or after a long day.
   const hum = humans.find((h) => h.a === 1);
-  const humanDone = !hum || !!hum.v || hum.s === 1 || hum.x === 1 || hum.sn === 1;
+  const humanDone = !hum || humans.filter((h) => h.a === 1).every((h) => !!h.v || h.s === 1 || h.x === 1 || h.sn === 1);
   if (humanDone || now - (room.an && room.an.t ? room.an.t : M.dayStart) > 70000) {
     speakers.filter((b) => !b.v).forEach((b) => { if (go('v' + k + b.id, 1200, 7000)) { const t = aiVoteChoice(b, ctx, M); if (t) write({ [`pl/${b.id}/v`]: t }); } });
   }

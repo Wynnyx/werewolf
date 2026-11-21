@@ -3119,11 +3119,13 @@ function StatusChip({ active, onClick, color, children }) {
     <button onClick={onClick} aria-pressed={active}
       className="min-h-[36px] rounded-full px-3 text-xs font-semibold"
       style={{
-        color: active ? '#0B0E14' : color,
+        color: active ? '#0B0E14' : '#7C879B',
         background: active ? color : 'transparent',
-        border: `1px solid ${color}88`
+        border: active ? `1px solid ${color}` : '1px dashed #475569',
+        fontWeight: active ? 800 : 500,
+        boxShadow: active ? `0 0 10px -2px ${color}` : 'none'
       }}>
-      {children}
+      {active ? '✓ ' : '+ '}{children}
     </button>
   );
 }
@@ -3183,7 +3185,7 @@ function nightActions(c) {
   if (hasV(c.spellcaster)) out.push({ key: 'spellcaster', target: c.spellcaster });
   if (hasV(c.sniper)) out.push({ key: 'sniper', target: c.sniper });
   if (hasV(c.doctor)) out.push({ key: 'doctor', target: c.doctor });
-  if (hasV(c.plaguedoctor)) out.push({ key: 'plaguedoctor', target: c.plaguedoctor });
+  if (hasV(c.plaguedoctor)) out.push({ key: 'plaguedoctor', target: c.plaguedoctor, harm: c.plagueAct === 'infect' });
   if (hasV(c.zombie)) out.push({ key: 'zombie', target: c.zombie });
   if (hasV(c.infector)) out.push({ key: 'infector', target: c.infector });
   return out;
@@ -3203,7 +3205,7 @@ function seerVision(c, sh, shadowId, seerId, players) {
   const c2 = applyShadow(c, sh, shadowId);
   let stoned = hasV(c2.medusa) && c2.medusa === seerId;
   if (players && hasV(c2.medusa)) { const t = players.find((x) => x.id === c2.medusa); stoned = !!t && t.role === 'seer' && !players.some((x) => x.alive && x.role === 'seer' && x.id !== t.id); } // with two Seers, the other one still sees
-  return { target: hasV(c2.seer) ? c2.seer : null, stoned };
+  return { target: hasV(c2.seer) ? c2.seer : null, stoned, from: hasV(c.seer) && hasV(c2.seer) && c2.seer !== c.seer ? c.seer : null };
 }
 
 /* Cupid helpers. Items look like { id, role, alive, lover } (Pass & Play) */
@@ -3365,7 +3367,7 @@ function LockView({ title, sub, count, eye = false, fadeMoon = false }) {
   );
 }
 
-function GhostFlip({ name, wolf }) {
+function GhostFlip({ name, wolf, odd }) {
   const [on, setOn] = useState(false);
   useEffect(() => { const t = setTimeout(() => setOn(true), 500); return () => clearTimeout(t); }, []);
   return (
@@ -3379,6 +3381,7 @@ function GhostFlip({ name, wolf }) {
           <p className="font-display text-2xl font-black leading-snug" style={{ color: wolf ? '#FCA5A5' : '#6EE7B7' }}>
             {name}<br />{wolf ? 'is a WEREWOLF!' : 'is NOT a WEREWOLF!'}
           </p>
+          {odd && !wolf && <p className="mt-3 px-3 text-center text-sm font-semibold leading-snug text-amber-200">There&rsquo;s something off about this person, but they&rsquo;re not a werewolf.</p>}
         </div>
       </div>
     </div>
@@ -3482,12 +3485,18 @@ function ShadowAct({ actions, victimName, alive, wolves = [], selfId = null, nm,
   const chosen = act === null ? null : actions[act];
   const ready = skip || (act !== null && pick !== null);
   const finish = () => onDone(skip || act === null ? null : { key: chosen.key, to: pick });
+  const HARM = ['wolf1', 'wolf2', 'zombie', 'infector', 'witchPoison', 'medusa', 'sniper', 'spellcaster'];
+  const harmful = (a) => !!a && (HARM.includes(a.key) || (a.key === 'plaguedoctor' && a.harm));
+  const stoneIx = actions.findIndex((a) => a.key === 'medusa');
+  const others = alive.filter((p) => p.id !== selfId);
   return (
     <div className="flex flex-1 flex-col">
       {header}
       {stoned && (
-        <Panel className="mb-3 text-center text-sm leading-snug text-teal-100" style={{ border: '1px solid rgba(45,212,191,0.6)', background: 'rgba(13,148,136,0.18)' }}>
-          Medusa has turned you to stone. Redirect that action onto someone else to free yourself, or redirect a different action and stay stoned.
+        <Panel className="mb-3 text-center text-sm leading-snug text-teal-50" style={{ border: '2px solid rgba(45,212,191,0.9)', background: 'rgba(13,148,136,0.3)' }}>
+          <div className="font-display text-base font-black uppercase tracking-wide text-teal-200">Medusa is attempting to turn you to stone</div>
+          <p className="mt-1">Redirect that stone onto another valid target to speak and vote normally tomorrow, or pick a different action and stay Stoned in the morning.</p>
+          {stoneIx >= 0 && <Btn className="mt-3" onClick={() => { setAct(stoneIx); setSkip(false); setPick(null); }}>Redirect the stone</Btn>}
         </Panel>
       )}
       <Panel className="text-center" style={{ border: '1px solid rgba(239,68,68,0.6)', background: 'rgba(127,29,29,0.22)' }}>
@@ -3518,7 +3527,8 @@ function ShadowAct({ actions, victimName, alive, wolves = [], selfId = null, nm,
           {chosen && !skip && (
             <>
               <div className="mb-2 mt-4 text-center text-xs font-semibold uppercase tracking-widest text-slate-400">Choose a new target for that action</div>
-              <PickList players={alive} badges={wolves} team={selfId ? [selfId] : []} teamLabel={'Shadow Figure \u00B7 Werewolf Team'} value={pick === null ? '' : pick} onChange={(v) => setPick(v === '' ? null : v)} disabled={[chosen.target, ...actions.filter((a) => a !== chosen && (a.key === 'wolf1' || a.key === 'wolf2') && (chosen.key === 'wolf1' || chosen.key === 'wolf2')).map((a) => a.target)]} />
+              {harmful(chosen) && <p className="mb-2 text-center text-xs text-slate-400">Harmful actions cannot be redirected onto Werewolves.</p>}
+              <PickList players={others} badges={wolves} value={pick === null ? '' : pick} onChange={(v) => setPick(v === '' ? null : v)} disabled={[chosen.target, ...(harmful(chosen) ? wolves : []), ...actions.filter((a) => a !== chosen && (a.key === 'wolf1' || a.key === 'wolf2') && (chosen.key === 'wolf1' || chosen.key === 'wolf2')).map((a) => a.target)]} />
             </>
           )}
           <Btn className="mt-3" variant="secondary" onClick={() => { setSkip(!skip); setAct(null); setPick(null); }}>{skip ? 'Skip selected ✓' : 'Skip / Leave Actions Unchanged'}</Btn>
@@ -3586,7 +3596,7 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
     const teamIds = alive.filter((p) => p.role === 'werewolf' || p.role === 'shadow').map((p) => p.id);
     const cand = alive.filter((p) => !(solo || hideSelf) || !actor || p.id !== actor.id);
     if (bloodMoon && Math.min(2, cand.filter((p) => !teamIds.includes(p.id)).length) === 2) { // Blood Moon: two distinct targets
-      const sel = typeof pick === 'string' && pick ? pick.split('|') : [];
+      const sel = typeof pick === 'string' && pick ? pick.split('|').map((x) => (cand.find((q) => String(q.id) === x) || {}).id).filter((v) => v !== undefined) : [];
       return (
         <div className="flex flex-1 flex-col">
           <ActHeader role={role} prompt="BLOOD MOON: CHOOSE TWO TARGETS TO HUNT." sub={solo ? 'Choose silently, then tap the two names.' : 'Agree silently, then one of you taps the two names.'} />
@@ -3633,7 +3643,7 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
   }
   if (role === 'plaguedoctor') {
     return <PlagueScan header={<ActHeader role={role} sub="Lock onto one player to inspect them, then choose a serum." />}
-      alive={opts(alive.filter((p) => p.id !== actor.id))} isInfected={(id) => { const q = players.find((x) => x.id === id); return !!q && (q.role === 'zombie' || !!q.bitten); }}
+      alive={opts(alive.filter((p) => p.id !== actor.id))} isInfected={(id) => { const q = players.find((x) => x.id === id); return !!q && (q.role === 'zombie' || q.role === 'infector' || !!q.bitten || !!q.incub); }}
       value={pick} setValue={setPick} onDone={(t, a) => onDone({ plaguedoctor: t, plagueAct: a })} />;
   }
   if (role === 'infected') {
@@ -3669,7 +3679,8 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
     return (
       <div className="flex flex-1 flex-col">
         <ActHeader role="seerResult" />
-        {sv.stoned || !tp ? <StoneVision /> : <GhostFlip key={tp.id} name={tp.name} wolf={tp.role === 'werewolf'} />}
+        {sv.stoned || !tp ? <StoneVision /> : <GhostFlip key={tp.id} name={tp.name} wolf={tp.role === 'werewolf'} odd={tp.role === 'shadow' || tp.role === 'spellcaster'} />}
+        {!sv.stoned && tp && sv.from !== null && sv.from !== undefined && <p role="note" className="mt-3 rounded-xl px-3 py-2 text-center text-sm font-semibold text-amber-100" style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.55)' }}>Your inspection was redirected from {nm(sv.from)} to {tp.name}.</p>}
         <Btn className="mt-5" onClick={() => onDone({})}>Done</Btn>
       </div>
     );
@@ -3697,7 +3708,7 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
         <PickList players={opts(alive.filter((p) => p.id !== actor.id && !(ext && ext.group.includes(p.id))))} value={val} onChange={choose} locked={seen !== null} />
         {target && deferSeer && <StoneVision text="Your vision will come at the end of the night." />}
         {target && !deferSeer && stoned && <StoneVision />}
-        {target && !deferSeer && !stoned && <GhostFlip key={target.id} name={target.name} wolf={target.role === 'werewolf'} />}
+        {target && !deferSeer && !stoned && <GhostFlip key={target.id} name={target.name} wolf={target.role === 'werewolf'} odd={target.role === 'shadow' || target.role === 'spellcaster'} />}
         {target
           ? <Btn className="mt-5" onClick={() => onDone({ seer: deferSeer ? seen : stoned ? null : seen })}>Done</Btn>
           : <Btn className="mt-5" disabled={pick === null} onClick={() => setSeen(pick)}>{pick === null ? 'Select a player' : 'Confirm Inspection'}</Btn>}
@@ -3794,14 +3805,14 @@ function resolveNightPP(players, c0, night) {
   const docT = has(c.doctor) && !blocked('doctor') ? c.doctor : null;
   const docP = docT !== null ? byId.get(docT) : null;
   const docLive = !!docP && docP.alive && !dead.includes(docT);
-  const docCure = docLive && (docP.role === 'zombie' || !!docP.bitten) ? docT : null;
+  const docCure = docLive && (docP.role === 'zombie' || docP.role === 'infector' || !!docP.bitten || !!docP.incub) ? docT : null;
   const sedateId = docLive && docCure === null ? docT : null;
   // Plague Doctor: the serum matches the target's real status (a Shadow redirect can waste it). Cure beats the bite; an infection is stopped by the Bodyguard or a Witch heal.
   const pdT = has(c.plaguedoctor) && !blocked('plaguedoctor') ? c.plaguedoctor : null;
   const pdAct = pdT !== null && (c.plagueAct === 'cure' || c.plagueAct === 'infect') ? c.plagueAct : null;
   const pdP = pdT !== null ? byId.get(pdT) : null;
   const pdLive = !!pdP && pdP.alive && !dead.includes(pdT);
-  const pdIsInf = !!pdP && (pdP.role === 'zombie' || !!pdP.bitten);
+  const pdIsInf = !!pdP && (pdP.role === 'zombie' || pdP.role === 'infector' || !!pdP.bitten || !!pdP.incub);
   const pdCure = pdLive && pdAct === 'cure' && pdIsInf ? pdT : null;
   const pdInfect = pdLive && pdAct === 'infect' && !pdIsInf && !(pdP && (pdP.role === 'infector' || pdP.r === 'infector')) && pdT !== guarded && !(saveTarget !== null && pdT === saveTarget) ? pdT : null;
   const cureId = docCure !== null ? docCure : pdCure;
@@ -4707,14 +4718,14 @@ function mpResolveNight(room) {
   const docT = c.doctor && !blocked('doctor') ? c.doctor : '';
   const docP = docT ? byId[docT] : null;
   const docLive = !!docP && docP.a === 1 && !dead.includes(docT);
-  const docCure = docLive && (docP.r === 'zombie' || !!docP.bt) ? docT : '';
+  const docCure = docLive && (docP.r === 'zombie' || docP.r === 'infector' || !!docP.bt || !!docP.ic) ? docT : '';
   const sedateId = docLive && !docCure ? docT : '';
   // Plague Doctor: the serum matches the target's real status (a Shadow redirect can waste it). An infection is stopped by the Bodyguard or a Witch heal.
   const pdT = c.plaguedoctor && !blocked('plaguedoctor') ? c.plaguedoctor : '';
   const pdAct = pdT && (c.plagueAct === 'cure' || c.plagueAct === 'infect') ? c.plagueAct : '';
   const pdP = pdT ? byId[pdT] : null;
   const pdLive = !!pdP && pdP.a === 1 && !dead.includes(pdT);
-  const pdIsInf = !!pdP && (pdP.r === 'zombie' || !!pdP.bt);
+  const pdIsInf = !!pdP && (pdP.r === 'zombie' || pdP.r === 'infector' || !!pdP.bt || !!pdP.ic);
   const pdCure = pdLive && pdAct === 'cure' && pdIsInf ? pdT : '';
   const pdInfect = pdLive && pdAct === 'infect' && !pdIsInf && !(pdP && (pdP.role === 'infector' || pdP.r === 'infector')) && pdT !== guarded && !(saveTarget && pdT === saveTarget) ? pdT : '';
   const cureId = docCure || pdCure;
@@ -5055,19 +5066,25 @@ function MpReveal({ me, ready, readyCount, total, onReady }) {
 }
 
 function MultiPickList({ players, value, onChange, max = 2, team = [], teamLabel = 'Werewolf team', TeamIcon = WolfIcon, badges = [], locked }) {
+  const has = (id) => value.some((v) => String(v) === String(id));
   return (
     <ul className="flex flex-col gap-2" role="listbox" aria-multiselectable="true">
       {players.map((p) => {
         const mate = team.includes(p.id);
-        const sel = value.includes(p.id);
+        const sel = !mate && has(p.id);
+        const toggle = () => onChange(sel ? value.filter((x) => String(x) !== String(p.id)) : value.length < max ? [...value, p.id] : [value[value.length - 1], p.id]);
         return (
           <li key={p.id}>
-            <button role="option" aria-selected={sel} disabled={locked || mate} onClick={() => onChange(sel ? value.filter((x) => x !== p.id) : value.length < max ? [...value, p.id] : [value[1], p.id])}
-              className={`flex min-h-[52px] w-full items-center justify-between rounded-xl px-4 text-left text-[15px] font-semibold transition active:scale-[0.99] ${mate ? '' : 'disabled:opacity-40'}`}
+            <button role="option" aria-selected={sel} disabled={locked || mate} onClick={toggle}
+              className={`flex min-h-[52px] w-full items-center gap-3 rounded-xl px-4 text-left text-[15px] font-semibold transition active:scale-[0.99] ${mate ? '' : 'disabled:opacity-60'}`}
               style={mate ? { background: 'rgba(127,29,29,0.25)', border: '1px solid rgba(239,68,68,0.55)', color: '#FCA5A5' }
-                : { background: sel ? 'rgba(185,28,28,0.4)' : 'var(--card-2)', border: `${sel ? 2 : 1}px solid ${sel ? '#FCA5A5' : 'var(--line)'}`, boxShadow: sel ? '0 0 18px -4px rgba(248,113,113,0.75)' : 'none', color: '#E6EAF2' }}>
-              {mate ? <><span>{p.n}</span><span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider"><TeamIcon width="18" height="18" aria-hidden="true" />{teamLabel}</span></>
-                : <><span className="flex items-center gap-2">{p.n}{badges.includes(p.id) && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-200" style={{ background: 'rgba(127,29,29,0.5)', border: '1px solid rgba(239,68,68,0.75)' }}>Werewolf</span>}</span>{sel && <span aria-hidden="true" className="text-lg">✓</span>}</>}
+                : { background: sel ? 'rgba(185,28,28,0.62)' : 'var(--card-2)', border: `2px solid ${sel ? '#FCA5A5' : 'var(--line)'}`, boxShadow: sel ? '0 0 20px -3px rgba(248,113,113,0.9)' : 'none', color: '#F8FAFC' }}>
+              {mate ? <><span className="flex-1">{p.n}</span><span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider"><TeamIcon width="18" height="18" aria-hidden="true" />{teamLabel}</span></>
+                : <>
+                  <span aria-hidden="true" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-sm font-black" style={{ background: sel ? '#FCA5A5' : 'transparent', border: `2px solid ${sel ? '#FCA5A5' : '#64748B'}`, color: '#450A0A' }}>{sel ? '✓' : ''}</span>
+                  <span className="flex flex-1 items-center gap-2">{p.n}{badges.includes(p.id) && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-200" style={{ background: 'rgba(127,29,29,0.5)', border: '1px solid rgba(239,68,68,0.75)' }}>Werewolf</span>}</span>
+                  {sel && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-950" style={{ background: '#FCA5A5' }}>Target</span>}
+                </>}
             </button>
           </li>
         );
@@ -5165,7 +5182,7 @@ function MpNightManual({ me, players, room, write }) {
     const pack = players.filter((p) => p.r === 'werewolf' && p.id !== me.id);
     const teamIds = alive.filter((p) => p.r === 'werewolf' || p.r === 'shadow').map((p) => p.id);
     if (room.bm && Math.min(2, alive.filter((p) => p.id !== me.id && !teamIds.includes(p.id)).length) === 2) { // Blood Moon: two targets
-      const sel = done ? [me.t, me.t2].filter(Boolean) : (pick ? String(pick).split('|') : []);
+      const sel = done ? [me.t, me.t2].filter(Boolean) : (pick ? String(pick).split('|').filter((x) => alive.some((q) => String(q.id) === x)) : []);
       return (
         <div className="flex flex-1 flex-col">
           {header('BLOOD MOON: CHOOSE TWO TARGETS TO HUNT.', 'Agree silently with your pack. The most votes win.')}
@@ -5286,7 +5303,7 @@ function MpNightManual({ me, players, room, write }) {
   if (role === 'plaguedoctor') {
     if (done) return <div className="flex flex-1 flex-col">{header('Inspect a player', me.ws === 1 ? 'You administered the cure.' : me.ws === 2 ? 'You injected the plague.' : 'You left them alone.')}{lockedNote}</div>;
     return <PlagueScan header={header('Inspect a player', 'Lock onto one player to inspect them, then choose a serum.')}
-      alive={alive.filter((p) => p.id !== me.id).map((p) => ({ id: p.id, n: p.n }))} isInfected={(id) => { const q = players.find((x) => x.id === id); return !!q && (q.r === 'zombie' || !!q.bt); }}
+      alive={alive.filter((p) => p.id !== me.id).map((p) => ({ id: p.id, n: p.n }))} isInfected={(id) => { const q = players.find((x) => x.id === id); return !!q && (q.r === 'zombie' || q.r === 'infector' || !!q.bt || !!q.ic); }}
       value={pick} setValue={setPick} onDone={(t, a) => write({ [`pl/${me.id}/t`]: t, [`pl/${me.id}/ws`]: a === 'cure' ? 1 : a === 'infect' ? 2 : 0, [`pl/${me.id}/nd`]: 1 })} />;
   }
   if (role === 'spellcaster') {
@@ -5405,7 +5422,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
     );
   }
   if (mine) {
-    const adapted = players.map((p) => ({ id: p.id, name: p.n, role: p.r, alive: p.a === 1, saveUsed: p.wsu === 1, poisonUsed: p.wpu === 1, lastGuard: p.lp || null, lastStone: p.lp || null, bitten: p.bt || 0, sedatedTag: p.sd === room.k }));
+    const adapted = players.map((p) => ({ id: p.id, name: p.n, role: p.r, alive: p.a === 1, saveUsed: p.wsu === 1, poisonUsed: p.wpu === 1, lastGuard: p.lp || null, lastStone: p.lp || null, bitten: p.bt || 0, incub: p.ic || 0, sedatedTag: p.sd === room.k }));
     const actor = adapted.find((p) => p.id === me.id);
     const victim = mpWolfVictim(players);
     const shadowAlive = players.some((p) => p.a === 1 && (p.r === 'shadow' || p.r === 'medusa' || (p.r === 'seer' && group.length > 1 && role === 'seer')));

@@ -5133,7 +5133,7 @@ function MpJoinForm({ onBack, onJoined, onHost }) {
 }
 
 /* ---------- player-side views ---------- */
-function MpReveal({ me, ready, readyCount, total, onReady }) {
+function MpReveal({ me, ready, readyCount, total, onReady, onLeave }) {
   const [phase, setPhase] = useState('idle'); // idle | lift | flipping | open
   const [sent, setSent] = useState(false);
   const [showAbility, setShowAbility] = useState(false);
@@ -5150,6 +5150,7 @@ function MpReveal({ me, ready, readyCount, total, onReady }) {
   const done = ready || sent;
   if (done) {
     return (
+      <NightStage fixed onExit={onLeave}>
       <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
         <p className="font-display text-2xl font-bold">You&rsquo;re ready</p>
         <p className="text-sm text-slate-300">Waiting for the others to look at their cards.</p>
@@ -5157,6 +5158,7 @@ function MpReveal({ me, ready, readyCount, total, onReady }) {
         <button onClick={() => setShowAbility(true)} className="min-h-[44px] rounded-xl px-5 text-sm font-semibold text-slate-200 hover:bg-white/5" style={{ border: '1px solid var(--line)' }}>View my role</button>
         {showAbility && <RoleViewModal role={me.r} onClose={() => setShowAbility(false)} />}
       </div>
+      </NightStage>
     );
   }
   return (
@@ -5518,7 +5520,8 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
   const waveNo = isWave ? ns.slice(2) : '';
   let role = ns.indexOf('r:') === 0 ? ns.slice(2) : '';
   if (isWave) {
-    if (waveNo === '1') role = me.jt === 1 ? 'infected' : me.cj === 1 ? 'cured' : (mpActive(me.r, room.k) && me.r !== 'witch' && me.r !== 'shadow' ? me.r : '');
+    const wolvesDone = !players.some((p) => p.a === 1 && p.r === 'werewolf' && p.nd !== 1); // the Witch unlocks as soon as the Werewolves have chosen
+    if (waveNo === '1') role = me.jt === 1 ? 'infected' : me.cj === 1 ? 'cured' : (mpActive(me.r, room.k) && me.r !== 'shadow' && (me.r !== 'witch' || wolvesDone) ? me.r : '');
     else if (waveNo === '2') role = me.r === 'witch' ? 'witch' : '';
     else role = me.r === 'shadow' ? 'shadow' : '';
   }
@@ -5637,11 +5640,26 @@ function useNightDirector({ room, players, write }) {
         base.ns = 'w:1'; base.nk = 1; // no intro splash: everyone's night screen opens at once
         setDir({ on: true, label: 'Night: everyone acts' });
         await write(base); if (!live()) return;
-        const w1 = roles.filter((r) => r !== 'witch' && r !== 'shadow' && r !== 'infected' && r !== 'cured');
-        await waitFor(() => latest.current.players.filter((p) => p.a === 1 && ((w1.includes(p.r) && p.nd !== 1) || p.jt === 1 || p.cj === 1)), MP_WAVE_SECS * 1000); if (!live()) return;
-        if (roles.includes('witch')) {
-          await stepO('w:2', 'Wave 2: Witch');
-          await waitFor(() => latest.current.players.filter((p) => p.a === 1 && p.r === 'witch' && p.nd !== 1), MP_WAVE_SECS * 1000); if (!live()) return;
+        const w1 = roles.filter((r) => r !== 'shadow' && r !== 'infected' && r !== 'cured');
+        { // Wave 1: everyone at once. The Witch joins the moment the Werewolves have chosen and gets her own 30 seconds.
+          const idleOthers = () => latest.current.players.filter((p) => p.a === 1 && ((w1.includes(p.r) && p.r !== 'witch' && p.nd !== 1) || p.jt === 1 || p.cj === 1));
+          const idleWitch = () => latest.current.players.filter((p) => p.a === 1 && p.r === 'witch' && p.nd !== 1);
+          const skipAll = async (list) => { const o = {}; list.forEach((p) => { if (p.jt === 1) o[`pl/${p.id}/jt`] = 2; else if (p.cj === 1) o[`pl/${p.id}/cj`] = 2; else o[`pl/${p.id}/nd`] = 1; }); if (Object.keys(o).length) await write(o); };
+          skip.current = false;
+          const t0 = Date.now(); let wd = 0;
+          while (live() && latest.current.room.ns !== 'w:1' && Date.now() - t0 < 4000) await wait(100);
+          const t1 = Date.now();
+          while (live() && !skip.current) {
+            const o = idleOthers(); const w = idleWitch();
+            if (!o.length && !w.length) break;
+            const now = Date.now();
+            const wolvesDone = !latest.current.players.some((p) => p.a === 1 && p.r === 'werewolf' && p.nd !== 1);
+            if (wolvesDone && !wd) wd = now;
+            if (o.length && now - t1 >= MP_WAVE_SECS * 1000) { await skipAll(o); continue; }
+            if (w.length && wolvesDone && now - Math.max(wd, t1) >= MP_WAVE_SECS * 1000) { await skipAll(w); continue; }
+            await wait(500);
+          }
+          if (!live()) return;
         }
         if (roles.includes('shadow')) {
           await stepO('w:3', 'Wave 3: Shadow Figure');
@@ -5857,6 +5875,8 @@ function MpDay({ me, players, room, write }) {
 
 function MpOver({ room, players, meId }) {
   const W = WIN_UI[room.w] || WIN_UI.werewolf;
+  const [seen, setSeen] = useState({});
+  const [view, setView] = useState('');
   useEffect(() => { Sfx.win(room.w === 'zombie' ? 'zombie' : room.w); }, []);
   return (
     <div className="flex flex-1 flex-col gap-4">
@@ -5866,13 +5886,28 @@ function MpOver({ room, players, meId }) {
         {players.some((p) => p.r === 'plaguedoctor') && <p className="mt-2 text-sm text-slate-300">{plagueLine(players.map((p) => ({ role: p.r, alive: p.a === 1, side: pdSide(p.pdc, p.pdi, p.pdl) })), room.w).trim()}</p>}
       </Panel>
       <ul className="flex flex-col gap-2">
-        {players.map((p) => (
-          <li key={p.id} className="flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5" style={{ background: 'var(--card-2)', border: '1px solid var(--line)', opacity: p.a === 1 ? 1 : 0.65 }}>
-            <span className="truncate text-[15px] font-semibold">{p.n}{p.id === meId ? ' (you)' : ''}{p.a !== 1 ? ' · out' : ''}</span>
-            <RoleChip role={p.r} />
-          </li>
-        ))}
+        {players.map((p) => {
+          const r = ROLES_DATA[p.r];
+          const shown = !!seen[p.id];
+          const teamName = r ? ({ village: 'Team Villagers', werewolf: 'Team Werewolves', zombie: 'Team Zombies', neutral: 'Team Neutral' })[r.team] || '' : '';
+          return (
+            <li key={p.id}>
+              <button type="button" onClick={() => { setSeen((x) => ({ ...x, [p.id]: 1 })); setView(p.r); }} aria-label={`Reveal ${p.n}'s role`}
+                className="flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 text-left transition active:scale-[0.99]" style={{ background: 'var(--card-2)', border: '1px solid var(--line)', opacity: p.a === 1 ? 1 : 0.65 }}>
+                <span className="truncate text-[15px] font-semibold">{p.n}{p.id === meId ? ' (you)' : ''}{p.a !== 1 ? ' · out' : ''}</span>
+                <span className="flex shrink-0 items-center gap-2">
+                  {shown ? <RoleChip role={p.r} /> : <>
+                    {r && <span className="rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: teamColor(r.team), background: teamColor(r.team) + '1A', border: `1px solid ${teamColor(r.team)}55` }}>{teamName}</span>}
+                    <span className="flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-200" style={{ border: '1px solid var(--line)' }}>
+                      <svg width="12" height="14" viewBox="0 0 12 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="1" y="1" width="10" height="14" rx="1.5" /><path d="M4 8h4M6 6v4" /></svg>Tap to reveal
+                    </span></>}
+                </span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
+      {view && <RoleViewModal role={view} onClose={() => setView('')} />}
     </div>
   );
 }
@@ -6027,7 +6062,7 @@ function MpMod({ room, players, me, write, director }) {
 function mpWaveLeft(players, room) {
   const ns = room.ns || '';
   const a = players.filter((p) => p.a === 1);
-  if (ns === 'w:1') return a.filter((p) => p.jt === 1 || p.cj === 1 || (mpActive(p.r, room.k) && p.r !== 'witch' && p.r !== 'shadow' && p.nd !== 1));
+  if (ns === 'w:1') return a.filter((p) => p.jt === 1 || p.cj === 1 || (mpActive(p.r, room.k) && p.r !== 'shadow' && p.nd !== 1));
   if (ns === 'w:2') return a.filter((p) => p.r === 'witch' && p.nd !== 1);
   if (ns === 'w:3') return a.filter((p) => p.r === 'shadow' && p.nd !== 1);
   if (ns === 'v:seer') return a.filter((p) => p.r === 'seer' && p.rd !== 1);
@@ -6186,7 +6221,7 @@ function MpRoom({ session, onExit, onPhase }) {
     const used = new Set(players.map((p) => p.n.toLowerCase()));
     const o0 = players.reduce((m, p) => Math.max(m, p.o || 0), 0);
     const add = {};
-    shuffle(AI_NAMES.filter((x) => !used.has(x.toLowerCase()))).slice(0, need).forEach((nm, i) => { const id = randId(); add[`pl/${id}/n`] = nm; add[`pl/${id}/o`] = o0 + i + 1; add[`pl/${id}/bot`] = 1; });
+    aiPickNames(used, need).forEach((nm, i) => { const id = randId(); add[`pl/${id}/n`] = nm; add[`pl/${id}/o`] = o0 + i + 1; add[`pl/${id}/bot`] = 1; });
     const withBots = { ...room, pl: { ...(room.pl || {}) } };
     Object.keys(add).forEach((k) => { const [, id, f] = k.split('/'); withBots.pl[id] = { ...(withBots.pl[id] || {}), [f]: add[k] }; });
     await write({ ...add, ai: 1, ...mpDealPatch(withBots, { ...emptyDeck(), ...room.dk }) });
@@ -6242,7 +6277,7 @@ function MpRoom({ session, onExit, onPhase }) {
       </div>
     );
   } else if (showPlayer) {
-    if (ph === 'reveal') body = <MpReveal me={me} ready={me.d === 1} readyCount={players.filter((p) => p.d === 1).length} total={players.length} onReady={() => write({ [`pl/${pid}/d`]: 1 })} />;
+    if (ph === 'reveal') body = <MpReveal me={me} ready={me.d === 1} readyCount={players.filter((p) => p.d === 1).length} total={players.length} onReady={() => write({ [`pl/${pid}/d`]: 1 })} onLeave={() => setConfirmLeave(true)} />;
     else if (ph === 'night') body = <MpNight key={`n${room.k}`} me={me} players={players} room={room} write={write} immersive={!isHost || hostPlays} onLeave={() => setConfirmLeave(true)} />;
     else if (ph === 'day') body = <MpDay key={`d${room.k}`} me={me} players={players} room={room} write={write} />;
     else body = <MpOver room={room} players={players} meId={pid} />;
@@ -6305,7 +6340,14 @@ function MpRoom({ session, onExit, onPhase }) {
 /* bots are ordinary players whose choices are written by the host       */
 /* device, so every night still goes through the one resolution engine.  */
 /* ------------------------------------------------------------------ */
-const AI_NAMES = ['Mira', 'Bram', 'Ivy', 'Corvin', 'Sable', 'Thorn', 'Wren', 'Dax', 'Lysa', 'Odin', 'Pia', 'Rook', 'Nyx', 'Hale', 'Juno', 'Kade', 'Vera', 'Finn'];
+const AI_NAMES = ['Darren', 'Jenna', 'Charlie', 'James', 'Ava', 'Stacy', 'Mira', 'Bram', 'Ivy', 'Corvin', 'Sable', 'Thorn', 'Wren', 'Dax', 'Lysa', 'Odin', 'Pia', 'Rook', 'Nyx', 'Hale', 'Juno', 'Kade', 'Vera', 'Finn'];
+
+// The six house names come first (in order), then the rest at random; never a name already in the room.
+function aiPickNames(used, n) {
+  const free = AI_NAMES.filter((x) => !used.has(x.toLowerCase()));
+  const front = free.slice(0, 6).filter((x) => AI_NAMES.indexOf(x) < 6);
+  return [...front, ...shuffle(free.filter((x) => !front.includes(x)))].slice(0, n);
+}
 
 async function aiCreateRoom(name, cfg) {
   Mp.local = true;
@@ -6315,7 +6357,7 @@ async function aiCreateRoom(name, cfg) {
   for (let i = 0; i < words.length; i++) { if (!(await Mp.get(`rooms/${words[i]}`))) { code = words[i]; break; } }
   if (!code) code = randLetters();
   const pl = { [pid]: { n: name, o: 1, a: 1, d: 0 } };
-  shuffle(AI_NAMES.filter((x) => x.toLowerCase() !== name.toLowerCase())).slice(0, cfg.n - 1).forEach((nm, i) => { pl[randId()] = { n: nm, o: i + 2, a: 1, d: 0, bot: 1 }; });
+  aiPickNames(new Set([name.toLowerCase()]), cfg.n - 1).forEach((nm, i) => { pl[randId()] = { n: nm, o: i + 2, a: 1, d: 0, bot: 1 }; });
   const room = { v: 1, host: pid, hp: 1, rn: 'AI Village', hn: name, md: getGameMode(), ph: 'lobby', k: 0, lk: 0, w: '', ts: Date.now(), pub: 0, st: 'waiting', mx: cfg.n, dk: cfg.deck, nightStyle: 'eyes_open', ai: 1, pl };
   await Mp.put(`rooms/${code}`, room);
   await Mp.patch(`rooms/${code}`, mpDealPatch(room, { ...emptyDeck(), ...cfg.deck })); // the human's secret card is dealt with everyone else's
@@ -6477,7 +6519,7 @@ function aiTick(ctx, M) {
     const roleOf = (p) => {
       if (sq) return sq === 'infected' ? (p.jt === 1 ? 'infected' : '') : sq === 'cured' ? (p.cj === 1 ? 'cured' : '') : (p.r === sq ? sq : '');
       if (ns === 'v:seer') return p.r === 'seer' ? 'seer' : '';
-      if (ns === 'w:1') return p.jt === 1 ? 'infected' : p.cj === 1 ? 'cured' : (mpActive(p.r, k) && p.r !== 'witch' && p.r !== 'shadow' ? p.r : '');
+      if (ns === 'w:1') return p.jt === 1 ? 'infected' : p.cj === 1 ? 'cured' : (mpActive(p.r, k) && p.r !== 'shadow' && (p.r !== 'witch' || !players.some((q) => q.a === 1 && q.r === 'werewolf' && q.nd !== 1)) ? p.r : '');
       if (ns === 'w:2') return p.r === 'witch' ? 'witch' : '';
       return p.r === 'shadow' ? 'shadow' : '';
     };

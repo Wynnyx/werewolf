@@ -6382,7 +6382,7 @@ function MpRoom({ session, onExit, onPhase }) {
     else if (ph === 'night') body = <MpNight key={`n${room.k}`} me={me} players={players} room={room} write={write} immersive={!isHost || hostPlays} onLeave={() => setConfirmLeave(true)} />;
     else if (ph === 'day') body = <MpDay key={`d${room.k}`} me={me} players={players} room={room} write={write} onTimeUp={isHost && hostPlays ? () => { if (room.vd === 1) return; const t = mpTally(players); write(mpVotePatch(players, t.tie ? '' : t.top, { tie: t.tie, skip: t.skip, none: t.voted === 0 })); } : undefined} />;
     else body = <MpOver room={room} players={players} meId={pid} />;
-    if (hostPlays && ph !== 'lobby') body = <div className="flex flex-1 flex-col gap-4">{body}{ph === 'over' && <MpHostPanel room={room} players={players} write={write} director={director} />}</div>;
+    if (hostPlays && ph !== 'lobby') body = <div className="flex flex-1 flex-col gap-4">{body}{ph === 'over' && <><Btn variant="secondary" disabled={busy} onClick={leave}>Exit to Home</Btn><MpHostPanel room={room} players={players} write={write} director={director} /></>}</div>;
   } else {
     body = <MpMod room={room} players={players} me={me} write={write} director={director} />;
   }

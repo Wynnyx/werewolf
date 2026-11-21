@@ -5064,6 +5064,8 @@ function MpJoinForm({ onBack, onJoined, onHost }) {
   };
   return (
     <div className="flex flex-col gap-4">
+      <button onClick={onHost} className="flex min-h-[56px] w-full items-center justify-center rounded-2xl text-base font-bold uppercase tracking-wide text-violet-100 transition hover:brightness-125 active:scale-[0.99]"
+        style={{ background: 'linear-gradient(135deg, rgba(109,40,217,0.4), rgba(21,26,36,0.95))', border: '1px solid rgba(167,139,250,0.65)' }}>+ Create Your Own Room</button>
       <MpPublicRooms onPick={openName} />
       <h2 className="font-display mt-2 text-sm font-bold uppercase tracking-[0.2em] text-slate-300">Join a Private Room</h2>
       <MpField label="Room code">
@@ -5072,8 +5074,6 @@ function MpJoinForm({ onBack, onJoined, onHost }) {
       </MpField>
       {err && !target && <p role="alert" className="text-sm text-amber-300">{err}</p>}
       <Btn onClick={tryCode}>Join Room</Btn>
-      <button onClick={onHost} className="mt-2 flex min-h-[56px] w-full items-center justify-center rounded-2xl text-base font-bold uppercase tracking-wide text-violet-100 transition hover:brightness-125 active:scale-[0.99]"
-        style={{ background: 'linear-gradient(135deg, rgba(109,40,217,0.4), rgba(21,26,36,0.95))', border: '1px solid rgba(167,139,250,0.65)' }}>+ Create Your Own Room</button>
       <Btn variant="ghost" onClick={onBack}>Back</Btn>
       {target && (
         <div role="dialog" aria-modal="true" aria-label="Write your name" className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: 'rgba(5,7,12,0.86)' }}>

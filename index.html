@@ -216,6 +216,17 @@ const CrosshairIcon = (p) => (
     <circle cx="32" cy="32" r="2.5" fill="currentColor" />
   </svg>
 );
+const MedusaIcon = (p) => (
+  <svg {...iconProps} {...p}>
+    <circle cx="32" cy="36" r="11" />
+    <path d="M27 34 H29 M35 34 H37" />
+    <path d="M28 41 Q32 43.5 36 41" />
+    <path d="M22 28 Q10 22 14 12 Q18 8 21 14" />
+    <path d="M42 28 Q54 22 50 12 Q46 8 43 14" />
+    <path d="M26 25 Q24 12 32 8 Q40 12 38 25" />
+    <path d="M20 40 Q8 44 10 54 M44 40 Q56 44 54 54" />
+  </svg>
+);
 const MayorIcon = (p) => (
   <svg {...iconProps} {...p}>
     <path d="M10 46 L8 22 L22 33 L32 14 L42 33 L56 22 L54 46Z" />
@@ -381,6 +392,23 @@ const SpellcasterArt = () => (
   </svg>
 );
 
+const MedusaArt = () => (
+  <svg {...artSvg}>
+    <defs>
+      <linearGradient id="md-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0B2A2A" /><stop offset="1" stopColor="#04080C" /></linearGradient>
+    </defs>
+    <rect width="200" height="267" fill="url(#md-bg)" />
+    <Stars pts={[[24, 28, 1.2], [168, 22, 1], [30, 210, 1]]} fill="#A7F3D0" />
+    <circle cx="150" cy="52" r="18" fill="#D1FAE5" opacity="0.75" />
+    <circle cx="100" cy="140" r="34" fill="#C7B9A4" />
+    <path d="M86 132 H94 M106 132 H114" stroke="#0B1A12" strokeWidth="3" strokeLinecap="round" />
+    <path d="M90 154 Q100 160 110 154" fill="none" stroke="#7F1D1D" strokeWidth="3" strokeLinecap="round" />
+    <g fill="none" stroke="#34D399" strokeWidth="6" strokeLinecap="round">
+      <path d="M72 120 Q40 100 54 70 Q64 56 76 72" /><path d="M128 120 Q160 100 146 70 Q136 56 124 72" />
+      <path d="M84 108 Q76 66 100 56 Q124 66 116 108" /><path d="M68 150 Q36 160 44 196" /><path d="M132 150 Q164 160 156 196" />
+    </g>
+  </svg>
+);
 const MayorArt = () => (
   <svg {...artSvg}>
     <defs>
@@ -483,6 +511,8 @@ function makeBgStore(key, fallback) {
     use: function () { return React.useSyncExternalStore((fn) => { listeners.add(fn); return () => listeners.delete(fn); }, this.get); }
   };
 }
+const MEDUSA_ART_DEFAULT = 'images/medusa-card.jpg';
+const medusaArtStore = makeBgStore('nightfall.medusaart.v1', MEDUSA_ART_DEFAULT);
 const MAYOR_ART_DEFAULT = 'images/mayor-card.jpg';
 const mayorArtStore = makeBgStore('nightfall.mayorart.v1', MAYOR_ART_DEFAULT);
 const NIGHT_BG_DEFAULTS = ['images/night-bg.jpg', 'images/night-1.jpg', 'images/night-2.jpg', 'images/night-3.jpg', 'images/night-4.jpg'];
@@ -564,7 +594,8 @@ try { localStorage.removeItem('nightfall.cardart.v1'); } catch (e) { /* custom a
 const DEFAULT_BACK = 'images/card-back.jpg';
 function useCardImage(role) {
   const mayor = mayorArtStore.use();
-  return role === 'mayor' ? mayor : (ROLES_DATA[role].imageUrl || '');
+  const medusa = medusaArtStore.use();
+  return role === 'mayor' ? mayor : role === 'medusa' ? medusa : (ROLES_DATA[role].imageUrl || '');
 }
 function DefaultBackDesign() {
   const Diamond = ({ className }) => (
@@ -683,6 +714,12 @@ const ROLES_DATA = {
     short: 'Your vote counts twice.',
     ability: 'Your vote counts twice.'
   },
+  medusa: {
+    id: 'medusa', balance: 4, Art: MedusaArt, get imageUrl() { return medusaArtStore.get(); }, blurb: 'Turn one player to stone until dusk.', name: 'Medusa', team: 'village', max: 1, color: '#2DD4BF', Icon: MedusaIcon,
+    nightOrder: 0.5, nightPrompt: 'Medusa wakes and may turn one player to stone until dusk, or skips. Not the same player as last night.',
+    short: 'Turns one player to stone until dusk.',
+    ability: 'Each night, you may turn one player to stone until dusk, blocking their action.'
+  },
   villager: {
     id: 'villager', balance: 1, Art: VillagerArt, imageUrl: 'images/villager-card.jpg', blurb: 'No night power. Use deduction to find the wolves.', name: 'Villager', team: 'village', max: 1, color: '#CBD5E1', Icon: HouseIcon,
     nightOrder: null, nightPrompt: null,
@@ -784,7 +821,8 @@ function deal(deck, names, count) {
     role: shuffled[i],
     alive: true,
     protectedTag: false,
-    silencedTag: false
+    silencedTag: false,
+    stoneTag: false
   }));
 }
 
@@ -1277,7 +1315,7 @@ function setLang(l) {
 const useLang = () => React.useSyncExternalStore((fn) => { langListeners.add(fn); return () => langListeners.delete(fn); }, getLang);
 document.documentElement.lang = langNow;
 
-const TH_ROLE = { Werewolf: 'มนุษย์หมาป่า', Seer: 'ผู้หยั่งรู้', Witch: 'แม่มด', Bodyguard: 'บอดี้การ์ด', Hunter: 'นายพราน', Spellcaster: 'จอมเวทใบ้', Mayor: 'นายกเทศมนตรี', Villager: 'ชาวบ้าน' };
+const TH_ROLE = { Werewolf: 'มนุษย์หมาป่า', Seer: 'ผู้หยั่งรู้', Witch: 'แม่มด', Bodyguard: 'บอดี้การ์ด', Hunter: 'นายพราน', Spellcaster: 'จอมเวทใบ้', Medusa: 'เมดูซ่า', Mayor: 'นายกเทศมนตรี', Villager: 'ชาวบ้าน' };
 const TH_PAIRS = [
   // role names
   ...Object.entries(TH_ROLE),
@@ -1402,6 +1440,22 @@ const TH_PAIRS = [
   ['Night Background Pool', 'ชุดภาพพื้นหลังกลางคืน'], ['Day Background Pool', 'ชุดภาพพื้นหลังกลางวัน'],
   ['Add several images. Each night picks one at random, never the same one twice in a row.', 'เพิ่มได้หลายภาพ ทุกคืนจะสุ่มหนึ่งภาพ และจะไม่ซ้ำกับคืนก่อนหน้า'], ['Add several images. Each morning picks one at random, separately from the night.', 'เพิ่มได้หลายภาพ ทุกเช้าจะสุ่มหนึ่งภาพ แยกจากภาพกลางคืน'],
   ['Add photos', 'เพิ่มรูปภาพ'], ['Reset Defaults', 'คืนค่าเริ่มต้น'], ['{#} images', '{1} ภาพ'], ['{#} image', '{1} ภาพ'], ['image', 'ภาพ'], ['images', 'ภาพ'], ['Remove image {#}', 'ลบภาพที่ {1}'], ['Image removed.', 'ลบภาพแล้ว'], ['Back to the default images.', 'กลับไปใช้ภาพเริ่มต้น'], ['1 image added.', 'เพิ่ม 1 ภาพแล้ว'], ['{#} images added.', 'เพิ่ม {1} ภาพแล้ว'], ['The pool holds up to {#} images.', 'ชุดภาพเก็บได้สูงสุด {1} ภาพ'], ['Could not save. The photos are too large for this browser to keep.', 'บันทึกไม่ได้ รูปภาพใหญ่เกินกว่าที่เบราว์เซอร์นี้จะเก็บได้'],
+  ['Turn one player to stone until dusk.', 'เปลี่ยนผู้เล่นหนึ่งคนเป็นหินจนถึงพลบค่ำ'], ['Turns one player to stone until dusk.', 'เปลี่ยนผู้เล่นหนึ่งคนเป็นหินจนถึงพลบค่ำ'],
+  ['Each night, you may turn one player to stone until dusk, blocking their action.', 'ทุกคืนคุณอาจเปลี่ยนผู้เล่นหนึ่งคนเป็นหินจนถึงพลบค่ำ เพื่อขัดขวางการกระทำของเขา'],
+  ['Medusa wakes and may turn one player to stone until dusk, or skips. Not the same player as last night.', 'เมดูซ่าตื่นขึ้นและอาจเปลี่ยนผู้เล่นหนึ่งคนเป็นหินจนถึงพลบค่ำ หรือข้ามก็ได้ ห้ามเป็นคนเดิมกับเมื่อคืน'],
+  ['Medusa Card Art', 'ภาพไพ่เมดูซ่า'], ['Your own picture for the Medusa card. A portrait 3:4 image fits best.', 'ภาพของคุณเองสำหรับไพ่เมดูซ่า ภาพแนวตั้งอัตราส่วน 3:4 เหมาะที่สุด'], ['Medusa card art updated.', 'อัปเดตภาพไพ่เมดูซ่าแล้ว'], ['Back to the default Medusa card.', 'กลับไปใช้ไพ่เมดูซ่าแบบเริ่มต้น'],
+  ['Medusa, choose who to turn to stone.', 'เมดูซ่า เลือกคนที่จะเปลี่ยนเป็นหิน'],
+  ['You cannot petrify {} two nights in a row.', 'คุณเปลี่ยน {1} เป็นหินสองคืนติดกันไม่ได้'], ['They cannot act tonight, and cannot speak or vote tomorrow.', 'เขาจะทำอะไรไม่ได้ในคืนนี้ และห้ามพูดหรือโหวตในวันพรุ่งนี้'],
+  ['Skip selected ✓', 'เลือกข้ามแล้ว ✓'], ['Skip / Don’t Use Gaze Tonight', 'ข้าม / ไม่ใช้สายตาในคืนนี้'], ['Select a player or Skip', 'เลือกผู้เล่นหรือข้าม'], ['Confirm Skip', 'ยืนยันการข้าม'], ['Confirm Petrify', 'ยืนยันการสาปเป็นหิน'],
+  ['Your vision was turned to stone tonight.', 'ญาณทิพย์ของคุณถูกสาปเป็นหินในคืนนี้'],
+  ['{} has been turned to stone until dusk. They cannot speak or vote.', '{1} ถูกสาปเป็นหินจนถึงพลบค่ำ ห้ามพูดและห้ามโหวต'],
+  ['{} has been turned to stone by Medusa until dusk. They cannot speak, vote or be voted out today.', '{1} ถูกเมดูซ่าสาปเป็นหินจนถึงพลบค่ำ ห้ามพูด ห้ามโหวต และไม่สามารถถูกโหวตออกในวันนี้'],
+  ['{} have been turned to stone by Medusa until dusk. They cannot speak, vote or be voted out today.', '{1} ถูกเมดูซ่าสาปเป็นหินจนถึงพลบค่ำ ห้ามพูด ห้ามโหวต และไม่สามารถถูกโหวตออกในวันนี้'],
+  ['STONED', 'ถูกสาปเป็นหิน'], ['Stoned', 'ถูกสาปเป็นหิน'], ['stoned', 'ถูกสาปเป็นหิน'], ['{} silenced, skipped', '{1} ถูกสาปให้เงียบ ข้ามไป'], ['{} stoned, skipped', '{1} ถูกสาปเป็นหิน ข้ามไป'],
+  ['Turn a player to stone', 'เปลี่ยนผู้เล่นเป็นหิน'], ['You skipped your gaze tonight.', 'คุณไม่ใช้สายตาในคืนนี้'], ['Your vision is clouding. Waiting for Medusa…', 'ญาณทิพย์ของคุณพร่ามัว กำลังรอเมดูซ่า…'],
+  ['You are turned to stone and cannot vote today.', 'คุณถูกสาปเป็นหินและไม่สามารถโหวตในวันนี้'],
+  ['You have been turned to stone by Medusa until dusk — you cannot speak or vote, and you cannot be voted out today.', 'คุณถูกเมดูซ่าสาปเป็นหินจนถึงพลบค่ำ — ห้ามพูดและห้ามโหวต และคุณไม่สามารถถูกโหวตออกในวันนี้'],
+  ['last stoned {}', 'สาปเป็นหินล่าสุด {1}'], ['{} 🗿 STONED', '{1} 🗿 ถูกสาปเป็นหิน'], ['{} (you) 🗿 STONED', '{1} (คุณ) 🗿 ถูกสาปเป็นหิน'], ['{} 🤐 🗿 STONED', '{1} 🤐 🗿 ถูกสาปเป็นหิน'], ['{} (you) 🤐 🗿 STONED', '{1} (คุณ) 🤐 🗿 ถูกสาปเป็นหิน'],
   ['Restore', 'กู้คืน'], ['{#} to {#} players', '{1} ถึง {2} คน'], ['{#} of {#} votes are in.', 'มีคะแนนเข้ามาแล้ว {1} จาก {2}'], ['You have been silenced by the Spellcaster — you cannot speak or vote today.', 'คุณถูกจอมเวทใบ้สาปให้เงียบ — ห้ามพูดและห้ามโหวตในวันนี้'], ['{} 🤐', '{1} 🤐'], ['{} (you) 🤐', '{1} (คุณ) 🤐']
 ];
 const trNorm = (s) => s.replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
@@ -1841,6 +1895,7 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
 
             <PoolRow rowStyle={rowStyle} pool={nightPool} title="Night Background Pool" desc="Add several images. Each night picks one at random, never the same one twice in a row." />
             <PoolRow rowStyle={rowStyle} pool={dayPool} title="Day Background Pool" desc="Add several images. Each morning picks one at random, separately from the night." />
+            <BgRow rowStyle={rowStyle} store={medusaArtStore} thumb="aspect-[3/4] w-[60px]" title="Medusa Card Art" desc="Your own picture for the Medusa card. A portrait 3:4 image fits best." savedMsg="Medusa card art updated." resetMsg="Back to the default Medusa card." />
             <BgRow rowStyle={rowStyle} store={mayorArtStore} thumb="aspect-[3/4] w-[60px]" title="Mayor Card Art" desc="Your own picture for the Mayor card. A portrait 3:4 image fits best." savedMsg="Mayor card art updated." resetMsg="Back to the default Mayor card." />
             <ServerUrlRow rowStyle={rowStyle} />
 
@@ -2629,11 +2684,12 @@ function StatusChip({ active, onClick, color, children }) {
 /* ------------------------------------------------------------------ */
 /* Automated night: shared pieces, Pass & Play loop, day trial        */
 /* ------------------------------------------------------------------ */
-const NIGHT_ORDER = ['werewolf', 'seer', 'bodyguard', 'witch', 'spellcaster'];
+const NIGHT_ORDER = ['medusa', 'werewolf', 'seer', 'bodyguard', 'witch', 'spellcaster'];
 const NIGHT_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 const nightWord = (n) => NIGHT_WORDS[n] || String(n);
 const roleLabel = (id) => (id === 'werewolf' ? 'Werewolves' : ROLES_DATA[id].name);
 const NIGHT_PROMPT = {
+  medusa: 'Medusa, choose who to turn to stone.',
   werewolf: 'Werewolves, choose who to hunt.',
   seer: 'Seer, choose who to inspect.',
   bodyguard: 'Bodyguard, choose someone to protect.',
@@ -2641,12 +2697,14 @@ const NIGHT_PROMPT = {
   spellcaster: 'Spellcaster, choose who to silence.'
 };
 const PROTECTED_LINE = 'The Werewolves attacked overnight, but the victim was protected!';
-function dawnLines(saved, deadNames, silencedName) {
+const stoneLine = (name) => `${name} has been turned to stone until dusk. They cannot speak or vote.`;
+function dawnLines(saved, deadNames, silencedName, stonedName) {
   const out = [];
   if (saved) out.push(deadNames.length ? PROTECTED_LINE : PROTECTED_LINE + ' No one was eliminated.');
   deadNames.forEach((n) => out.push(`${n} was found dead this morning.`));
   if (!out.length) out.push('The night passed quietly. No one was eliminated.');
   if (silencedName) out.push(`${silencedName} has been silenced for the day. They cannot speak or vote.`);
+  if (stonedName) out.push(stoneLine(stonedName));
   return out;
 }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -2768,6 +2826,15 @@ function GhostFlip({ name, wolf }) {
   );
 }
 
+function StoneVision() {
+  return (
+    <div role="status" className="mt-4 rounded-xl px-4 py-5 text-center" style={{ background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.55)' }}>
+      <MedusaIcon width="36" height="36" className="mx-auto text-teal-300" />
+      <p className="font-display mt-2 text-xl font-bold text-teal-100">Your vision was turned to stone tonight.</p>
+    </div>
+  );
+}
+
 function ActHeader({ role, sub }) {
   return (
     <div className="mb-4 text-center">
@@ -2808,15 +2875,30 @@ function NightActPP({ role, players, actor, choices, onDone }) {
       </div>
     );
   }
+  if (role === 'medusa') {
+    const last = actor.lastStone;
+    const hasLast = last !== undefined && last !== null && last !== '';
+    const skip = pick === 'skip';
+    return (
+      <div className="flex flex-1 flex-col">
+        <ActHeader role={role} sub={hasLast ? `You cannot petrify ${nm(last)} two nights in a row.` : 'They cannot act tonight, and cannot speak or vote tomorrow.'} />
+        <PickList players={opts(alive.filter((p) => p.id !== actor.id))} value={skip ? '' : val} onChange={choose} disabled={hasLast ? [last] : []} />
+        <Btn className="mt-3" variant="secondary" onClick={() => setPick(skip ? null : 'skip')}>{skip ? 'Skip selected ✓' : 'Skip / Don\u2019t Use Gaze Tonight'}</Btn>
+        <Btn className="mt-3" disabled={pick === null} onClick={() => onDone({ medusa: skip ? null : pick })}>{pick === null ? 'Select a player or Skip' : skip ? 'Confirm Skip' : 'Confirm Petrify'}</Btn>
+      </div>
+    );
+  }
   if (role === 'seer') {
+    const stoned = choices.medusa !== undefined && choices.medusa !== null && choices.medusa !== '' && choices.medusa === actor.id;
     const target = seen === null ? null : players.find((p) => p.id === seen);
     return (
       <div className="flex flex-1 flex-col">
         <ActHeader role={role} sub={target ? '' : 'Tap a name to select. Nothing is revealed until you confirm.'} />
         <PickList players={opts(alive.filter((p) => p.id !== actor.id))} value={val} onChange={choose} locked={seen !== null} />
-        {target && <GhostFlip key={target.id} name={target.name} wolf={target.role === 'werewolf'} />}
+        {target && stoned && <StoneVision />}
+        {target && !stoned && <GhostFlip key={target.id} name={target.name} wolf={target.role === 'werewolf'} />}
         {target
-          ? <Btn className="mt-5" onClick={() => onDone({ seer: seen })}>Done</Btn>
+          ? <Btn className="mt-5" onClick={() => onDone({ seer: stoned ? null : seen })}>Done</Btn>
           : <Btn className="mt-5" disabled={pick === null} onClick={() => setSeen(pick)}>{pick === null ? 'Select a player' : 'Confirm Inspection'}</Btn>}
       </div>
     );
@@ -2869,25 +2951,32 @@ function NightActPP({ role, players, actor, choices, onDone }) {
 }
 
 function resolveNightPP(players, c, night) {
-  const has = (v) => v !== null && v !== undefined;
+  const has = (v) => v !== null && v !== undefined && v !== '';
   const byId = new Map(players.map((p) => [p.id, p]));
-  const victim = has(c.werewolf) ? c.werewolf : null;
-  const guarded = has(c.bodyguard) ? c.bodyguard : null;
-  const poison = has(c.witchPoison) ? c.witchPoison : null;
-  const silenced = has(c.spellcaster) ? c.spellcaster : null;
-  const saved = victim !== null && (victim === guarded || !!c.witchSave);
+  // Medusa's gaze lands first: whoever she stones loses their action for the night.
+  const stoneId = has(c.medusa) && byId.get(c.medusa) && byId.get(c.medusa).alive ? c.medusa : null;
+  const stoned = stoneId !== null ? byId.get(stoneId) : null;
+  const blocked = (role) => !!stoned && stoned.role === role;
+  const victim = has(c.werewolf) && !blocked('werewolf') ? c.werewolf : null;
+  const guarded = has(c.bodyguard) && !blocked('bodyguard') ? c.bodyguard : null;
+  const poison = has(c.witchPoison) && !blocked('witch') ? c.witchPoison : null;
+  const witchSave = !!c.witchSave && !blocked('witch');
+  const silenced = has(c.spellcaster) && !blocked('spellcaster') ? c.spellcaster : null;
+  const saved = victim !== null && (victim === guarded || witchSave);
   const dead = [];
   if (victim !== null && !saved) dead.push(victim);
   if (poison !== null && poison !== guarded && !dead.includes(poison)) dead.push(poison);
   const next = players.map((p) => {
-    const q = { ...p, nn: night, protectedTag: p.id === guarded, silencedTag: p.alive && p.id === silenced };
-    if (dead.includes(p.id)) { q.alive = false; q.protectedTag = false; q.silencedTag = false; }
+    const q = { ...p, nn: night, protectedTag: p.id === guarded, silencedTag: p.alive && p.id === silenced, stoneTag: p.alive && p.id === stoneId };
+    if (dead.includes(p.id)) { q.alive = false; q.protectedTag = false; q.silencedTag = false; q.stoneTag = false; }
     if (p.role === 'bodyguard' && p.alive && guarded !== null) q.lastGuard = guarded;
-    if (p.role === 'witch') { if (c.witchSave && victim !== null) q.saveUsed = true; if (poison !== null) q.poisonUsed = true; }
+    if (p.role === 'medusa' && p.alive) q.lastStone = stoneId;
+    if (p.role === 'witch') { if (witchSave && victim !== null) q.saveUsed = true; if (poison !== null) q.poisonUsed = true; }
     return q;
   });
   const silencedName = silenced !== null && byId.get(silenced) && !dead.includes(silenced) ? byId.get(silenced).name : '';
-  return { next, dead, saved, victim, silenced, silencedName, lines: dawnLines(saved, dead.map((id) => byId.get(id).name), silencedName) };
+  const stonedName = stoneId !== null && !dead.includes(stoneId) ? stoned.name : '';
+  return { next, dead, saved, victim, silenced, silencedName, stoned: stonedName ? stoneId : null, stonedName, lines: dawnLines(saved, dead.map((id) => byId.get(id).name), silencedName, stonedName) };
 }
 
 // Pass & Play: the narrator runs the whole night by voice. One device, passed to each role in turn.
@@ -2998,6 +3087,7 @@ function NightStartCard({ night, onStart, over }) {
   );
 }
 
+const StonedBadge = () => <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-100" style={{ background: 'rgba(13,148,136,0.45)', border: '1px solid rgba(45,212,191,0.75)' }}>STONED</span>;
 const SilencedBadge = () => <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-100" style={{ background: 'rgba(109,40,217,0.45)', border: '1px solid rgba(167,139,250,0.7)' }}>SILENCED</span>;
 
 // Pass & Play day: recap the dawn, talk, then each voter takes the phone and casts a secret ballot. Silenced players cannot vote.
@@ -3024,15 +3114,17 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
   const [hunter, setHunter] = useState(null);
   const [shot, setShot] = useState(null);
   const alive = players.filter((p) => p.alive);
-  const voters = alive.filter((p) => !p.silencedTag);
+  const voters = alive.filter((p) => !p.silencedTag && !p.stoneTag);
   const silenced = alive.filter((p) => p.silencedTag);
+  const stoneds = alive.filter((p) => p.stoneTag);
+  const targets = alive.filter((p) => !p.stoneTag); // a stoned player cannot be voted out today
   const wolves = alive.filter((p) => ROLES_DATA[p.role].team === 'werewolf').length;
   const village = alive.length - wolves;
   const over = wolves === 0 ? { text: 'No Werewolves are left. The Village wins!', color: '#34D399' } : wolves >= village ? { text: 'The Werewolves match or outnumber the Village. The Werewolves win!', color: '#F87171' } : null;
-  const kill = (ids) => setPlayers(players.map((p) => (ids.includes(p.id) ? { ...p, alive: false, protectedTag: false, silencedTag: false } : p)));
+  const kill = (ids) => setPlayers(players.map((p) => (ids.includes(p.id) ? { ...p, alive: false, protectedTag: false, silencedTag: false, stoneTag: false } : p)));
   const opts = (list) => list.map((p) => ({ id: p.id, n: p.name }));
   const nm = (id) => (players.find((p) => p.id === id) || {}).name || '?';
-  const mayorAlive = alive.some((p) => p.role === 'mayor');
+  const mayorAlive = alive.some((p) => p.role === 'mayor' && !p.stoneTag);
   const voter = phase === 'ballots' ? voters[bi] : null;
   const tallyUp = (all) => {
     const tally = {};
@@ -3084,19 +3176,24 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
               {silenced.map((p) => p.name).join(', ')} {silenced.length > 1 ? 'have' : 'has'} been silenced by the Spellcaster and cannot speak or vote today.
             </p>
           )}
+          {stoneds.length > 0 && (
+            <p role="alert" className="mt-3 rounded-xl px-4 py-2.5 text-center text-sm font-semibold text-teal-100" style={{ background: 'rgba(45,212,191,0.16)', border: '1px solid rgba(45,212,191,0.6)' }}>
+              {stoneds.map((p) => p.name).join(', ')} {stoneds.length > 1 ? 'have' : 'has'} been turned to stone by Medusa until dusk. They cannot speak, vote or be voted out today.
+            </p>
+          )}
           {over && <p role="status" className="mt-3 rounded-xl px-4 py-3 text-center text-sm font-bold" style={{ color: over.color, background: 'rgba(10,10,18,0.8)', border: `1px solid ${over.color}66` }}>{over.text}</p>}
           <div className="mt-3"><DayTimer /></div>
           <Panel className="mt-3" style={{ background: 'rgba(21,26,36,0.82)' }}>
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Players still alive</h2>
             <ul className="flex flex-col gap-1.5">
-              {alive.map((p) => <li key={p.id} className="flex items-center justify-between gap-2 text-[15px] font-semibold text-slate-100"><span>{p.name}</span>{p.silencedTag && <SilencedBadge />}</li>)}
+              {alive.map((p) => <li key={p.id} className="flex items-center justify-between gap-2 text-[15px] font-semibold text-slate-100"><span>{p.name}</span><span className="flex gap-1.5">{p.silencedTag && <SilencedBadge />}{p.stoneTag && <StonedBadge />}</span></li>)}
             </ul>
           </Panel>
         </>
       )}
       {phase === 'ballots' && voter && (
         <div className="flex flex-1 flex-col">
-          <p className="text-center text-xs tabular-nums text-slate-300">Ballot {bi + 1} of {voters.length}{silenced.length > 0 ? ` · ${silenced.map((p) => p.name).join(', ')} silenced, skipped` : ''}</p>
+          <p className="text-center text-xs tabular-nums text-slate-300">Ballot {bi + 1} of {voters.length}{silenced.length > 0 ? ` · ${silenced.map((p) => p.name).join(', ')} silenced, skipped` : ''}{stoneds.length > 0 ? ` · ${stoneds.map((p) => p.name).join(', ')} stoned, skipped` : ''}</p>
           {hold ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
               <ShieldIcon width="64" height="64" className="text-slate-200" />
@@ -3108,7 +3205,7 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
             <div className="mt-4 flex flex-1 flex-col">
               {voter.role === 'mayor' && <MayorNote className="mb-3" />}
               <h2 className="font-display mb-3 text-center text-xl font-bold text-slate-50">{voter.name}, who do you vote to eliminate?</h2>
-              <PickList players={opts((cands ? alive.filter((p) => cands.includes(p.id)) : alive).filter((p) => p.id !== voter.id))} value={pick === null ? '' : pick} onChange={(v) => setPick(v === '' ? null : v)} />
+              <PickList players={opts((cands ? targets.filter((p) => cands.includes(p.id)) : targets).filter((p) => p.id !== voter.id))} value={pick === null ? '' : pick} onChange={(v) => setPick(v === '' ? null : v)} />
               <Btn className="mt-3" variant="secondary" onClick={() => setPick('skip')}>{pick === 'skip' ? 'Skip selected ✓' : 'Skip (no vote)'}</Btn>
               <Btn className="mt-3" disabled={pick === null} onClick={cast}>{pick === null ? 'Select a player or Skip' : pick === 'skip' ? 'Confirm Vote: Skip' : `Confirm Vote: ${nm(pick)}`}</Btn>
             </div>
@@ -3121,7 +3218,7 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
             Discuss and vote out loud together. Select the player with the most votes, or tap Skip Vote if the vote is tied.
           </p>
           <ul className="mt-3 flex flex-col gap-2" role="listbox" aria-label="Players still alive">
-            {alive.map((p) => {
+            {targets.map((p) => {
               const sel = pick === p.id;
               return (
                 <li key={p.id}>
@@ -3192,7 +3289,7 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
   const [mode, setMode] = useState(autoNight ? 'night' : 'grimoire'); // grimoire | night | day
   const [night, setNight] = useState(() => players.reduce((m, p) => Math.max(m, p.nn || 0), 0) + 1);
   const [info, setInfo] = useState(null);
-  const clearSilence = () => { if (players.some((p) => p.silencedTag)) setPlayers(players.map((p) => ({ ...p, silencedTag: false }))); };
+  const clearSilence = () => { if (players.some((p) => p.silencedTag || p.stoneTag)) setPlayers(players.map((p) => ({ ...p, silencedTag: false, stoneTag: false }))); };
   useEffect(() => { if (autoNight) clearSilence(); }, []);
   const [checked, setChecked] = useState({});
   const [confirmExit, setConfirmExit] = useState(false);
@@ -3312,7 +3409,7 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
                       <TeamBadge team={r.team} />
                     </div>
                   </div>
-                  <button onClick={() => update(p.id, p.alive ? { alive: false, protectedTag: false, silencedTag: false } : { alive: true })}
+                  <button onClick={() => update(p.id, p.alive ? { alive: false, protectedTag: false, silencedTag: false, stoneTag: false } : { alive: true })}
                     aria-pressed={!p.alive}
                     aria-label={`${p.name} is ${p.alive ? 'alive. Mark as eliminated' : 'eliminated. Mark as alive'}`}
                     className="min-h-[44px] shrink-0 rounded-lg px-3 text-xs font-bold uppercase tracking-wider"
@@ -3326,6 +3423,7 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
                   <div className="mt-2.5 flex gap-2 pl-14">
                     <StatusChip color="#34D399" active={p.protectedTag} onClick={() => update(p.id, { protectedTag: !p.protectedTag })}>Protected</StatusChip>
                     <StatusChip color="#818CF8" active={p.silencedTag} onClick={() => update(p.id, { silencedTag: !p.silencedTag })}>Silenced</StatusChip>
+                    <StatusChip color="#2DD4BF" active={p.stoneTag} onClick={() => update(p.id, { stoneTag: !p.stoneTag })}>Stoned</StatusChip>
                   </div>
                 )}
                 {p.role === 'hunter' && !p.alive && (
@@ -3409,9 +3507,9 @@ const STORE_KEY = 'nightfall.games.v1';
 //  w: winner ('village' | 'werewolf')          hp: 1 when the host also plays
 //  an: { k, l:{0:'text'}, sv, si, x:{ts:'text'} }   morning announcement
 //  pl[pid]: { n name, o join order, r roleId, a alive 1/0, d ready 1/0, t night target pid, nd night action done,
-//             ws witch save this night, wsu / wpu potion used, lp bodyguard last target, hs hunter shot used, s silenced, lf left }
+//             ws witch save this night, wsu / wpu potion used, lp bodyguard (or Medusa) last target, hs hunter shot used, s silenced, x stoned until dusk, lf left }
 const SESSION_KEY = 'nightfall.mp.v1';
-const MP_ACTIVE = ['werewolf', 'seer', 'bodyguard', 'witch', 'spellcaster'];
+const MP_ACTIVE = ['medusa', 'werewolf', 'seer', 'bodyguard', 'witch', 'spellcaster'];
 const MP_MIN = 4;
 const MP_MAX = 8;
 const CODE_WORDS = ['WOLF', 'MOON', 'FANG', 'HOWL', 'PACK', 'CLAW', 'DARK', 'BONE', 'MIST', 'GRIM', 'CROW', 'BATS', 'DUSK', 'DAWN', 'HUNT', 'PREY', 'FEAR', 'GORE', 'MAUL', 'OMEN'];
@@ -3585,7 +3683,7 @@ function mpLobbyPatch(room) {
   const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null, vd: null };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
-    ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'lf', 'v'].forEach((f) => { patch[b + f] = null; });
+    ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'x', 'lf', 'v'].forEach((f) => { patch[b + f] = null; });
     patch[b + 'a'] = 1; patch[b + 'd'] = 0;
   });
   return patch;
@@ -3594,9 +3692,15 @@ function mpNightPatch(room) {
   const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1, vd: null, bn: nextBgIdx('night', room.bn) };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
-    patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0; patch[b + 'v'] = ''; patch[b + 's'] = 0;
+    patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0; patch[b + 'v'] = ''; patch[b + 's'] = 0; patch[b + 'x'] = 0; // dusk: the stone wears off
   });
   return patch;
+}
+
+// Medusa's choice this night: the alive player she is turning to stone ('' when she skips or no one is chosen yet).
+function mpStoneTarget(players) {
+  const m = players.find((p) => p.a === 1 && p.r === 'medusa' && p.t && p.t !== p.id);
+  return m && players.some((p) => p.id === m.t && p.a === 1) ? m.t : '';
 }
 
 // Works out the night from everyone's secret choices and returns the patch that opens the day.
@@ -3604,14 +3708,18 @@ function mpResolveNight(room) {
   const ps = roomPlayers(room);
   const byId = Object.fromEntries(ps.map((p) => [p.id, p]));
   const alive = ps.filter((p) => p.a === 1);
-  const victim = mpWolfVictim(ps);
+  // Medusa's gaze lands first: whoever she stones loses their action for the night.
+  const stoneId = mpStoneTarget(ps);
+  const stoneRole = stoneId ? byId[stoneId].r : '';
+  const blocked = (role) => stoneRole === role;
+  const victim = blocked('werewolf') ? '' : mpWolfVictim(ps);
   const bg = alive.find((p) => p.r === 'bodyguard' && p.t && byId[p.t]);
-  const guarded = bg ? bg.t : '';
+  const guarded = bg && !blocked('bodyguard') ? bg.t : '';
   const witch = alive.find((p) => p.r === 'witch');
-  const witchSaves = !!(witch && witch.ws === 1 && !witch.wsu && victim);
-  const poison = witch && witch.t && !witch.wpu && byId[witch.t] ? witch.t : '';
+  const witchSaves = !!(witch && witch.ws === 1 && !witch.wsu && victim && !blocked('witch'));
+  const poison = witch && witch.t && !witch.wpu && byId[witch.t] && !blocked('witch') ? witch.t : '';
   const sc = alive.find((p) => p.r === 'spellcaster' && p.t && byId[p.t]);
-  const silenced = sc ? sc.t : '';
+  const silenced = sc && !blocked('spellcaster') ? sc.t : '';
 
   const dead = [];
   let saved = false;
@@ -3620,15 +3728,18 @@ function mpResolveNight(room) {
 
   const lines = dawnLines(saved, dead.map((id) => byId[id].n));
   const silencedAlive = silenced && !dead.includes(silenced) ? silenced : '';
-  const an = { k: room.k || 0, t: Date.now(), l: Object.fromEntries(lines.map((t, i) => [i, t])), sv: saved ? 1 : 0, si: silencedAlive };
+  const stonedAlive = stoneId && !dead.includes(stoneId) ? stoneId : '';
+  const an = { k: room.k || 0, t: Date.now(), l: Object.fromEntries(lines.map((t, i) => [i, t])), sv: saved ? 1 : 0, si: silencedAlive, st: stonedAlive };
   if (dead.length && getSettings().revealDead) an.rv = Object.fromEntries(dead.map((id) => [id, byId[id].r]));
   const patch = { ph: 'day', an, ns: null, nk: null, bd: nextBgIdx('day', room.bd) };
-  ps.forEach((p) => { patch[`pl/${p.id}/s`] = silencedAlive && p.id === silencedAlive ? 1 : 0; });
+  ps.forEach((p) => { patch[`pl/${p.id}/s`] = silencedAlive && p.id === silencedAlive ? 1 : 0; patch[`pl/${p.id}/x`] = stonedAlive && p.id === stonedAlive ? 1 : 0; });
   dead.forEach((id) => { patch[`pl/${id}/a`] = 0; });
-  if (witch && witch.ws === 1 && victim && !witch.wsu) patch[`pl/${witch.id}/wsu`] = 1;
+  if (witchSaves) patch[`pl/${witch.id}/wsu`] = 1;
   if (poison) patch[`pl/${witch.id}/wpu`] = 1;
-  if (bg) patch[`pl/${bg.id}/lp`] = guarded;
-  return { patch, dead, saved, victim, guarded, silenced: silencedAlive, lines, silencedLine: silencedAlive ? `${byId[silencedAlive].n} has been silenced for the day. They cannot speak or vote.` : '' };
+  if (bg && guarded) patch[`pl/${bg.id}/lp`] = guarded;
+  const medusa = alive.find((p) => p.r === 'medusa');
+  if (medusa) patch[`pl/${medusa.id}/lp`] = stoneId;
+  return { patch, dead, saved, victim, guarded, silenced: silencedAlive, stoned: stonedAlive, lines, silencedLine: silencedAlive ? `${byId[silencedAlive].n} has been silenced for the day. They cannot speak or vote.` : '', stonedLine: stonedAlive ? stoneLine(byId[stonedAlive].n) : '' };
 }
 
 /* ------------------------------------------------------------------ */
@@ -4011,14 +4122,30 @@ function MpNightManual({ me, players, room, write }) {
       </div>
     );
   }
+  if (role === 'medusa') {
+    const skipped = done && !me.t;
+    return (
+      <div className="flex flex-1 flex-col">
+        {header('Turn a player to stone', me.lp ? `You cannot petrify ${name(me.lp)} two nights in a row.` : 'They cannot act tonight, and cannot speak or vote tomorrow.')}
+        <PickList players={alive.filter((p) => p.id !== me.id)} value={done ? me.t : pick} onChange={setPick} disabled={me.lp ? [me.lp] : []} locked={done} />
+        {!done && <Btn className="mt-3" variant="secondary" onClick={() => setPick('skip')}>{pick === 'skip' ? 'Skip selected ✓' : 'Skip / Don\u2019t Use Gaze Tonight'}</Btn>}
+        {done ? <>{skipped && <p className="mt-3 text-center text-sm text-slate-300">You skipped your gaze tonight.</p>}{lockedNote}</>
+          : <Btn className="mt-3" disabled={!pick} onClick={() => lock(pick === 'skip' ? { [`pl/${me.id}/t`]: '' } : undefined)}>{!pick ? 'Select a player or Skip' : pick === 'skip' ? 'Confirm Skip' : 'Confirm Petrify'}</Btn>}
+      </div>
+    );
+  }
   if (role === 'seer') {
-    const target = done ? players.find((p) => p.id === me.t) : null;
+    const medusaPending = players.some((p) => p.a === 1 && p.r === 'medusa' && p.nd !== 1);
+    const seerStoned = !!me.id && mpStoneTarget(players) === me.id;
+    const target = done && !medusaPending && !seerStoned ? players.find((p) => p.id === me.t) : null;
     return (
       <div className="flex flex-1 flex-col">
         {header('Inspect a player', 'Learn whether one player is a werewolf.')}
         <PickList players={alive.filter((p) => p.id !== me.id)} value={done ? me.t : pick} onChange={setPick} locked={done} />
         {done ? (
           <>
+            {done && medusaPending && <p className="mt-4 text-center text-sm text-slate-300">Your vision is clouding. Waiting for Medusa&hellip;</p>}
+            {done && !medusaPending && seerStoned && <StoneVision />}
             {target && (
               <div className="mt-4 rounded-xl px-4 py-4 text-center" style={{ background: target.r === 'werewolf' ? 'rgba(220,38,38,0.18)' : 'rgba(16,185,129,0.14)', border: `1px solid ${target.r === 'werewolf' ? '#EF4444' : '#34D399'}` }}>
                 <div className="font-display text-xl font-bold">{target.n}</div>
@@ -4110,7 +4237,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
     );
   }
   if (mine) {
-    const adapted = players.map((p) => ({ id: p.id, name: p.n, role: p.r, alive: p.a === 1, saveUsed: p.wsu === 1, poisonUsed: p.wpu === 1, lastGuard: p.lp || null }));
+    const adapted = players.map((p) => ({ id: p.id, name: p.n, role: p.r, alive: p.a === 1, saveUsed: p.wsu === 1, poisonUsed: p.wpu === 1, lastGuard: p.lp || null, lastStone: p.lp || null }));
     const actor = adapted.find((p) => p.id === me.id);
     const victim = mpWolfVictim(players);
     const submit = (c) => {
@@ -4118,7 +4245,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
       if (role === 'witch') write({ [`pl/${me.id}/t`]: c.witchPoison === null || c.witchPoison === undefined ? '' : c.witchPoison, [`pl/${me.id}/ws`]: c.witchSave ? 1 : 0, [`pl/${me.id}/nd`]: 1 });
       else write({ [`pl/${me.id}/t`]: c[role] || '', [`pl/${me.id}/nd`]: 1 });
     };
-    return wrap(<NightActPP key={tag} role={role} players={adapted} actor={actor} choices={{ werewolf: victim || null }} onDone={submit} />);
+    return wrap(<NightActPP key={tag} role={role} players={adapted} actor={actor} choices={{ werewolf: victim || null, medusa: mpStoneTarget(players) || null }} onDone={submit} />);
   }
   const text = me.a !== 1 ? 'You have been eliminated. Stay silent and keep your eyes closed.' : 'The night is not over.';
   return wrap(<LockView key={'z' + tag} title="Keep your eyes closed..." sub={text} />, true);
@@ -4171,7 +4298,7 @@ function useNightDirector({ room, players, write }) {
       await write(result.patch);
       setDir({ on: false, label: '' });
       await morning; if (!live()) return;
-      const spoken = result.silencedLine ? result.lines.concat(result.silencedLine) : result.lines;
+      const spoken = result.lines.concat(result.silencedLine || [], result.stonedLine || []);
       for (const line of spoken) { await wait(800); if (!live()) return; await Narrator.say(line); if (!live()) return; }
     } catch (e) { setDir({ on: false, label: '' }); }
   };
@@ -4182,9 +4309,9 @@ function useNightDirector({ room, players, write }) {
 function mpTally(players) {
   const byId = Object.fromEntries(players.map((p) => [p.id, p]));
   const alive = players.filter((p) => p.a === 1);
-  const voters = alive.filter((p) => p.s !== 1);
+  const voters = alive.filter((p) => p.s !== 1 && p.x !== 1);
   const tally = {};
-  voters.forEach((p) => { if (p.v && byId[p.v] && byId[p.v].a === 1) tally[p.v] = (tally[p.v] || 0) + (p.r === 'mayor' ? 2 : 1); });
+  voters.forEach((p) => { if (p.v && byId[p.v] && byId[p.v].a === 1 && byId[p.v].x !== 1) tally[p.v] = (tally[p.v] || 0) + (p.r === 'mayor' ? 2 : 1); });
   const ranked = Object.keys(tally).sort((x, y) => tally[y] - tally[x]);
   const top = ranked[0] || '';
   const tie = ranked.length > 1 && tally[ranked[1]] === tally[top];
@@ -4209,7 +4336,8 @@ function MpVote({ me, players, room, write }) {
   const alive = players.filter((p) => p.a === 1);
   const { voters, voted } = mpTally(players);
   const [pick, setPick] = useState(me.v || '');
-  const silenced = me.s === 1;
+  const stonedMe = me.x === 1;
+  const silenced = me.s === 1 || stonedMe;
   const nm = (id) => (players.find((p) => p.id === id) || {}).n || '?';
   if (room.vd === 1) return <Panel className="text-center text-sm text-slate-300">The village has decided.</Panel>;
   if (me.a !== 1) return <Panel className="text-center text-sm text-slate-400">The village is voting. {voted} of {voters.length} votes are in.</Panel>;
@@ -4217,8 +4345,8 @@ function MpVote({ me, players, room, write }) {
     <Panel>
       <h3 className="font-display text-lg font-bold">Trial vote</h3>
       {me.r === 'mayor' && !silenced && <MayorNote className="mt-2" />}
-      <p className="mb-3 mt-1 text-xs text-slate-300">{silenced ? 'You cannot vote today.' : 'Discuss, then vote for the player you want eliminated.'} {voted} of {voters.length} votes are in.</p>
-      <PickList players={alive.filter((p) => p.id !== me.id)} value={silenced ? '' : pick} onChange={setPick} locked={silenced} />
+      <p className="mb-3 mt-1 text-xs text-slate-300">{stonedMe ? 'You are turned to stone and cannot vote today.' : silenced ? 'You cannot vote today.' : 'Discuss, then vote for the player you want eliminated.'} {voted} of {voters.length} votes are in.</p>
+      <PickList players={alive.filter((p) => p.id !== me.id && p.x !== 1)} value={silenced ? '' : pick} onChange={setPick} locked={silenced} />
       <Btn className="mt-3" disabled={silenced || !pick || pick === me.v} onClick={() => write({ [`pl/${me.id}/v`]: pick })}>{silenced ? 'Voting disabled' : me.v ? 'Change Vote' : 'Cast Vote'}</Btn>
       {!silenced && me.v && <p className="mt-2 text-center text-xs text-emerald-300">Your vote: {nm(me.v)}</p>}
     </Panel>
@@ -4231,6 +4359,7 @@ function AnnounceCard({ room, players }) {
   const lines = Object.values(an.l || {});
   const extra = Object.entries(an.x || {}).sort((a, b) => a[0].localeCompare(b[0])).map((e) => e[1]);
   const si = an.si && players.find((p) => p.id === an.si);
+  const st = an.st && players.find((p) => p.id === an.st);
   return (
     <Panel className="text-center" style={{ background: 'linear-gradient(160deg, rgba(251,191,36,0.1), rgba(21,26,36,0.95))', border: '1px solid rgba(251,191,36,0.4)' }}>
       <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-amber-300">Morning of day {an.k}</div>
@@ -4242,6 +4371,7 @@ function AnnounceCard({ room, players }) {
           </div>
         )}
         {si && <p className="text-sm text-violet-200">{si.n} has been silenced for the day. They cannot speak or vote.</p>}
+        {st && <p className="text-sm text-teal-200">{stoneLine(st.n)}</p>}
         {extra.map((t, i) => <p key={'x' + i} className="text-sm text-slate-300">{t}</p>)}
       </div>
     </Panel>
@@ -4254,7 +4384,7 @@ function StatusBadges({ players, meId }) {
       {players.map((p) => (
         <span key={p.id} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold"
           style={p.a === 1 ? { background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.4)', color: '#A7F3D0' } : { background: 'rgba(100,116,139,0.12)', border: '1px solid rgba(100,116,139,0.35)', color: '#94A3B8', textDecoration: 'line-through' }}>
-          {p.n}{p.id === meId ? ' (you)' : ''}{p.s === 1 && p.a === 1 ? ' 🤐' : ''}
+          {p.n}{p.id === meId ? ' (you)' : ''}{p.s === 1 && p.a === 1 ? ' 🤐' : ''}{p.x === 1 && p.a === 1 ? ' 🗿 STONED' : ''}
         </span>
       ))}
     </div>
@@ -4286,6 +4416,8 @@ function MpDay({ me, players, room, write }) {
       <DayTimer />
       {me.a !== 1
         ? <Panel className="text-center text-sm text-slate-300">You are eliminated. You can still watch, but keep quiet.</Panel>
+        : me.x === 1
+          ? <Panel className="text-center text-sm font-semibold text-teal-100" style={{ border: '1px solid rgba(45,212,191,0.7)', background: 'rgba(13,148,136,0.25)' }} role="alert">You have been turned to stone by Medusa until dusk &mdash; you cannot speak or vote, and you cannot be voted out today.</Panel>
         : me.s === 1
           ? <Panel className="text-center text-sm font-semibold text-violet-100" style={{ border: '1px solid rgba(167,139,250,0.7)', background: 'rgba(109,40,217,0.25)' }} role="alert">You have been silenced by the Spellcaster &mdash; you cannot speak or vote today.</Panel>
           : <Panel className="text-center text-sm text-slate-300">You are alive. Discuss and find the werewolves.</Panel>}
@@ -4368,6 +4500,8 @@ function MpMod({ room, players, me, write, director }) {
         const tags = [];
         if (p.r === 'witch') tags.push(`heal ${p.wsu === 1 ? 'used' : 'ready'}`, `poison ${p.wpu === 1 ? 'used' : 'ready'}`);
         if (p.s === 1 && ph === 'day') tags.push('silenced');
+        if (p.x === 1 && ph === 'day') tags.push('stoned');
+        if (p.r === 'medusa' && p.lp) tags.push(`last stoned ${nm(p.lp)}`);
         if (p.r === 'bodyguard' && p.lp) tags.push(`last guarded ${nm(p.lp)}`);
         return (
           <li key={p.id} className="rounded-xl px-3.5 py-2.5" style={{ background: 'var(--card-2)', border: '1px solid var(--line)', opacity: p.a === 1 ? 1 : 0.6 }}>
@@ -4835,7 +4969,7 @@ function AppInner() {
 /* ------------------------------------------------------------------ */
 function activeImageSources() {
   const list = [DEFAULT_BG, LOADING_BG, DEFAULT_BACK, nightPool.get()[0], dayPool.get()[0]];
-  list.push(mayorArtStore.get());
+  list.push(mayorArtStore.get(), medusaArtStore.get());
   ROLE_IDS.forEach((id) => {
     const src = ROLES_DATA[id].imageUrl;
     if (src) list.push(src);

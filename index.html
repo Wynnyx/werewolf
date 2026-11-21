@@ -4917,11 +4917,8 @@ function MpField({ label, children }) {
 const mpInputStyle = { background: 'var(--card)', border: '1px solid rgba(203,213,225,0.3)' };
 
 // Live list of open public rooms (polled every 3 seconds). Only rooms that are still waiting in the lobby are shown.
-function MpPublicRooms({ onJoined }) {
+function MpPublicRooms({ onPick }) {
   const [rooms, setRooms] = useState(null);
-  const [name, setName] = useState(loadName);
-  const [busy, setBusy] = useState('');
-  const [err, setErr] = useState('');
   useEffect(() => {
     let live = true;
     const load = async () => {
@@ -4941,21 +4938,11 @@ function MpPublicRooms({ onJoined }) {
     const t = setInterval(() => { if (!document.hidden) load(); }, 3000);
     return () => { live = false; clearInterval(t); };
   }, []);
-  const join = async (code) => {
-    const n = name.trim();
-    if (!n) { setErr('Enter your name first.'); return; }
-    setBusy(code); setErr('');
-    try { saveName(n); onJoined(await mpJoinRoom(code, n), n); }
-    catch (e) { setErr(mpJoinErrorText(e)); setBusy(''); }
-  };
   return (
     <section aria-label="Public rooms" className="mt-2">
       <h2 className="font-display mb-2 text-sm font-bold uppercase tracking-[0.2em] text-slate-300">Public Rooms</h2>
-      <input value={name} maxLength={14} onChange={(e) => setName(e.target.value)} placeholder="Your name to join..." autoComplete="off"
-        className="mb-3 h-12 w-full rounded-xl px-4 text-base text-slate-100 placeholder-slate-500" style={mpInputStyle} />
-      {err && <p role="alert" className="mb-2 text-sm text-amber-300">{err}</p>}
       {rooms === null ? <p className="hint-pulse py-4 text-center text-sm text-slate-400">Looking for rooms...</p>
-        : rooms.length === 0 ? <p className="py-4 text-center text-sm text-slate-500">No public rooms open right now. Host a Public room to start one!</p>
+        : rooms.length === 0 ? <p className="py-4 text-center text-sm text-slate-500">No public rooms open right now.</p>
         : <ul className="flex flex-col gap-2.5">{rooms.map((r) => { const full = r.n >= MP_MAX; return (
           <li key={r.code} className="flex items-center gap-3 rounded-2xl p-3.5" style={{ background: 'rgba(21,26,36,0.92)', border: '1px solid rgba(139,92,246,0.45)' }}>
             <div className="min-w-0 flex-1">
@@ -4963,13 +4950,13 @@ function MpPublicRooms({ onJoined }) {
               <div className="mt-0.5 truncate text-xs text-slate-400"><span className="font-bold tracking-widest text-violet-300">{r.code}</span> · Host: {r.hn} · {r.md}</div>
               <div className="mt-0.5 text-xs font-semibold tabular-nums text-slate-300">{r.n}/{MP_MAX} players</div>
             </div>
-            <button disabled={full || !!busy} onClick={() => join(r.code)} className="min-h-[44px] rounded-xl px-5 text-sm font-bold text-white disabled:opacity-40" style={{ background: full ? '#334155' : 'linear-gradient(180deg, #7C3AED, #5B21B6)' }}>{full ? 'Full' : busy === r.code ? 'Joining...' : 'Join'}</button>
+            <button disabled={full} onClick={() => onPick(r.code)} className="min-h-[44px] rounded-xl px-5 text-sm font-bold text-white disabled:opacity-40" style={{ background: full ? '#334155' : 'linear-gradient(180deg, #7C3AED, #5B21B6)' }}>{full ? 'Full' : 'Join'}</button>
           </li>); })}</ul>}
     </section>
   );
 }
 
-function MpEntry({ onHost, onJoin, onJoined, onBack }) {
+function MpEntry({ onHost, onJoin, onBack }) {
   const card = (title, sub, onClick, icon, accent) => (
     <button onClick={onClick} className="flex w-full items-center gap-4 rounded-2xl p-5 text-left transition hover:brightness-125 active:scale-[0.99]"
       style={{ background: `linear-gradient(135deg, ${accent}2E, rgba(21,26,36,0.95))`, border: `1px solid ${accent}77` }}>
@@ -4982,8 +4969,7 @@ function MpEntry({ onHost, onJoin, onJoined, onBack }) {
     <div className="flex flex-col gap-4">
       <p className="text-sm leading-relaxed text-slate-300">Everyone plays on their own phone. The host shares a 4-letter code and each player sees only their own card.</p>
       {card('Host a Room', 'Create a code and run the game', onHost, <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#C4B5FD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4 V20 M4 12 H20" /></svg>, '#8B5CF6')}
-      {card('Join a Room', 'Enter a code from your host', onJoin, <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FCA5A5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12 H19 M13 6 L19 12 L13 18" /></svg>, '#EF4444')}
-      <MpPublicRooms onJoined={onJoined} />
+      {card('Join a Room', 'Join a private room or browse public rooms', onJoin, <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FCA5A5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12 H19 M13 6 L19 12 L13 18" /></svg>, '#EF4444')}
       <Btn variant="ghost" className="mt-2" onClick={onBack}>Back</Btn>
     </div>
   );
@@ -5042,31 +5028,43 @@ function MpHostForm({ onBack, onCreated }) {
 
 function MpJoinForm({ onBack, onJoined }) {
   const [code, setCode] = useState('');
+  const [target, setTarget] = useState(''); // the room the player chose; the name step opens for it
   const [name, setName] = useState(loadName);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const go = async () => {
+  const openName = (c) => { setErr(''); setTarget(c); };
+  const tryCode = () => { if (cleanCode(code).length !== 4) { setErr('Enter the 4-letter room code.'); return; } openName(cleanCode(code)); };
+  const enterLobby = async () => {
     const n = name.trim();
-    if (cleanCode(code).length !== 4) { setErr('Enter the 4-letter room code.'); return; }
-    if (!n) { setErr('Enter your name first.'); return; }
+    if (!n) return;
     setBusy(true); setErr('');
-    try { saveName(n); onJoined(await mpJoinRoom(code, n), n); }
+    try { saveName(n); onJoined(await mpJoinRoom(target, n), n); }
     catch (e) { setErr(mpJoinErrorText(e)); setBusy(false); }
   };
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="font-display text-2xl font-bold">Join a Room</h2>
+      <h2 className="font-display text-2xl font-bold uppercase">Join a Private Room</h2>
       <MpField label="Room code">
         <input value={code} maxLength={4} onChange={(e) => setCode(cleanCode(e.target.value))} placeholder="WOLF" autoComplete="off" autoCapitalize="characters" spellCheck={false}
           className="font-display h-16 w-full rounded-xl text-center text-3xl font-black uppercase tracking-[0.4em] text-white placeholder-slate-600" style={{ ...mpInputStyle, paddingLeft: '0.4em' }} />
       </MpField>
-      <MpField label="Your name">
-        <input value={name} maxLength={14} onChange={(e) => setName(e.target.value)} placeholder="Enter your name..." autoComplete="off"
-          className="h-14 w-full rounded-xl px-4 text-lg text-slate-100 placeholder-slate-500" style={mpInputStyle} />
-      </MpField>
-      {err && <p role="alert" className="text-sm text-amber-300">{err}</p>}
-      <Btn disabled={busy} onClick={go}>{busy ? 'Joining...' : 'Join Room'}</Btn>
-      <Btn variant="ghost" disabled={busy} onClick={onBack}>Back</Btn>
+      {err && !target && <p role="alert" className="text-sm text-amber-300">{err}</p>}
+      <Btn onClick={tryCode}>Join Room</Btn>
+      <MpPublicRooms onPick={openName} />
+      <Btn variant="ghost" onClick={onBack}>Back</Btn>
+      {target && (
+        <div role="dialog" aria-modal="true" aria-label="Write your name" className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: 'rgba(5,7,12,0.86)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid rgba(139,92,246,0.55)' }}>
+            <h3 className="font-display text-xl font-bold">Write Your Name</h3>
+            <p className="mt-1 text-sm text-slate-400">Room <span className="font-bold tracking-widest text-violet-300">{target}</span></p>
+            <input value={name} maxLength={14} autoFocus onChange={(e) => setName(e.target.value)} placeholder="Enter your name" autoComplete="off"
+              className="mt-4 h-14 w-full rounded-xl px-4 text-lg text-slate-100 placeholder-slate-500" style={mpInputStyle} />
+            {err && <p role="alert" className="mt-3 text-sm text-amber-300">{err}</p>}
+            <Btn className="mt-4" disabled={busy || !name.trim()} onClick={enterLobby}>{busy ? 'Joining...' : 'Continue / Enter Lobby'}</Btn>
+            <Btn variant="ghost" className="mt-2" disabled={busy} onClick={() => { setTarget(''); setErr(''); }}>Cancel</Btn>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -6119,7 +6117,7 @@ function MultiScreen({ onBack, onPhase, gameCount, onClearGames }) {
             ? <MpHostForm onBack={() => setView('entry')} onCreated={enter} />
             : view === 'join'
               ? <MpJoinForm onBack={() => setView('entry')} onJoined={enter} />
-              : <MpEntry onHost={() => setView('host')} onJoin={() => setView('join')} onJoined={enter} onBack={onBack} />}
+              : <MpEntry onHost={() => setView('host')} onJoin={() => setView('join')} onBack={onBack} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} gameCount={gameCount} onClearGames={onClearGames} />}
     </Screen>
   );

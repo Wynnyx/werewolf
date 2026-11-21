@@ -4546,10 +4546,10 @@ async function mpWithFallback(fn) {
     throw e;
   }
 }
-const mpCreateRoom = (name, hostPlays, roomName) => mpWithFallback(() => mpCreateRoomImpl(name, hostPlays, roomName));
+const mpCreateRoom = (name, hostPlays, roomName, isPublic) => mpWithFallback(() => mpCreateRoomImpl(name, hostPlays, roomName, isPublic));
 const mpJoinRoom = (codeIn, name) => mpWithFallback(() => mpJoinRoomImpl(codeIn, name));
 
-async function mpCreateRoomImpl(name, hostPlays, roomName) {
+async function mpCreateRoomImpl(name, hostPlays, roomName, isPublic) {
   const pid = randId();
   let code = '';
   const words = shuffle(CODE_WORDS);
@@ -4559,9 +4559,10 @@ async function mpCreateRoomImpl(name, hostPlays, roomName) {
     if (!existing) { code = c; break; }
   }
   if (!code) throw new Error('no-code');
-  const room = { v: 1, host: pid, hp: hostPlays ? 1 : 0, rn: (roomName || '').trim() || 'Nightfall Village', hn: hostPlays ? name : 'Moderator', md: getGameMode(), ph: 'lobby', k: 0, lk: 0, w: '', ts: Date.now() };
+  const room = { v: 1, host: pid, hp: hostPlays ? 1 : 0, rn: (roomName || '').trim() || 'Nightfall Village', hn: hostPlays ? name : 'Moderator', md: getGameMode(), ph: 'lobby', k: 0, lk: 0, w: '', ts: Date.now(), pub: isPublic ? 1 : 0, st: 'waiting' }; // pub: listed publicly; st: waiting | in_game | closed
   if (hostPlays) room.pl = { [pid]: { n: name, o: 1, a: 1, d: 0 } };
   await Mp.put(`rooms/${code}`, room);
+  if (isPublic) { try { await Mp.put(`publicRooms/${code}`, { rn: room.rn, hn: room.hn, ts: room.ts }); } catch (e) { /* the room still works with its code */ } } // small index so the public list needs one read
   return { code, pid, host: true, local: Mp.local };
 }
 
@@ -4616,7 +4617,7 @@ function mpDealPatch(room, deck) {
   const cards = [];
   ROLE_IDS.forEach((id) => { for (let i = 0; i < (deck[id] || 0); i++) cards.push(id); });
   const mix = shuffle(cards);
-  const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0, bm: 0 };
+  const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0, bm: 0, st: 'in_game' };
   players.forEach((p, i) => {
     const b = `pl/${p.id}/`;
     Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0, [b + 'v']: '', [b + 'lv']: '', [b + 't2']: '', [b + 'la']: 0, [b + 'bt']: 0, [b + 'jt']: 0, [b + 'cu']: 0, [b + 'cj']: 0, [b + 'sd']: 0, [b + 'sn']: 0, [b + 'fr']: '', [b + 'pdc']: 0, [b + 'pdi']: 0, [b + 'pdl']: '', [b + 'ic']: 0 });
@@ -4624,7 +4625,7 @@ function mpDealPatch(room, deck) {
   return patch;
 }
 function mpLobbyPatch(room) {
-  const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null, vd: null, cm: null, sp: null, bm: null };
+  const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null, vd: null, cm: null, sp: null, bm: null, st: 'waiting' };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
     ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'x', 'sa', 'rd', 'lf', 'v', 'lv', 't2', 'la', 'bt', 'jt', 'sn', 'fr', 'cu', 'cj', 'sd', 'pdc', 'pdi', 'pdl', 'ic'].forEach((f) => { patch[b + f] = null; });
@@ -4915,7 +4916,60 @@ function MpField({ label, children }) {
 }
 const mpInputStyle = { background: 'var(--card)', border: '1px solid rgba(203,213,225,0.3)' };
 
-function MpEntry({ onHost, onJoin, onBack }) {
+// Live list of open public rooms (polled every 3 seconds). Only rooms that are still waiting in the lobby are shown.
+function MpPublicRooms({ onJoined }) {
+  const [rooms, setRooms] = useState(null);
+  const [name, setName] = useState(loadName);
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    let live = true;
+    const load = async () => {
+      try {
+        const idx = (await Mp.get('publicRooms')) || {};
+        const codes = Object.keys(idx).slice(0, 20);
+        const rows = await Promise.all(codes.map(async (c) => {
+          const r = await Mp.get(`rooms/${c}`);
+          if (!r || Date.now() - (idx[c].ts || 0) > 3 * 3600 * 1000) { try { await Mp.del(`publicRooms/${c}`); } catch (e) { /* ignore */ } return null; } // closed or abandoned
+          if (!r.pub || r.st !== 'waiting' || r.ph !== 'lobby' || r.lk) return null;
+          return { code: c, rn: r.rn, hn: r.hn, md: r.md === 'outbreak' ? 'Outbreak' : 'Classic', n: roomPlayers(r).length };
+        }));
+        if (live) setRooms(rows.filter(Boolean));
+      } catch (e) { if (live) setRooms((x) => x || []); }
+    };
+    load();
+    const t = setInterval(() => { if (!document.hidden) load(); }, 3000);
+    return () => { live = false; clearInterval(t); };
+  }, []);
+  const join = async (code) => {
+    const n = name.trim();
+    if (!n) { setErr('Enter your name first.'); return; }
+    setBusy(code); setErr('');
+    try { saveName(n); onJoined(await mpJoinRoom(code, n), n); }
+    catch (e) { setErr(mpJoinErrorText(e)); setBusy(''); }
+  };
+  return (
+    <section aria-label="Public rooms" className="mt-2">
+      <h2 className="font-display mb-2 text-sm font-bold uppercase tracking-[0.2em] text-slate-300">Public Rooms</h2>
+      <input value={name} maxLength={14} onChange={(e) => setName(e.target.value)} placeholder="Your name to join..." autoComplete="off"
+        className="mb-3 h-12 w-full rounded-xl px-4 text-base text-slate-100 placeholder-slate-500" style={mpInputStyle} />
+      {err && <p role="alert" className="mb-2 text-sm text-amber-300">{err}</p>}
+      {rooms === null ? <p className="hint-pulse py-4 text-center text-sm text-slate-400">Looking for rooms...</p>
+        : rooms.length === 0 ? <p className="py-4 text-center text-sm text-slate-500">No public rooms open right now. Host a Public room to start one!</p>
+        : <ul className="flex flex-col gap-2.5">{rooms.map((r) => { const full = r.n >= MP_MAX; return (
+          <li key={r.code} className="flex items-center gap-3 rounded-2xl p-3.5" style={{ background: 'rgba(21,26,36,0.92)', border: '1px solid rgba(139,92,246,0.45)' }}>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[15px] font-bold text-slate-50">{r.rn}</div>
+              <div className="mt-0.5 truncate text-xs text-slate-400"><span className="font-bold tracking-widest text-violet-300">{r.code}</span> · Host: {r.hn} · {r.md}</div>
+              <div className="mt-0.5 text-xs font-semibold tabular-nums text-slate-300">{r.n}/{MP_MAX} players</div>
+            </div>
+            <button disabled={full || !!busy} onClick={() => join(r.code)} className="min-h-[44px] rounded-xl px-5 text-sm font-bold text-white disabled:opacity-40" style={{ background: full ? '#334155' : 'linear-gradient(180deg, #7C3AED, #5B21B6)' }}>{full ? 'Full' : busy === r.code ? 'Joining...' : 'Join'}</button>
+          </li>); })}</ul>}
+    </section>
+  );
+}
+
+function MpEntry({ onHost, onJoin, onJoined, onBack }) {
   const card = (title, sub, onClick, icon, accent) => (
     <button onClick={onClick} className="flex w-full items-center gap-4 rounded-2xl p-5 text-left transition hover:brightness-125 active:scale-[0.99]"
       style={{ background: `linear-gradient(135deg, ${accent}2E, rgba(21,26,36,0.95))`, border: `1px solid ${accent}77` }}>
@@ -4929,6 +4983,7 @@ function MpEntry({ onHost, onJoin, onBack }) {
       <p className="text-sm leading-relaxed text-slate-300">Everyone plays on their own phone. The host shares a 4-letter code and each player sees only their own card.</p>
       {card('Host a Room', 'Create a code and run the game', onHost, <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#C4B5FD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4 V20 M4 12 H20" /></svg>, '#8B5CF6')}
       {card('Join a Room', 'Enter a code from your host', onJoin, <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FCA5A5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12 H19 M13 6 L19 12 L13 18" /></svg>, '#EF4444')}
+      <MpPublicRooms onJoined={onJoined} />
       <Btn variant="ghost" className="mt-2" onClick={onBack}>Back</Btn>
     </div>
   );
@@ -4938,13 +4993,14 @@ function MpHostForm({ onBack, onCreated }) {
   const [name, setName] = useState(loadName);
   const [roomName, setRoomName] = useState('');
   const [plays, setPlays] = useState(true);
+  const [isPublic, setIsPublic] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const go = async () => {
     const n = name.trim();
     if (plays && !n) { setErr('Enter your name first.'); return; }
     setBusy(true); setErr('');
-    try { if (plays) saveName(n); onCreated(await mpCreateRoom(plays ? n : 'Moderator', plays, roomName), n); }
+    try { if (plays) saveName(n); onCreated(await mpCreateRoom(plays ? n : 'Moderator', plays, roomName, isPublic), n); }
     catch (e) { setErr(e.message === 'no-code' ? 'Could not find a free room code. Try again.' : mpErrorText(e)); setBusy(false); }
   };
   const opt = (val, title, sub) => (
@@ -4963,6 +5019,13 @@ function MpHostForm({ onBack, onCreated }) {
       <div role="radiogroup" aria-label="Host role" className="flex gap-2.5">
         {opt(true, 'Playing + Hosting', 'You get a card and run the game.')}
         {opt(false, 'Moderator Only', 'You run the game without a card.')}
+      </div>
+      <div role="radiogroup" aria-label="Room visibility" className="flex gap-2.5">
+        {[[false, 'Private', 'Friends join with the 4-letter code.'], [true, 'Public', 'Also listed so anyone can join.']].map(([v, t, sub]) => (
+          <button key={t} type="button" role="radio" aria-checked={isPublic === v} onClick={() => setIsPublic(v)} className="flex-1 rounded-xl p-3 text-left transition"
+            style={{ background: isPublic === v ? 'rgba(109,40,217,0.3)' : 'var(--card)', border: `1px solid ${isPublic === v ? '#A78BFA' : 'var(--line)'}` }}>
+            <span className="block text-sm font-bold text-slate-50">{t}</span><span className="mt-0.5 block text-xs leading-snug text-slate-400">{sub}</span>
+          </button>))}
       </div>
       {plays && (
         <MpField label="Your name">
@@ -5932,7 +5995,7 @@ function MpRoom({ session, onExit, onPhase }) {
   const leave = async () => {
     setBusy(true);
     try {
-      if (isHost) await Mp.del(`rooms/${code}`);
+      if (isHost) { await Mp.del(`rooms/${code}`); try { await Mp.del(`publicRooms/${code}`); } catch (e) { /* ignore */ } }
       else if (ph === 'lobby') await Mp.del(`rooms/${code}/pl/${pid}`);
       else await Mp.patch(`rooms/${code}/pl/${pid}`, { a: 0, lf: 1 });
     } catch (e) { /* leaving anyway */ }
@@ -6056,7 +6119,7 @@ function MultiScreen({ onBack, onPhase, gameCount, onClearGames }) {
             ? <MpHostForm onBack={() => setView('entry')} onCreated={enter} />
             : view === 'join'
               ? <MpJoinForm onBack={() => setView('entry')} onJoined={enter} />
-              : <MpEntry onHost={() => setView('host')} onJoin={() => setView('join')} onBack={onBack} />}
+              : <MpEntry onHost={() => setView('host')} onJoin={() => setView('join')} onJoined={enter} onBack={onBack} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} gameCount={gameCount} onClearGames={onClearGames} />}
     </Screen>
   );

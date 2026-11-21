@@ -3188,7 +3188,7 @@ function NightCard({ player, line }) {
 // The Shadow Figure's screen: anonymous action list, then a new target. Used by Pass & Play, Multi-Device auto and manual.
 const SHADOW_VERB = { medusa: 'Medusa turns {} to stone', bodyguard: 'Bodyguard protects {}', seer: 'Seer inspects {}', witchSave: 'Witch heals {}', witchPoison: 'Witch poisons {}', spellcaster: 'Spellcaster silences {}', sniper: 'Sniper scopes {}', zombie: 'Zombie Infect \u2192 {}' };
 const shadowActionLabel = (key, name) => (SHADOW_VERB[key] || '{}').replace('{}', name);
-function ShadowAct({ actions, victimName, alive, wolves = [], nm, stoned, onDone, header }) {
+function ShadowAct({ actions, victimName, alive, wolves = [], selfId = null, nm, stoned, onDone, header }) {
   const order = useMemo(() => shuffle(actions.map((_, i) => i)), []);
   const [act, setAct] = useState(null);
   const [skip, setSkip] = useState(false);
@@ -3236,7 +3236,7 @@ function ShadowAct({ actions, victimName, alive, wolves = [], nm, stoned, onDone
           {chosen && !skip && (
             <>
               <div className="mb-2 mt-4 text-center text-xs font-semibold uppercase tracking-widest text-slate-400">Choose a new target for that action</div>
-              <PickList players={alive} badges={wolves} value={pick === null ? '' : pick} onChange={(v) => setPick(v === '' ? null : v)} disabled={[chosen.target]} />
+              <PickList players={alive} badges={wolves} team={selfId ? [selfId] : []} teamLabel={'Shadow Figure \u00B7 Werewolf Team'} value={pick === null ? '' : pick} onChange={(v) => setPick(v === '' ? null : v)} disabled={[chosen.target]} />
             </>
           )}
           <Btn className="mt-3" variant="secondary" onClick={() => { setSkip(!skip); setAct(null); setPick(null); }}>{skip ? 'Skip selected ✓' : 'Skip / Leave Actions Unchanged'}</Btn>
@@ -3317,7 +3317,7 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
   if (role === 'shadow') {
     const stoned = hasV(choices.medusa) && choices.medusa === actor.id;
     return <ShadowAct header={<ActHeader role="shadow" />} actions={nightActions(choices)} victimName={hasV(choices.werewolf) ? nm(choices.werewolf) : 'No one'}
-      alive={opts(alive.filter((p) => !hideSelf || !actor || p.id !== actor.id))} wolves={alive.filter((p) => p.role === 'werewolf').map((p) => p.id)} nm={nm} stoned={stoned} onDone={(r) => onDone({ shadow: r })} />;
+      alive={opts(alive.filter((p) => !hideSelf || !actor || p.id !== actor.id))} wolves={alive.filter((p) => p.role === 'werewolf').map((p) => p.id)} selfId={hideSelf || !actor ? null : actor.id} nm={nm} stoned={stoned} onDone={(r) => onDone({ shadow: r })} />;
   }
   if (role === 'seerResult') {
     const sv = seerOverride || seerVision(choices, choices.shadow, (players.find((p) => p.alive && p.role === 'shadow') || {}).id, actor.id, players);
@@ -3425,7 +3425,7 @@ function resolveNightPP(players, c0, night) {
   const saved = victim !== null && (victim === guarded || (saveTarget !== null && victim === saveTarget));
   const dead = [];
   if (victim !== null && !saved) dead.push(victim);
-  if (poison !== null && poison !== guarded && !dead.includes(poison)) dead.push(poison);
+  if (poison !== null && !dead.includes(poison)) dead.push(poison); // the Bodyguard blocks hunts and bites, never the Witch's poison
   // Cupid's Lovers: when one dies from any cause the other dies of heartbreak (even if the Bodyguard guarded them).
   const pair = Array.isArray(c0.cupid) && c0.cupid.length === 2 ? c0.cupid : null;
   const partnerOf = (id) => { if (pair) { if (pair[0] === id) return pair[1]; if (pair[1] === id) return pair[0]; } const q = byId.get(id); return q && has(q.lover) ? q.lover : null; };
@@ -4292,7 +4292,7 @@ function mpResolveNight(room) {
   const dead = [];
   let saved = false;
   if (victim) { if (victim === guarded || (saveTarget && victim === saveTarget)) saved = true; else dead.push(victim); }
-  if (poison && poison !== guarded && !dead.includes(poison)) dead.push(poison);
+  if (poison && !dead.includes(poison)) dead.push(poison); // the Bodyguard blocks hunts and bites, never the Witch's poison
   // Lovers: a partner dies of heartbreak with them, even if the Bodyguard guarded that partner.
   const brokenIds = [];
   dead.slice().forEach((id) => { const pid = byId[id] && byId[id].lv; if (pid && byId[pid] && byId[pid].a === 1 && !dead.includes(pid)) { dead.push(pid); brokenIds.push(pid); } });
@@ -4721,7 +4721,7 @@ function MpNightManual({ me, players, room, write }) {
     if (done) return <div className="flex flex-1 flex-col">{header('Redirect an action', me.sa ? 'Your redirect is set.' : 'You left every action unchanged.')}{lockedNote}</div>;
     if (waiting) return <div className="flex flex-1 flex-col">{header('Redirect an action', 'You act last, once everyone else has chosen.')}<p className="mt-4 text-center text-sm text-slate-300">Waiting for the other night roles to finish&hellip;</p></div>;
     return <ShadowAct header={header('Redirect an action', 'Choose one action and a new target, or skip.')} actions={nightActions(c)} victimName={c.werewolf ? name(c.werewolf) : 'No one'}
-      alive={alive.map((p) => ({ id: p.id, n: p.n }))} nm={name} stoned={mpStoneTarget(players) === me.id}
+      alive={alive.filter((p) => p.id !== me.id).map((p) => ({ id: p.id, n: p.n }))} wolves={alive.filter((p) => p.r === 'werewolf').map((p) => p.id)} nm={name} stoned={mpStoneTarget(players) === me.id}
       onDone={(r) => lock({ [`pl/${me.id}/t`]: r ? r.to : '', [`pl/${me.id}/sa`]: r ? r.key : '' })} />;
   }
   if (role === 'medusa') {

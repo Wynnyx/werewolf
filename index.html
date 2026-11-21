@@ -4635,7 +4635,7 @@ function mpDealPatch(room, deck) {
   const cards = [];
   ROLE_IDS.forEach((id) => { for (let i = 0; i < (deck[id] || 0); i++) cards.push(id); });
   const mix = shuffle(cards);
-  const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0, bm: 0, st: 'in_game', dc: null, dl: (room.dl || 0) + 1, bn: nextBgIdx('night', room.bn) }; // dl: a new deal, so bots forget the last match
+  const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0, bm: 0, st: 'in_game', vr: null, dc: null, dl: (room.dl || 0) + 1, bn: nextBgIdx('night', room.bn) }; // dl: a new deal, so bots forget the last match
   players.forEach((p, i) => {
     const b = `pl/${p.id}/`;
     Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0, [b + 'v']: '', [b + 'lv']: '', [b + 't2']: '', [b + 'la']: 0, [b + 'bt']: 0, [b + 'jt']: 0, [b + 'cu']: 0, [b + 'cj']: 0, [b + 'sd']: 0, [b + 'sn']: 0, [b + 'fr']: '', [b + 'pdc']: 0, [b + 'pdi']: 0, [b + 'pdl']: '', [b + 'ic']: 0 });
@@ -4643,7 +4643,7 @@ function mpDealPatch(room, deck) {
   return patch;
 }
 function mpLobbyPatch(room) {
-  const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null, vd: null, cm: null, sp: null, bm: null, dc: null, st: 'waiting' };
+  const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null, vd: null, vr: null, cm: null, sp: null, bm: null, dc: null, st: 'waiting' };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
     ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'x', 'sa', 'rd', 'lf', 'v', 'lv', 't2', 'la', 'bt', 'jt', 'sn', 'fr', 'cu', 'cj', 'sd', 'pdc', 'pdi', 'pdl', 'ic'].forEach((f) => { patch[b + f] = null; });
@@ -4652,7 +4652,7 @@ function mpLobbyPatch(room) {
   return patch;
 }
 function mpNightPatch(room) {
-  const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1, cm: null, sp: null, vd: null, dc: null, bn: nextBgIdx('night', room.bn) };
+  const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1, cm: null, sp: null, vd: null, vr: null, dc: null, bn: nextBgIdx('night', room.bn) };
   patch.bm = patch.k >= 2 && Math.random() < 0.2 ? 1 : 0; // Blood Moon: 20% from Night 2 on, shared with every phone through the room
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
@@ -5760,6 +5760,7 @@ function mpVotePatch(players, id, opts) {
   players.forEach((p) => { patch[`pl/${p.id}/v`] = ''; });
   if (!o.revote) patch.vd = 1;
   const t = id ? players.find((p) => p.id === id) : null;
+  if (!o.revote) patch.vr = { t: t ? 'out' : o.skip ? 'skip' : o.tie ? 'tie' : 'none', id: t ? t.id : '', n: t ? t.n : '', r: t && getSettings().revealDead ? t.r : '', ts }; // read by the "village has spoken" screen
   if (t) {
     patch[`pl/${id}/a`] = 0;
     patch[`an/x/${ts}a`] = `${t.n} was voted out by the village.`;
@@ -5767,6 +5768,7 @@ function mpVotePatch(players, id, opts) {
     const pt = t.lv ? players.find((x) => x.id === t.lv && x.a === 1) : null;
     if (pt) { patch[`pl/${pt.id}/a`] = 0; patch[`an/x/${ts}c`] = `${pt.n} died of heartbreak.`; }
   } else if (o.skip) patch[`an/x/${ts}a`] = 'The village chose to skip the vote. No one was eliminated.';
+  else if (o.none) patch[`an/x/${ts}a`] = 'Time ran out with no votes. No one was eliminated.';
   else if (o.tie) patch[`an/x/${ts}a`] = 'The vote was tied. No one was eliminated.';
   return patch;
 }
@@ -5836,6 +5838,7 @@ function ElimGate({ me, room, code }) {
   const key = `${code}:${me.id}:${room.dl || 0}`;
   const [, bump] = useState(0);
   if (me.a !== 0 || !me.r || !ROLES_DATA[me.r] || ELIM_SEEN.key === key) return null;
+  if (room.vd === 1 && room.vr && VR_SEEN.key !== `${code}:${room.dl || 0}:${room.k}`) return null; // the vote result comes first
   const lines = Object.values((room.an && room.an.l) || {});
   const xs = Object.values((room.an && room.an.x) || {});
   const has = (t) => lines.concat(xs).some((l) => String(l).indexOf(t) >= 0);
@@ -5860,8 +5863,29 @@ function ElimGate({ me, room, code }) {
   );
 }
 
+const VR_SEEN = { key: '' };
+// Full-screen result once the vote closes (everyone voted, or the discussion timer ran out): who was voted out and what they were.
+function VoteResultGate({ room, code }) {
+  const [, bump] = useState(0);
+  const vr = room.vr;
+  const key = `${code}:${room.dl || 0}:${room.k}`;
+  if (room.vd !== 1 || !vr || VR_SEEN.key === key) return null;
+  const r = vr.r && ROLES_DATA[vr.r] ? ROLES_DATA[vr.r] : null;
+  const msg = vr.t === 'out' ? `${vr.n} was voted out.` : vr.t === 'skip' ? 'The village chose to skip the vote.' : vr.t === 'tie' ? 'The vote was tied.' : 'Time ran out and no votes were cast.';
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Vote result" className="fixed inset-0 z-[65] flex flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-8 text-center screen-in" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(76,29,149,0.5), rgba(5,7,12,0.97) 70%)' }}>
+      <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-violet-300">The village has spoken</div>
+      <h2 className="font-display text-3xl font-black text-slate-50" style={{ textShadow: '0 0 26px rgba(139,92,246,0.7)' }}>{msg}</h2>
+      {vr.t === 'out' && r && <><NightCard player={{ role: vr.r }} line="" /><p className="text-base text-slate-200">They were the <b style={{ color: r.color }}>{r.name}</b>.</p></>}
+      {vr.t !== 'out' && <p className="max-w-xs text-sm text-slate-300">No one was eliminated.</p>}
+      <p className="text-xs text-slate-400">Night falls soon...</p>
+      <div className="mt-1 w-full max-w-xs"><Btn variant="secondary" onClick={() => { VR_SEEN.key = key; bump((x) => x + 1); }}>Continue</Btn></div>
+    </div>
+  );
+}
+
 const DAWN_SEEN = { key: '' };
-function MpDay({ me, players, room, write }) {
+function MpDay({ me, players, room, write, onTimeUp }) {
   const fxKey = room.an && room.an.k === room.k && room.an.t ? String(room.an.t) : '';
   const [fx, setFx] = useState(!!fxKey && fxKey !== DAWN_SEEN.key && Date.now() - Number(fxKey) < 20000);
   useEffect(() => { if (!fx) return; DAWN_SEEN.key = fxKey; const t = setTimeout(() => setFx(false), 2700); return () => clearTimeout(t); }, [fx]);
@@ -5906,7 +5930,7 @@ function MpDay({ me, players, room, write }) {
       {!(voting && me.a === 1) ? (
         <>
           <AnnounceCard room={room} players={players} />
-          <DayTimer startAt={fxKey ? Number(fxKey) : 0} onEnd={() => { if (me.a === 1) setVoting(true); }} />
+          <DayTimer startAt={fxKey ? Number(fxKey) : 0} onEnd={() => { if (me.a === 1) setVoting(true); if (onTimeUp) onTimeUp(); }} />
           {me.a !== 1
             ? <Panel className="text-center text-sm text-slate-300">You are eliminated. You can still watch, but keep quiet.</Panel>
             : me.x === 1
@@ -6245,7 +6269,7 @@ function MpRoom({ session, onExit, onPhase }) {
     if (ph === 'reveal' && allSeen) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, 1800);
     else if (ph === 'night') t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start({ again: true }); } }, 6000); // only if the director is not running (for example after a refresh)
     else if (ph === 'day' && autoWinner) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; write({ ph: 'over', w: autoWinner }); } }, hunterPending ? 20000 : 7000);
-    else if (ph === 'day' && room.vd === 1) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, hunterPending ? 30000 : 7000);
+    else if (ph === 'day' && room.vd === 1) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, hunterPending ? 30000 : 12000); // time to read who was voted out
     return () => clearTimeout(t);
   }, [hostPlays, ph, room && room.k, room && room.vd, allSeen, autoWinner, hunterPending, director.dir.on]);
   const voteClosed = useRef('');
@@ -6339,7 +6363,7 @@ function MpRoom({ session, onExit, onPhase }) {
   } else if (showPlayer) {
     if (ph === 'reveal') body = <MpReveal me={me} ready={me.d === 1} readyCount={players.filter((p) => p.d === 1).length} total={players.length} onReady={() => write({ [`pl/${pid}/d`]: 1 })} onLeave={() => setConfirmLeave(true)} />;
     else if (ph === 'night') body = <MpNight key={`n${room.k}`} me={me} players={players} room={room} write={write} immersive={!isHost || hostPlays} onLeave={() => setConfirmLeave(true)} />;
-    else if (ph === 'day') body = <MpDay key={`d${room.k}`} me={me} players={players} room={room} write={write} />;
+    else if (ph === 'day') body = <MpDay key={`d${room.k}`} me={me} players={players} room={room} write={write} onTimeUp={isHost && hostPlays ? () => { if (room.vd === 1) return; const t = mpTally(players); write(mpVotePatch(players, t.tie ? '' : t.top, { tie: t.tie, skip: t.skip, none: t.voted === 0 })); } : undefined} />;
     else body = <MpOver room={room} players={players} meId={pid} />;
     if (hostPlays && ph !== 'lobby') body = <div className="flex flex-1 flex-col gap-4">{body}{ph === 'over' && <MpHostPanel room={room} players={players} write={write} director={director} />}</div>;
   } else {
@@ -6350,6 +6374,7 @@ function MpRoom({ session, onExit, onPhase }) {
   return (
     <>
     {ph === 'day' && <DayBackdrop />}
+    {showPlayer && me && ph === 'day' && <VoteResultGate room={room} code={code} />}
     {showPlayer && me && ph === 'day' && <ElimGate me={me} room={room} code={code} />}
     {fullHost && session.ai && (ph === 'day' || (ph === 'reveal' && !(me && me.d === 1))) && (
       <ExitButton onClick={() => setConfirmLeave(true)} className="fixed left-3 z-50" style={{ top: 'max(10px, env(safe-area-inset-top))' }} />

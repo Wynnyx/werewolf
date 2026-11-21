@@ -485,27 +485,74 @@ function makeBgStore(key, fallback) {
 }
 const MAYOR_ART_DEFAULT = 'images/mayor-card.jpg';
 const mayorArtStore = makeBgStore('nightfall.mayorart.v1', MAYOR_ART_DEFAULT);
-const NIGHT_BG_DEFAULT = 'images/night-bg.jpg';
-const nightBgStore = makeBgStore('nightfall.nightbg.v1', NIGHT_BG_DEFAULT);
-const DAY_BG_DEFAULT = 'images/day-bg.jpg';
-const dayBgStore = makeBgStore('nightfall.daybg.v1', DAY_BG_DEFAULT);
-const getNightBg = () => nightBgStore.get();
-const useNightBg = () => nightBgStore.use();
-const useDayBg = () => dayBgStore.use();
+const NIGHT_BG_DEFAULTS = ['images/night-bg.jpg', 'images/night-1.jpg', 'images/night-2.jpg', 'images/night-3.jpg', 'images/night-4.jpg'];
+const DAY_BG_DEFAULTS = ['images/day-bg.jpg', 'images/day-1.jpg', 'images/day-2.jpg', 'images/day-3.jpg', 'images/day-4.jpg'];
+const POOL_MAX = 12;
+// A pool of background images (data URLs or file paths). Custom pools live in localStorage; with none saved, the built-in defaults are used.
+function makePool(key, legacyKey, defaults) {
+  let custom = null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) { const a = JSON.parse(raw); if (Array.isArray(a) && a.length) custom = a.filter((x) => typeof x === 'string'); }
+    else if (legacyKey) {
+      const old = localStorage.getItem(legacyKey);
+      if (old) { custom = [old, ...defaults]; localStorage.setItem(key, JSON.stringify(custom)); localStorage.removeItem(legacyKey); }
+    }
+  } catch (e) { custom = null; }
+  if (custom && !custom.length) custom = null;
+  let cur = custom || defaults;
+  const listeners = new Set();
+  const commit = (arr) => {
+    try { if (arr) localStorage.setItem(key, JSON.stringify(arr)); else localStorage.removeItem(key); } catch (e) { return false; }
+    custom = arr; cur = arr || defaults; listeners.forEach((fn) => fn()); return true;
+  };
+  return {
+    defaults,
+    get: () => cur,
+    isCustom: () => !!custom,
+    add: (url) => { if (cur.length >= POOL_MAX) return 'full'; const ok = commit([...cur, url]); if (ok) preloadImage(url); return ok; },
+    remove: (i) => cur.length > 1 && commit(cur.filter((_, k) => k !== i)),
+    reset: () => commit(null),
+    use: function () { return React.useSyncExternalStore((fn) => { listeners.add(fn); return () => listeners.delete(fn); }, this.get); }
+  };
+}
+const nightPool = makePool('nightfall.nightpool.v1', 'nightfall.nightbg.v1', NIGHT_BG_DEFAULTS);
+const dayPool = makePool('nightfall.daypool.v1', 'nightfall.daybg.v1', DAY_BG_DEFAULTS);
+// Which image of each pool is on screen. Rolled once at the start of every night and every day (never the same image twice in a row).
+let bgSelState = { night: 0, day: 0 };
+const bgSelListeners = new Set();
+const useBgSel = () => React.useSyncExternalStore((fn) => { bgSelListeners.add(fn); return () => bgSelListeners.delete(fn); }, () => bgSelState);
+const poolOf = (kind) => (kind === 'night' ? nightPool : dayPool);
+function nextBgIdx(kind, prev) {
+  const n = poolOf(kind).get().length;
+  if (n <= 1) return 0;
+  const p = (typeof prev === 'number' ? prev : bgSelState[kind]) % n;
+  const i = randInt(n - 1);
+  return i >= p ? i + 1 : i;
+}
+function setBgIdx(kind, idx) {
+  if (bgSelState[kind] === idx) return;
+  bgSelState = { ...bgSelState, [kind]: idx };
+  bgSelListeners.forEach((fn) => fn());
+}
+const rollBg = (kind) => { const i = nextBgIdx(kind); setBgIdx(kind, i); return i; };
+const pickFrom = (list, idx) => list[((idx % list.length) + list.length) % list.length];
+const useNightBg = () => { const list = nightPool.use(); return pickFrom(list, useBgSel().night); };
+const useDayBg = () => { const list = dayPool.use(); return pickFrom(list, useBgSel().day); };
 const DAY_GRADIENT = 'linear-gradient(180deg, #2B2140 0%, #6B2D3E 52%, #C2693F 100%)';
 // Downscale a chosen photo (max 1080 x 1920) to JPEG so it fits comfortably in localStorage.
-function fileToBg(file) {
+function fileToBg(file, maxW = 1080, maxH = 1920, quality = 0.8) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
       try {
-        const k = Math.min(1, 1080 / img.naturalWidth, 1920 / img.naturalHeight);
+        const k = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
         const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
         const c = document.createElement('canvas'); c.width = w; c.height = h;
         const ctx = c.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
         URL.revokeObjectURL(url);
-        resolve(c.toDataURL('image/jpeg', 0.8));
+        resolve(c.toDataURL('image/jpeg', quality));
       } catch (e) { URL.revokeObjectURL(url); reject(e); }
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable')); };
@@ -1352,6 +1399,9 @@ const TH_PAIRS = [
   ['{} (you)', '{1} (คุณ)'], ['(you)', '(คุณ)'], ['{#} Players', '{1} ผู้เล่น'], ['{#} Players ·', '{1} ผู้เล่น ·'], ['{}: {}', '{1}: {2}'],
   ['Opening the Grimoire reveals every player’s secret role. The Narrator is running the game, so you may not need it.', 'การเปิดคัมภีร์จะเผยบทบาทลับของผู้เล่นทุกคน ผู้บรรยายกำลังดำเนินเกมอยู่ คุณอาจไม่จำเป็นต้องใช้'],
   ['Opening the Grimoire reveals every player’s secret role.', 'การเปิดคัมภีร์จะเผยบทบาทลับของผู้เล่นทุกคน'],
+  ['Night Background Pool', 'ชุดภาพพื้นหลังกลางคืน'], ['Day Background Pool', 'ชุดภาพพื้นหลังกลางวัน'],
+  ['Add several images. Each night picks one at random, never the same one twice in a row.', 'เพิ่มได้หลายภาพ ทุกคืนจะสุ่มหนึ่งภาพ และจะไม่ซ้ำกับคืนก่อนหน้า'], ['Add several images. Each morning picks one at random, separately from the night.', 'เพิ่มได้หลายภาพ ทุกเช้าจะสุ่มหนึ่งภาพ แยกจากภาพกลางคืน'],
+  ['Add photos', 'เพิ่มรูปภาพ'], ['Reset Defaults', 'คืนค่าเริ่มต้น'], ['{#} images', '{1} ภาพ'], ['{#} image', '{1} ภาพ'], ['image', 'ภาพ'], ['images', 'ภาพ'], ['Remove image {#}', 'ลบภาพที่ {1}'], ['Image removed.', 'ลบภาพแล้ว'], ['Back to the default images.', 'กลับไปใช้ภาพเริ่มต้น'], ['1 image added.', 'เพิ่ม 1 ภาพแล้ว'], ['{#} images added.', 'เพิ่ม {1} ภาพแล้ว'], ['The pool holds up to {#} images.', 'ชุดภาพเก็บได้สูงสุด {1} ภาพ'], ['Could not save. The photos are too large for this browser to keep.', 'บันทึกไม่ได้ รูปภาพใหญ่เกินกว่าที่เบราว์เซอร์นี้จะเก็บได้'],
   ['Restore', 'กู้คืน'], ['{#} to {#} players', '{1} ถึง {2} คน'], ['{#} of {#} votes are in.', 'มีคะแนนเข้ามาแล้ว {1} จาก {2}'], ['You have been silenced by the Spellcaster — you cannot speak or vote today.', 'คุณถูกจอมเวทใบ้สาปให้เงียบ — ห้ามพูดและห้ามโหวตในวันนี้'], ['{} 🤐', '{1} 🤐'], ['{} (you) 🤐', '{1} (คุณ) 🤐']
 ];
 const trNorm = (s) => s.replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
@@ -1621,6 +1671,55 @@ function ServerUrlRow({ rowStyle }) {
   );
 }
 
+function PoolRow({ rowStyle, pool, title, desc }) {
+  const list = pool.use();
+  const [msg, setMsg] = useState('');
+  const custom = pool.isCustom();
+  const pick = async (e) => {
+    const files = Array.from((e.target.files) || []);
+    e.target.value = '';
+    if (!files.length) return;
+    let added = 0, err = '';
+    for (const f of files) {
+      try {
+        const url = await fileToBg(f, 720, 1280, 0.78);
+        const r = pool.add(url);
+        if (r === true) added += 1; else { err = r === 'full' ? `The pool holds up to ${POOL_MAX} images.` : 'Could not save. The photos are too large for this browser to keep.'; break; }
+      } catch (x) { err = 'That file could not be read as an image.'; }
+    }
+    setMsg(err ? (added ? `${added} added. ${err}` : err) : (added === 1 ? '1 image added.' : `${added} images added.`));
+  };
+  return (
+    <div className="rounded-2xl p-4" style={rowStyle}>
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="text-[15px] font-semibold">{title}</div>
+        <span className="text-xs tabular-nums text-slate-400">{list.length} {list.length === 1 ? 'image' : 'images'}</span>
+      </div>
+      <p className="mt-0.5 text-xs leading-snug text-slate-400">{desc}</p>
+      <ul className="mt-3 grid grid-cols-4 gap-2">
+        {list.map((src, i) => (
+          <li key={i + src.slice(-24)} className="relative aspect-[9/16] overflow-hidden rounded-lg" style={{ background: '#05070B', border: '1px solid var(--line)' }}>
+            <img src={src} alt="" draggable={false} className="h-full w-full object-cover" />
+            <button onClick={() => { if (pool.remove(i)) setMsg('Image removed.'); }} disabled={list.length <= 1} aria-label={`Remove image ${i + 1}`}
+              className="absolute right-0.5 top-0.5 flex h-6 w-6 items-center justify-center rounded-full text-sm font-bold leading-none text-white disabled:opacity-30"
+              style={{ background: 'rgba(10,10,18,0.78)', border: '1px solid rgba(203,213,225,0.4)' }}>&times;</button>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <label className="inline-flex min-h-[44px] cursor-pointer items-center rounded-lg px-3 text-sm font-semibold text-slate-100 focus-within:outline focus-within:outline-2 focus-within:outline-violet-400"
+          style={{ background: 'var(--card)', border: '1px solid rgba(203,213,225,0.35)' }}>
+          Add photos
+          <input type="file" accept="image/*" multiple className="sr-only" onChange={pick} />
+        </label>
+        {custom && <button onClick={() => { pool.reset(); setMsg('Back to the default images.'); }}
+          className="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-red-300 hover:bg-white/5" style={{ border: '1px solid #DC262666' }}>Reset Defaults</button>}
+      </div>
+      {msg && <p role="status" className="mt-1.5 text-xs text-slate-400">{msg}</p>}
+    </div>
+  );
+}
+
 function BgRow({ rowStyle, store, title, desc, savedMsg, resetMsg, thumb = 'aspect-[9/16] w-[54px]' }) {
   const src = store.use();
   const [msg, setMsg] = useState('');
@@ -1740,8 +1839,8 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
               </button>
             </div>
 
-            <BgRow rowStyle={rowStyle} store={nightBgStore} title="Night Phase Background" desc="Artwork behind the narrator’s night screens. Portrait photos fit best." savedMsg="Night background updated." resetMsg="Back to the default night background." />
-            <BgRow rowStyle={rowStyle} store={dayBgStore} title="Day Phase Background" desc="Artwork behind the dawn announcement, discussion and voting screens." savedMsg="Day background updated." resetMsg="Back to the default day background." />
+            <PoolRow rowStyle={rowStyle} pool={nightPool} title="Night Background Pool" desc="Add several images. Each night picks one at random, never the same one twice in a row." />
+            <PoolRow rowStyle={rowStyle} pool={dayPool} title="Day Background Pool" desc="Add several images. Each morning picks one at random, separately from the night." />
             <BgRow rowStyle={rowStyle} store={mayorArtStore} thumb="aspect-[3/4] w-[60px]" title="Mayor Card Art" desc="Your own picture for the Mayor card. A portrait 3:4 image fits best." savedMsg="Mayor card art updated." resetMsg="Back to the default Mayor card." />
             <ServerUrlRow rowStyle={rowStyle} />
 
@@ -2794,6 +2893,7 @@ function resolveNightPP(players, c, night) {
 // Pass & Play: the narrator runs the whole night by voice. One device, passed to each role in turn.
 function NightLoopPP({ players, night, onFinish, onExit }) {
   const roles = useMemo(() => NIGHT_ORDER.filter((r) => players.some((p) => p.alive && p.role === r)), []);
+  useState(() => rollBg('night'));
   const [st, setSt] = useState({ k: 'title' });
   const [count, setCount] = useState(5);
   const [res, setRes] = useState(null);
@@ -2828,6 +2928,7 @@ function NightLoopPP({ players, night, onFinish, onExit }) {
       } else if (st.k === 'dawnSay') {
         morningP.current = Narrator.say('Everyone, open your eyes. Morning has broken.');
         const r = resolveNightPP(players, ch.current, night);
+        rollBg('day');
         setRes(r); setSpoken(false); setSt({ k: 'dawn' });
       } else if (st.k === 'dawn') {
         await morningP.current; if (off) return;
@@ -3479,7 +3580,7 @@ function mpLobbyPatch(room) {
   return patch;
 }
 function mpNightPatch(room) {
-  const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1, vd: null };
+  const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1, vd: null, bn: nextBgIdx('night', room.bn) };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
     patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0; patch[b + 'v'] = ''; patch[b + 's'] = 0;
@@ -3510,7 +3611,7 @@ function mpResolveNight(room) {
   const silencedAlive = silenced && !dead.includes(silenced) ? silenced : '';
   const an = { k: room.k || 0, t: Date.now(), l: Object.fromEntries(lines.map((t, i) => [i, t])), sv: saved ? 1 : 0, si: silencedAlive };
   if (dead.length && getSettings().revealDead) an.rv = Object.fromEntries(dead.map((id) => [id, byId[id].r]));
-  const patch = { ph: 'day', an, ns: null, nk: null };
+  const patch = { ph: 'day', an, ns: null, nk: null, bd: nextBgIdx('day', room.bd) };
   ps.forEach((p) => { patch[`pl/${p.id}/s`] = silencedAlive && p.id === silencedAlive ? 1 : 0; });
   dead.forEach((id) => { patch[`pl/${id}/a`] = 0; });
   if (witch && witch.ws === 1 && victim && !witch.wsu) patch[`pl/${witch.id}/wsu`] = 1;
@@ -4405,6 +4506,9 @@ function MpRoom({ session, onExit, onPhase }) {
   const writeRef = useRef(() => Promise.resolve());
 
   useEffect(() => { onPhase(cardsStep ? 'cards' : ph); }, [ph, cardsStep]);
+  // Every phone shows the scene the host rolled for this night and day.
+  useEffect(() => { if (room && typeof room.bn === 'number') setBgIdx('night', room.bn); }, [room && room.bn, room && room.k]);
+  useEffect(() => { if (room && typeof room.bd === 'number') setBgIdx('day', room.bd); }, [room && room.bd, room && room.k]);
   useEffect(() => () => onPhase(''), []);
   useEffect(() => { if (cardsStep) setDeck(autoFill(players.length)); }, [cardsStep, players.length]);
   useEffect(() => { if (ph !== 'lobby' && cardsStep) setCardsStep(false); }, [ph]);
@@ -4718,8 +4822,7 @@ function AppInner() {
 /* Startup: preload and decode images, then fade into the start screen */
 /* ------------------------------------------------------------------ */
 function activeImageSources() {
-  const list = [DEFAULT_BG, LOADING_BG, DEFAULT_BACK, getNightBg()];
-  list.push(dayBgStore.get());
+  const list = [DEFAULT_BG, LOADING_BG, DEFAULT_BACK, nightPool.get()[0], dayPool.get()[0]];
   list.push(mayorArtStore.get());
   ROLE_IDS.forEach((id) => {
     const src = ROLES_DATA[id].imageUrl;
@@ -4748,6 +4851,7 @@ function useBoot() {
       timers.push(setTimeout(() => setPhase('fading'), 250));
       timers.push(setTimeout(() => setPhase('done'), 850));
     };
+    timers.push(setTimeout(() => { [...nightPool.get(), ...dayPool.get()].forEach((u) => preloadImage(u)); }, 2500));
     timers.push(setTimeout(finish, 3000)); // safety: always unlock after 3 seconds
     preloadAll((loaded, total) => { if (!finished) setProgress({ loaded, total }); }).then(finish, finish);
     return () => { finished = true; timers.forEach(clearTimeout); };

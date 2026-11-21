@@ -1254,25 +1254,25 @@ function AbilityModal({ role, onClose }) {
   );
 }
 
-function ConfirmExit({ body, confirmLabel = 'Exit game', onCancel, onConfirm }) {
+function ConfirmExit({ body, title = 'Exit game?', confirmLabel = 'Exit game', cancelLabel = 'Keep playing', onCancel, onConfirm }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onCancel(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onCancel]);
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="alertdialog" aria-modal="true" aria-label="Exit game?">
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center" role="alertdialog" aria-modal="true" aria-label={title}>
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onCancel} />
       <div className="screen-in relative w-full max-w-md rounded-t-3xl p-6 text-center sm:rounded-3xl"
         style={{ background: 'var(--card)', border: '1px solid var(--line)', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
-        <h2 className="font-display text-2xl font-bold">Exit game?</h2>
+        <h2 className="font-display text-2xl font-bold">{title}</h2>
         <p className="mt-3 text-sm leading-relaxed text-slate-300">{body}</p>
         <div className="mt-6 flex flex-col gap-3">
-          <Btn variant="secondary" onClick={onCancel}>Keep playing</Btn>
+          <Btn variant="secondary" onClick={onCancel}>{cancelLabel}</Btn>
           <Btn onClick={onConfirm}>{confirmLabel}</Btn>
         </div>
       </div>
-    </div>
+    </div>, document.body
   );
 }
 
@@ -2131,7 +2131,7 @@ function Reveal({ players, onName, onDone, onExit }) {
 /* ------------------------------------------------------------------ */
 /* Screen 4a: Privacy shield with press-and-hold                       */
 /* ------------------------------------------------------------------ */
-function HoldButton({ onComplete, ms = 1500, children }) {
+function HoldButton({ onComplete, ms = 1500, aria = 'Press and hold for one and a half seconds to unlock the Moderator view', children }) {
   const [p, setP] = useState(0);
   const raf = useRef(0);
   const start = useRef(0);
@@ -2167,7 +2167,7 @@ function HoldButton({ onComplete, ms = 1500, children }) {
       onContextMenu={(e) => e.preventDefault()}
       onKeyDown={(e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); begin(); } }}
       onKeyUp={(e) => { if (e.key === ' ' || e.key === 'Enter') cancel(); }}
-      aria-label="Press and hold for one and a half seconds to unlock the Moderator view">
+      aria-label={aria}>
       <span className="absolute inset-y-0 left-0" style={{ width: `${p * 100}%`, background: 'linear-gradient(90deg, #991B1B, #DC2626)' }} />
       <span className="relative">{p > 0 && p < 1 ? 'Keep holding…' : children}</span>
     </button>
@@ -2596,13 +2596,11 @@ function NightStartCard({ night, onStart, over }) {
 const SilencedBadge = () => <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-100" style={{ background: 'rgba(109,40,217,0.45)', border: '1px solid rgba(167,139,250,0.7)' }}>SILENCED</span>;
 
 // Pass & Play day: recap the dawn, talk, then each voter takes the phone and casts a secret ballot. Silenced players cannot vote.
-function DayTrial({ players, setPlayers, night, info, onNight, onGrimoire }) {
+function DayTrial({ players, setPlayers, night, info, onNight, onAgain }) {
   const reveal = useSettings().revealDead;
-  const [phase, setPhase] = useState('talk'); // talk | ballots | result
-  const [bi, setBi] = useState(0);
-  const [hold, setHold] = useState(true);
+  const [phase, setPhase] = useState('talk'); // talk | vote | result
   const [pick, setPick] = useState(null);
-  const [ballots, setBallots] = useState({});
+  const [roles, setRoles] = useState(false);
   const [res, setRes] = useState(null);
   const [out, setOut] = useState(null);
   const [hunter, setHunter] = useState(null);
@@ -2616,31 +2614,21 @@ function DayTrial({ players, setPlayers, night, info, onNight, onGrimoire }) {
   const kill = (ids) => setPlayers(players.map((p) => (ids.includes(p.id) ? { ...p, alive: false, protectedTag: false, silencedTag: false } : p)));
   const opts = (list) => list.map((p) => ({ id: p.id, n: p.name }));
   const nm = (id) => (players.find((p) => p.id === id) || {}).name || '?';
-  const voter = phase === 'ballots' ? voters[bi] : null;
-
-  const tallyUp = (all) => {
-    const tally = {};
-    voters.forEach((v) => { const t = all[v.id]; if (t !== undefined && t !== null) tally[t] = (tally[t] || 0) + 1; });
-    const ranked = Object.keys(tally).map(Number).sort((x, y) => tally[y] - tally[x]);
-    const top = ranked.length ? ranked[0] : null;
-    const tie = ranked.length > 1 && tally[ranked[1]] === tally[top];
-    setRes({ tally, ranked, top, tie });
-    if (top !== null && !tie) { const p = players.find((x) => x.id === top); kill([top]); setOut(p); if (p.role === 'hunter') setHunter(p); }
+  const startVote = () => { setPick(null); setOut(null); setRes(null); setPhase('vote'); };
+  const eliminate = () => {
+    const p = players.find((x) => x.id === pick); if (!p) return;
+    kill([p.id]); setOut(p); setRes({ tally: {}, ranked: [], top: p.id, tie: false, skipped: false });
+    if (p.role === 'hunter') setHunter(p);
     setPhase('result');
   };
-  const cast = () => {
-    const all = { ...ballots, [voter.id]: pick };
-    setBallots(all); setPick(null);
-    if (bi + 1 < voters.length) { setBi(bi + 1); setHold(true); } else tallyUp(all);
-  };
-  const startVote = () => { setBallots({}); setBi(0); setHold(true); setPick(null); setOut(null); setRes(null); if (voters.length === 0) { setRes({ tally: {}, ranked: [], top: null, tie: false }); setPhase('result'); } else setPhase('ballots'); };
+  const skipVote = () => { setOut(null); setRes({ tally: {}, ranked: [], top: null, tie: false, skipped: true }); setPhase('result'); };
   const fire = () => { const t = players.find((x) => x.id === shot); if (!t) return; kill([t.id]); setOut(t); setHunter(null); setShot(null); };
 
   return (
     <DayStage>
       <header className="pb-3">
         <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-amber-300">Day {night}</p>
-        <h1 className="font-display text-3xl font-bold tracking-wide text-slate-50">{phase === 'ballots' ? 'The Vote' : 'The Village Wakes'}</h1>
+        <h1 className="font-display text-3xl font-bold tracking-wide text-slate-50">{phase === 'vote' ? 'The Vote' : 'The Village Wakes'}</h1>
       </header>
       {phase === 'talk' && (
         <>
@@ -2665,30 +2653,35 @@ function DayTrial({ players, setPlayers, night, info, onNight, onGrimoire }) {
           </Panel>
         </>
       )}
-      {phase === 'ballots' && voter && (
+      {phase === 'vote' && (
         <div className="flex flex-1 flex-col">
-          <p className="text-center text-xs tabular-nums text-slate-300">Ballot {bi + 1} of {voters.length}{silenced.length > 0 ? ` · ${silenced.map((p) => p.name).join(', ')} silenced, skipped` : ''}</p>
-          {hold ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
-              <ShieldIcon width="64" height="64" className="text-slate-200" />
-              <p className="font-display text-2xl font-bold text-slate-50">Pass the phone to {voter.name}</p>
-              <p className="max-w-xs text-sm text-slate-300">Eyes only. Everyone else look away while {voter.name} votes.</p>
-              <Btn className="max-w-xs" onClick={() => setHold(false)}>I&rsquo;m {voter.name}. Show my ballot</Btn>
-            </div>
-          ) : (
-            <div className="mt-4 flex flex-1 flex-col">
-              <h2 className="font-display mb-3 text-center text-xl font-bold text-slate-50">{voter.name}, who do you vote to eliminate?</h2>
-              <PickList players={opts(alive.filter((p) => p.id !== voter.id))} value={pick === null ? '' : pick} onChange={(v) => setPick(v === '' ? null : v)} />
-              <Btn className="mt-5" disabled={pick === null} onClick={cast}>{pick === null ? 'Select a player' : `Confirm Vote for ${nm(pick)}`}</Btn>
-            </div>
-          )}
+          <p className="rounded-xl px-4 py-3 text-center text-sm leading-relaxed text-slate-100" style={{ background: 'rgba(21,26,36,0.85)', border: '1px solid rgba(251,191,36,0.4)' }}>
+            Discuss and vote out loud together. Select the player with the most votes, or tap Skip Vote if the vote is tied.
+          </p>
+          <ul className="mt-3 flex flex-col gap-2" role="listbox" aria-label="Players still alive">
+            {alive.map((p) => {
+              const sel = pick === p.id;
+              return (
+                <li key={p.id}>
+                  <button role="option" aria-selected={sel} onClick={() => setPick(sel ? null : p.id)}
+                    className="flex min-h-[52px] w-full items-center justify-between gap-2 rounded-xl px-4 text-left text-[15px] font-semibold text-slate-50 transition active:scale-[0.99]"
+                    style={{ background: sel ? 'rgba(109,40,217,0.45)' : 'rgba(21,26,36,0.85)', border: `${sel ? 2 : 1}px solid ${sel ? '#C4B5FD' : 'var(--line)'}`, boxShadow: sel ? '0 0 18px -4px rgba(167,139,250,0.7)' : 'none' }}>
+                    <span>{p.name}</span>
+                    <span className="flex items-center gap-2">{p.silencedTag && <SilencedBadge />}{sel && <span aria-hidden="true" className="text-lg">✓</span>}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <Btn className="mt-4" disabled={pick === null} onClick={eliminate}>{pick === null ? 'Select a player' : `Confirm Elimination: ${nm(pick)}`}</Btn>
+          <Btn className="mt-2.5" variant="secondary" onClick={skipVote}>Skip Vote (Tie / No Elimination)</Btn>
         </div>
       )}
       {phase === 'result' && res && (
         <>
           <Panel className="text-center" style={{ border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(21,26,36,0.85)' }}>
-            <p className="font-display text-xl font-bold text-slate-50">{out ? `${out.name} was voted out by the village.` : res.ranked.length === 0 ? 'No votes were cast. No one is eliminated.' : 'The vote is tied. No one is eliminated.'}</p>
-            {res.ranked.length > 0 && <ul className="mt-3 flex flex-col gap-1 text-sm text-slate-200">{res.ranked.map((id) => <li key={id} className="flex justify-between"><span>{nm(id)}</span><span className="tabular-nums text-slate-400">{res.tally[id]}</span></li>)}</ul>}
+            <p className="font-display text-xl font-bold text-slate-50">{out ? `${out.name} was voted out by the village.` : 'The vote was skipped. No one is eliminated.'}</p>
+            {false && <ul className="mt-3 flex flex-col gap-1 text-sm text-slate-200">{res.ranked.map((id) => <li key={id} className="flex justify-between"><span>{nm(id)}</span><span className="tabular-nums text-slate-400">{res.tally[id]}</span></li>)}</ul>}
             {out && reveal && <div className="mt-3"><NightCard player={out} line={`${out.name} was the ${ROLES_DATA[out.role].name}`} /></div>}
           </Panel>
           {over && <p role="status" className="mt-3 rounded-xl px-4 py-3 text-center text-sm font-bold" style={{ color: over.color, background: 'rgba(10,10,18,0.8)', border: `1px solid ${over.color}66` }}>{over.text}</p>}
@@ -2702,17 +2695,35 @@ function DayTrial({ players, setPlayers, night, info, onNight, onGrimoire }) {
           )}
         </>
       )}
+      {roles && (
+        <Panel className="mt-3" style={{ background: 'rgba(21,26,36,0.88)' }}>
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Every role</h2>
+          <ul className="flex flex-col gap-2">
+            {players.map((p) => { const r = ROLES_DATA[p.role]; return (
+              <li key={p.id} className="flex items-center gap-3 rounded-lg p-2" style={{ background: r.color + '14', border: `1px solid ${r.color}55` }}>
+                <RoleEmblem role={p.role} size={24} />
+                <span className={`min-w-0 flex-1 truncate text-[15px] font-semibold ${p.alive ? '' : 'line-through'}`}>{p.name}</span>
+                <span className="font-display text-sm font-bold" style={{ color: r.color }}>{r.name}</span>
+              </li>
+            ); })}
+          </ul>
+        </Panel>
+      )}
       <div className="mt-auto flex flex-col gap-2.5 pt-6">
-        {phase === 'talk' && <Btn disabled={!!over} onClick={startVote}>{voters.length === 0 ? 'Skip Voting' : 'Start Voting'}</Btn>}
-        {phase === 'result' && res && res.tie && !over && <Btn variant="secondary" onClick={startVote}>Revote</Btn>}
-        {phase !== 'ballots' && <Btn disabled={!!over || !!hunter || phase === 'talk'} variant={phase === 'result' ? 'primary' : 'secondary'} onClick={onNight}>Start Night {night + 1}</Btn>}
-        {phase !== 'ballots' && <Btn variant="ghost" onClick={onGrimoire}>Open Grimoire</Btn>}
+        {phase === 'talk' && !over && <Btn onClick={startVote}>Start Voting</Btn>}
+        {over && phase !== 'vote' && <>
+          <Btn variant="secondary" disabled={!!hunter} onClick={() => setRoles(!roles)}>{roles ? 'Hide All Roles' : 'Reveal All Roles'}</Btn>
+          <Btn disabled={!!hunter} onClick={onAgain}>Play Again</Btn>
+        </>}
+        {!over && phase === 'result' && <Btn disabled={!!hunter} onClick={onNight}>Start Night {night + 1}</Btn>}
       </div>
     </DayStage>
   );
 }
 
 function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, onHome }) {
+  const [peek, setPeek] = useState(false); // Grimoire overlay during a running night or day
+  const [warn, setWarn] = useState(false);
   const [mode, setMode] = useState(autoNight ? 'night' : 'grimoire'); // grimoire | night | day
   const [night, setNight] = useState(() => players.reduce((m, p) => Math.max(m, p.nn || 0), 0) + 1);
   const [info, setInfo] = useState(null);
@@ -2743,26 +2754,60 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
   if (wolvesAlive === 0) status = { text: 'No Werewolves left. The Village wins.', color: '#34D399' };
   else if (wolvesAlive >= villageAlive) status = { text: 'Werewolves match or outnumber the Village.', color: '#F87171' };
 
-  if (mode === 'night') {
-    return <NightLoopPP key={night} players={players} night={night}
+  const body = (mode === 'night') ? (
+    <NightLoopPP key={night} players={players} night={night}
       onExit={() => setMode('grimoire')}
-      onFinish={(r) => { setPlayers(r.next); setInfo(r); setMode('day'); }} />;
+      onFinish={(r) => { setPlayers(r.next); setInfo(r); setMode('day'); }} />
+  ) : (mode === 'day') ? (
+    <DayTrial players={players} setPlayers={setPlayers} night={night} info={info}
+      onAgain={onAgain}
+      onNight={() => { clearSilence(); setNight(night + 1); setInfo(null); setMode('night'); }} />
+  ) : null;
+  if (body) {
+    return (
+      <>
+        {body}
+        <button onClick={() => setWarn(true)} aria-label="Open Grimoire"
+          className="fixed right-3 z-[45] flex h-10 w-10 items-center justify-center rounded-full text-slate-300/80 hover:text-slate-100"
+          style={{ top: 'max(14px, env(safe-area-inset-top))', background: 'rgba(10,10,18,0.55)', border: '1px solid rgba(203,213,225,0.25)' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v16H6.5A2.5 2.5 0 0 0 4 21.5z" /><path d="M4 21.5A2.5 2.5 0 0 0 6.5 24" opacity="0" /><circle cx="11.5" cy="10.5" r="2.2" /><path d="M7.5 10.5c1.2-2 2.7-3 4-3s2.8 1 4 3c-1.2 2-2.7 3-4 3s-2.8-1-4-3z" /></svg>
+        </button>
+        {warn && ReactDOM.createPortal(
+          <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center" role="alertdialog" aria-modal="true" aria-label="Spoiler Warning">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setWarn(false)} />
+            <div className="screen-in relative w-full max-w-md rounded-t-3xl p-6 text-center sm:rounded-3xl"
+              style={{ background: 'var(--card)', border: '1px solid var(--line)', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+              <h2 className="font-display text-2xl font-bold text-amber-300">Spoiler Warning</h2>
+              <p className="mt-3 text-sm leading-relaxed text-slate-300">Opening the Grimoire reveals every player&rsquo;s secret role.{narrator ? ' The Narrator is running the game, so you may not need it.' : ''}</p>
+              <div className="mt-6 flex flex-col gap-3">
+                <Btn variant="secondary" onClick={() => setWarn(false)}>Cancel</Btn>
+                <HoldButton aria="Press and hold for one and a half seconds to open the Grimoire" onComplete={() => { setWarn(false); setPeek(true); }}>Press &amp; Hold to View</HoldButton>
+              </div>
+            </div>
+          </div>, document.body)}
+        {peek && (
+          <div className="fixed inset-0 z-[55] overflow-y-auto" style={{ background: 'var(--bg)' }}>
+            {GrimoireView()}
+          </div>
+        )}
+      </>
+    );
   }
-  if (mode === 'day') {
-    return <DayTrial players={players} setPlayers={setPlayers} night={night} info={info}
-      onNight={() => { clearSilence(); setNight(night + 1); setInfo(null); setMode('night'); }}
-      onGrimoire={() => { setNight(night + 1); setMode('grimoire'); }} />;
-  }
+  return GrimoireView();
 
-  return (
+  function GrimoireView() { return (
     <Screen wide>
       <header className="flex items-start justify-between gap-3 pb-4">
         <div>
           <h1 className="font-display text-3xl font-bold tracking-wide">Grimoire</h1>
           <p className="text-sm text-slate-400">Moderator view. Keep the screen turned away from players.</p>
         </div>
-        <button onClick={() => setConfirmExit(true)} className="min-h-[44px] shrink-0 rounded-xl px-3.5 text-sm font-semibold text-slate-200 hover:bg-white/5"
-          style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>Exit</button>
+        <div className="flex shrink-0 gap-2">
+          {peek && <button onClick={() => setPeek(false)} className="min-h-[44px] rounded-xl px-3.5 text-sm font-semibold text-slate-50"
+            style={{ background: 'rgba(109,40,217,0.45)', border: '1px solid #C4B5FD' }}>Back to Game</button>}
+          <button onClick={() => setConfirmExit(true)} className="min-h-[44px] rounded-xl px-3.5 text-sm font-semibold text-slate-200 hover:bg-white/5"
+            style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>Exit</button>
+        </div>
       </header>
 
       {/* Tally */}
@@ -2878,11 +2923,12 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
         </Btn>
       </div>
       {confirmExit && (
-        <ConfirmExit body="Your game stays saved. You can resume it from My Games."
-          onCancel={() => setConfirmExit(false)} onConfirm={onHome} />
+        <ConfirmExit title="Exit game and return Home?" body="The current match ends and you go back to the Home screen."
+          confirmLabel="Exit to Home" cancelLabel="Stay"
+          onCancel={() => setConfirmExit(false)} onConfirm={() => { setConfirmExit(false); setPeek(false); onHome(); }} />
       )}
     </Screen>
-  );
+  ); }
 }
 
 /* ------------------------------------------------------------------ */
@@ -4310,7 +4356,7 @@ function AppInner() {
       narrator={narratorOn} autoNight={autoNight}
       onAgain={() => redeal(games.find((g) => g.id === curId))}
       onNew={() => { finishGame(); openNewSetup(); }}
-      onHome={() => setScreen('home')} />
+      onHome={() => { saveSession(null); finishGame(); setAutoNight(false); setScreen('home'); }} />
   );
 }
 

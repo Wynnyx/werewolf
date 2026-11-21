@@ -6529,26 +6529,35 @@ function aiNightWrites(b, role, ns, ctx, M) {
   return done(b.id, '');
 }
 
+// Bots never repeat a sentence until the whole list has been used (shared across the table).
+const AI_SAID = new Set();
+function aiLine(list) {
+  if (AI_SAID.size > 220) AI_SAID.clear();
+  const fresh = list.filter((x) => !AI_SAID.has(x));
+  const x = aiPick(fresh.length ? fresh : list);
+  AI_SAID.add(x);
+  return x;
+}
 const AI_L = {
-  seerClaim: (n) => aiPick([`I'm a Seer. I saw it. ${n} is a werewolf.`, `I'm the Seer. I looked at ${n} last night. Werewolf. Vote them out.`]),
-  seerFake: (n) => aiPick([`I'm a Seer. I saw it. ${n} is a werewolf.`, `I'm the Seer, and ${n} came up as a werewolf.`]),
-  unsure: () => aiPick(["I'm not really sure yet. But I'm definitely not a werewolf. Trust me.", "Too early to tell, let's hear from everyone first.", 'Nothing solid yet. Who has something to share?', "I'm going to watch who piles on whom before I decide."]),
-  wolfAccuse: (n) => aiPick([`${n} has been awfully quiet. What are they hiding?`, `Something about ${n} doesn't add up.`, `I'd start with ${n}. Just a hunch.`]),
-  wolfVsSeer: (n) => aiPick([`${n} claims to know things but shows no proof. Suspicious.`, `Anyone can say they are the Seer, ${n}.`]),
-  villAccuse: (n) => aiPick([`I think ${n} is acting strange today.`, `My gut says ${n}. Anyone else?`, `${n}, you haven't explained yourself. Care to?`]),
-  death: (n) => aiPick([`${n} is gone... the wolves are among us.`, `Rest easy, ${n}. We have to be careful now.`]),
-  quiet: () => aiPick(['A quiet night. Maybe someone was protected.', 'No one died. Interesting.']),
-  claim: (r) => aiPick([`I'm ${r}, I swear.`, `I'm ${r}, check someone else!`, `Why me? I'm literally ${r}.`]),
-  claimAgain: (r) => aiPick([`Like I said, I'm ${r}. Check someone else.`, `I'm ${r}. I'm not changing my story.`, `Still ${r}. You're wasting the vote on me.`]),
-  seerClash: (n) => aiPick([`Wait, I'm the Seer. ${n}, who did you check?`, `Two Seers? ${n}, tell us who you looked at.`]),
-  claimAck: (n, r) => aiPick([`Okay ${n}, ${r}. We'll see if that holds up.`, `Noted, ${n}. Let's see how you vote.`, `${r}, huh. Prove it, ${n}.`]),
-  doubt: (n) => aiPick([`That's a convenient claim, ${n}.`, `Anyone can say that, ${n}.`]),
-  skeptic: (n) => aiPick([`That's what everyone says, ${n}. We'll see how you vote.`, `Maybe, ${n}. Words are cheap.`, `Fair enough. Your vote will tell us more.`]),
-  askWhy: (n) => aiPick([`What makes you say that, ${n}?`, `${n}, got anything solid, or just a feeling?`, `Hmm. Why that one, ${n}?`]),
-  agree: (n) => aiPick([`${n} did seem a bit off. Let's hear their side.`, `I noticed ${n} too. Let's see how they answer.`]),
-  answer: () => aiPick(["Honestly, I can't say yet.", "Good question. I don't have a clear answer.", 'Hard to know this early.']),
-  chat: (n) => aiPick([`Fair point, ${n}.`, `Hmm, go on, ${n}. I'm listening.`, `Could be. Let's see who else weighs in.`, `I hear you, ${n}.`]),
-  wolfDefend: (n) => aiPick([`Leave ${n} alone. There is no proof against them.`, `Why are we piling on ${n}? That is exactly what a wolf would want.`])
+  seerClaim: (n) => aiLine([`I'm a Seer. I saw it. ${n} is a werewolf.`, `I'm the Seer. I looked at ${n} last night. Werewolf. Vote them out.`, `Okay, time to come clean. I'm the Seer, and ${n} is a werewolf.`, `I checked ${n} last night. I'm the Seer, and they're a wolf.`, `Don't ignore me: I'm a Seer, and ${n} came up as a werewolf.`, `I didn't want to reveal myself, but I'm the Seer. ${n} is a werewolf.`]),
+  seerFake: (n) => aiLine([`I'm a Seer. I saw it. ${n} is a werewolf.`, `I'm the Seer, and ${n} came up as a werewolf.`, `Last night I looked at ${n}. Werewolf. I'm the Seer, trust me.`, `I'm a Seer and I have a result: ${n} is a wolf.`, `Listen up, I'm the Seer. ${n} is not who they say they are.`, `I've been holding this back: I'm the Seer, and ${n} is a werewolf.`]),
+  unsure: () => aiLine(["I'm not really sure yet. But I'm definitely not a werewolf. Trust me.", "Too early to tell, let's hear from everyone first.", 'Nothing solid yet. Who has something to share?', "I'm going to watch who piles on whom before I decide.", "Honestly I have no read on anyone yet.", "I don't want to point a finger without a reason.", "Let's not rush. One wrong vote and we're in trouble.", "I'd rather listen first. Someone will slip up.", "Nobody's said anything suspicious to me yet.", "I'm keeping an eye on everyone. Let's see who gets defensive.", "Could be anyone. Let's talk it through.", "I'm just a regular person trying to figure this out too.", "Does anyone actually have information, or are we all guessing?", "We should compare notes about last night before we vote."]),
+  wolfAccuse: (n) => aiLine([`${n} has been awfully quiet. What are they hiding?`, `Something about ${n} doesn't add up.`, `I'd start with ${n}. Just a hunch.`, `${n} keeps dodging the question. Suspicious.`, `Why hasn't ${n} said anything useful yet?`, `Call it instinct, but I don't trust ${n}.`, `${n} is way too calm for this situation.`, `I'm not saying it's ${n}. But I'm not NOT saying it.`]),
+  wolfVsSeer: (n) => aiLine([`${n} claims to know things but shows no proof. Suspicious.`, `Anyone can say they are the Seer, ${n}.`, `A Seer claim with no proof? That's exactly what a wolf would say, ${n}.`, `I don't buy it, ${n}. Who did you check, and what did you see?`, `Careful, everyone. ${n} might be bluffing to steer the vote.`, `That's a bold claim, ${n}. Too convenient for me.`]),
+  villAccuse: (n) => aiLine([`I think ${n} is acting strange today.`, `My gut says ${n}. Anyone else?`, `${n}, you haven't explained yourself. Care to?`, `Does anyone else think ${n} is off?`, `I keep coming back to ${n}. Something's not right.`, `${n}, what were you doing last night? Be honest.`, `I'd keep an eye on ${n}. They're hard to read.`, `Not accusing yet, but ${n} is my first suspect.`]),
+  death: (n) => aiLine([`${n} is gone... the wolves are among us.`, `Rest easy, ${n}. We have to be careful now.`, `Poor ${n}. That hurts. We need to be smarter.`, `We lost ${n}. Whoever did this is sitting right here.`, `${n} didn't deserve that. Let's find who's responsible.`, `I can't believe ${n} is dead. Think carefully before we vote.`]),
+  quiet: () => aiLine(['A quiet night. Maybe someone was protected.', 'No one died. Interesting.', 'Nobody died. Either the wolves missed or someone saved the victim.', 'A peaceful morning, which is suspicious in itself.', 'No body this morning. Somebody out there has a protector.']),
+  claim: (r) => aiLine([`I'm ${r}, I swear.`, `I'm ${r}, check someone else!`, `Why me? I'm literally ${r}.`, `I'm ${r}. Why would I lie about it?`, `Seriously? I'm ${r}. Look elsewhere.`, `I'm ${r}, and I'm telling you the truth.`, `Come on, I'm ${r}. You're wasting time on me.`, `I'm ${r}. Believe what you want, but that's the truth.`]),
+  claimAgain: (r) => aiLine([`Like I said, I'm ${r}. Check someone else.`, `I'm ${r}. I'm not changing my story.`, `Still ${r}. You're wasting the vote on me.`, `I already told you, I'm ${r}.`, `Same answer: I'm ${r}. Asking again won't change it.`, `Still ${r}, still not a wolf.`]),
+  seerClash: (n) => aiLine([`Wait, I'm the Seer. ${n}, who did you check?`, `Two Seers? ${n}, tell us who you looked at.`, `Hold on. I'm the Seer, ${n}. Which of us is lying?`, `${n} says Seer? Interesting, because that's my role. Prove it.`]),
+  claimAck: (n, r) => aiLine([`Okay ${n}, ${r}. We'll see if that holds up.`, `Noted, ${n}. Let's see how you vote.`, `${r}, huh. Prove it, ${n}.`, `Alright ${n}. ${r} it is, for now.`, `I'll remember that, ${n}. Don't switch your story later.`, `Fine, ${n}, ${r}. Let's see what everyone else says.`]),
+  doubt: (n) => aiLine([`That's a convenient claim, ${n}.`, `Anyone can say that, ${n}.`, `Hmm, a little too neat, ${n}.`, `I'll believe it when I see proof, ${n}.`]),
+  skeptic: (n) => aiLine([`That's what everyone says, ${n}. We'll see how you vote.`, `Maybe, ${n}. Words are cheap.`, `Fair enough. Your vote will tell us more.`, `Easy to say, ${n}. Show me with your vote.`, `Everyone claims to be innocent, ${n}.`, `I'll wait and see what you actually do, ${n}.`]),
+  askWhy: (n) => aiLine([`What makes you say that, ${n}?`, `${n}, got anything solid, or just a feeling?`, `Hmm. Why that one, ${n}?`, `Walk me through it, ${n}. What did you see?`, `That's a serious accusation, ${n}. What's your reason?`, `${n}, explain yourself. Why them?`]),
+  agree: (n) => aiLine([`${n} did seem a bit off. Let's hear their side.`, `I noticed ${n} too. Let's see how they answer.`, `Now that you say it, ${n} has been shifty.`, `Okay, that's fair. ${n} should explain themselves.`, `I had the same feeling about ${n}.`]),
+  answer: () => aiLine(["Honestly, I can't say yet.", "Good question. I don't have a clear answer.", 'Hard to know this early.', "I wish I knew. I'm as lost as you are.", "Ask me again once more people have spoken.", "I'd be guessing, and a wrong guess costs us a villager."]),
+  chat: (n) => aiLine([`Fair point, ${n}.`, `Hmm, go on, ${n}. I'm listening.`, `Could be. Let's see who else weighs in.`, `I hear you, ${n}.`, `Interesting, ${n}. Anyone else agree?`, `That's something to think about.`, `Hm, I hadn't thought of it that way, ${n}.`, `Okay. Keep talking, ${n}, I'm following.`, `Let's see where that leads.`]),
+  wolfDefend: (n) => aiLine([`Leave ${n} alone. There is no proof against them.`, `Why are we piling on ${n}? That is exactly what a wolf would want.`, `${n} hasn't done anything wrong. Where's the evidence?`, `I don't see a reason to go after ${n}.`, `Slow down. Voting out ${n} on a hunch helps nobody but the wolves.`])
 };
 
 // "a Villager" / "the Doctor": roles with several copies in a deck read better with "a".

@@ -4543,6 +4543,7 @@ async function mpCreateRoomImpl(name, hostPlays, roomName, isPublic, cfg) {
   }
   if (!code) throw new Error('no-code');
   const room = { v: 1, host: pid, hp: hostPlays ? 1 : 0, rn: (roomName || '').trim() || 'Nightfall Village', hn: hostPlays ? name : 'Moderator', md: getGameMode(), ph: 'lobby', k: 0, lk: 0, w: '', ts: Date.now(), pub: isPublic ? 1 : 0, st: 'waiting' };
+  if (cfg && cfg.nightStyle) room.nightStyle = cfg.nightStyle; // eyes_closed | eyes_open
   if (cfg && cfg.mx) { room.mx = cfg.mx; room.dk = cfg.dk; } // the deck is built first: mx = exact player count, dk = the locked deck // pub: listed publicly; st: waiting | in_game | closed
   if (hostPlays) room.pl = { [pid]: { n: name, o: 1, a: 1, d: 0 } };
   await Mp.put(`rooms/${code}`, room);
@@ -4990,13 +4991,15 @@ function MpHostForm({ onBack, onCreated, cfg }) {
   const [roomName, setRoomName] = useState('');
   const [plays, setPlays] = useState(true);
   const [isPublic, setIsPublic] = useState(false);
+  const [nightStyle, setNightStyle] = useState('eyes_closed');
+  const [styleTouched, setStyleTouched] = useState(false); // until the host picks one, Public defaults to Eyes Open and Private to Eyes Closed
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const go = async () => {
     const n = name.trim();
     if (plays && !n) { setErr('Enter your name first.'); return; }
     setBusy(true); setErr('');
-    try { if (plays) saveName(n); onCreated(await mpCreateRoom(plays ? n : 'Moderator', plays, roomName, isPublic, { mx: cfg.n, dk: cfg.deck }), n); }
+    try { if (plays) saveName(n); onCreated(await mpCreateRoom(plays ? n : 'Moderator', plays, roomName, isPublic, { mx: cfg.n, dk: cfg.deck, nightStyle }), n); }
     catch (e) { setErr(e.message === 'no-code' ? 'Could not find a free room code. Try again.' : mpErrorText(e)); setBusy(false); }
   };
   const opt = (val, title, sub) => (
@@ -5022,8 +5025,15 @@ function MpHostForm({ onBack, onCreated, cfg }) {
       </div>
       <div role="radiogroup" aria-label="Room visibility" className="flex gap-2.5">
         {[[false, 'Private', 'Friends join with the 4-letter code.'], [true, 'Public', 'Also listed so anyone can join.']].map(([v, t, sub]) => (
-          <button key={t} type="button" role="radio" aria-checked={isPublic === v} onClick={() => setIsPublic(v)} className="flex-1 rounded-xl p-3 text-left transition"
+          <button key={t} type="button" role="radio" aria-checked={isPublic === v} onClick={() => { setIsPublic(v); if (!styleTouched) setNightStyle(v ? 'eyes_open' : 'eyes_closed'); }} className="flex-1 rounded-xl p-3 text-left transition"
             style={{ background: isPublic === v ? 'rgba(109,40,217,0.3)' : 'var(--card)', border: `1px solid ${isPublic === v ? '#A78BFA' : 'var(--line)'}` }}>
+            <span className="block text-sm font-bold text-slate-50">{t}</span><span className="mt-0.5 block text-xs leading-snug text-slate-400">{sub}</span>
+          </button>))}
+      </div>
+      <div role="radiogroup" aria-label="Night style" className="flex gap-2.5">
+        {[['eyes_closed', 'Eyes Closed', 'In-person circle \u2014 close eyes & wake by role'], ['eyes_open', 'Eyes Open', 'Silent / online \u2014 act on your phone, keep screen hidden']].map(([v, t, sub]) => (
+          <button key={v} type="button" role="radio" aria-checked={nightStyle === v} onClick={() => { setNightStyle(v); setStyleTouched(true); }} className="flex-1 rounded-xl p-3 text-left transition"
+            style={{ background: nightStyle === v ? 'rgba(109,40,217,0.3)' : 'var(--card)', border: `1px solid ${nightStyle === v ? '#A78BFA' : 'var(--line)'}` }}>
             <span className="block text-sm font-bold text-slate-50">{t}</span><span className="mt-0.5 block text-xs leading-snug text-slate-400">{sub}</span>
           </button>))}
       </div>
@@ -5501,9 +5511,16 @@ function TeamChat({ me, group, room, write, tag }) {
 
 function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
   const ns = room.ns || '';
-  const role = ns.indexOf('r:') === 0 ? ns.slice(2) : '';
+  const isWave = ns.indexOf('w:') === 0; // Eyes Open night: wave 1 everyone at once, wave 2 the Witch, wave 3 the Shadow Figure
+  const waveNo = isWave ? ns.slice(2) : '';
+  let role = ns.indexOf('r:') === 0 ? ns.slice(2) : '';
+  if (isWave) {
+    if (waveNo === '1') role = me.jt === 1 ? 'infected' : me.cj === 1 ? 'cured' : (mpActive(me.r, room.k) && me.r !== 'witch' && me.r !== 'shadow' ? me.r : '');
+    else if (waveNo === '2') role = me.r === 'witch' ? 'witch' : '';
+    else role = me.r === 'shadow' ? 'shadow' : '';
+  }
   const viewing = ns === 'v:seer'; // the Seer's final vision, after the Shadow Figure has acted
-  const tag = `${ns}:${room.nk}`;
+  const tag = `${ns}${isWave ? ':' + role : ''}:${room.nk}`;
   const [n, setN] = useState(5);
   const [opened, setOpened] = useState('');
   const [sent, setSent] = useState('');
@@ -5519,12 +5536,12 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
   const group = role && role !== 'cupid' ? players.filter((x) => x.a === 1 && x.r === role && x.sd !== room.k) : []; // everyone awake on this turn shares one action
   const chatGroup = group.length > 1 && me.a === 1 && me.r === role && me.nd !== 1;
   const [spL, setSpL] = useState(null);
-  const wrap = (body, pitch) => <NightStage fixed={!!immersive} pitch={pitch} blood={!!room.bm} onExit={immersive ? onLeave : undefined}>{!pitch && partner && <LoverBadge name={partner.n} className="mb-3" />}{body}{!pitch && chatGroup && <TeamChat me={me} group={group} room={room} write={write} tag={tag} />}</NightStage>;
+  const wrap = (body, pitch) => <NightStage fixed={!!immersive} pitch={pitch} blood={!!room.bm} onExit={immersive ? onLeave : undefined}>{isWave && <p role="note" className="mb-3 rounded-xl px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-amber-100" style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.5)' }}>Keep your screen hidden from others!</p>}{!pitch && partner && <LoverBadge name={partner.n} className="mb-3" />}{body}{!pitch && chatGroup && <TeamChat me={me} group={group} room={room} write={write} tag={tag} />}</NightStage>;
   const mine = me.a === 1 && ((!!role && me.r === role && me.nd !== 1) || (viewing && me.r === 'seer' && me.rd !== 1) || (role === 'infected' && me.jt === 1) || (role === 'cured' && me.cj === 1)) && sent !== tag;
 
   if (ns === 'i') return wrap(<><LockView key="i" title={`Night ${nightWord(room.k)} Begins...`} sub="The village falls silent." />{room.bm ? <BloodMoonBanner className="mb-6" /> : null}</>);
   if (ns === 'c') return wrap(<><LockView key="c" eye title="Close Your Eyes" sub="Keep them closed until the narrator says otherwise." count={n} />{room.bm ? <BloodMoonBanner className="mb-6" /> : null}</>);
-  if (mine && opened !== tag) {
+  if (mine && !isWave && opened !== tag) {
     return wrap(
       <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
         <LockView key={'u' + tag} title={roleLabel(viewing ? 'seer' : role)} sub="Only your role may look now. Everyone else has their eyes closed." />
@@ -5559,6 +5576,9 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
       return wrap(<NightActPP key={tag} role="seerResult" players={adapted} actor={actor} choices={mpChoices(players)} onDone={submit} seerOverride={sv} />);
     }
     return wrap(<NightActPP key={tag} role={role} players={adapted} actor={actor} choices={mpChoices(players)} deferSeer={shadowAlive} ext={ext} hideSelf bloodMoon={!!room.bm} onDone={submit} />);
+  }
+  if (isWave || (ns === 'v:seer' && room.nightStyle === 'eyes_open')) {
+    return wrap(<LockView key={'z' + tag} title="Night has fallen." sub={me.a !== 1 ? 'You have been eliminated. Stay silent.' : waveNo === '2' || waveNo === '3' ? 'Waiting for other players...' : 'Waiting for other players to finish their actions...'} />, true);
   }
   const text = me.a !== 1 ? 'You have been eliminated. Stay silent and keep your eyes closed.' : 'The night is not over.';
   return wrap(<LockView key={'z' + tag} title="Keep your eyes closed..." sub={text} />, true);
@@ -5596,6 +5616,37 @@ function useNightDirector({ room, players, write }) {
       let at = roles.findIndex((r) => { const ix = NIGHT_ORDER.indexOf(r) < 0 ? 99 : NIGHT_ORDER.indexOf(r); return ix >= key; });
       if (at < 0) at = roles.length;
       roles.splice(at, 0, 'cured');
+    }
+    if (room0.nightStyle === 'eyes_open') { // Eyes Open: no narration, three waves of silent phone actions, then straight to dawn
+      let nk0 = 1;
+      const stepO = async (ns, label) => { nk0 += 1; setDir({ on: true, label }); await write({ ns, nk: nk0, cm: null, sp: null }); };
+      const waitFor = async (isDone, ms) => { skip.current = false; const t0 = Date.now(); await wait(1200); while (live() && !isDone() && !skip.current && Date.now() - t0 < ms) await wait(500); };
+      try {
+        const base = mpNightPatch(room0);
+        if (opts && opts.again) { base.k = room0.k || 1; base.bm = base.k >= 2 && Math.random() < 0.2 ? 1 : 0; }
+        setDir({ on: true, label: 'Night begins' });
+        await write(base); await wait(2500); if (!live()) return;
+        const w1 = roles.filter((r) => r !== 'witch' && r !== 'shadow' && r !== 'infected' && r !== 'cured');
+        await stepO('w:1', 'Wave 1: everyone acts');
+        await waitFor(() => !latest.current.players.some((p) => p.a === 1 && ((w1.includes(p.r) && p.nd !== 1) || p.jt === 1 || p.cj === 1)), 150000); if (!live()) return;
+        if (roles.includes('witch')) {
+          await stepO('w:2', 'Wave 2: Witch');
+          await waitFor(() => !latest.current.players.some((p) => p.a === 1 && p.r === 'witch' && p.nd !== 1), 120000); if (!live()) return;
+        }
+        if (roles.includes('shadow')) {
+          await stepO('w:3', 'Wave 3: Shadow Figure');
+          await waitFor(() => !latest.current.players.some((p) => p.a === 1 && p.r === 'shadow' && p.nd !== 1), 120000); if (!live()) return;
+        }
+        if (roles.includes('seer') && (roles.includes('shadow') || roles.includes('medusa') || latest.current.players.filter((p) => p.a === 1 && p.r === 'seer').length > 1)) {
+          await stepO('v:seer', 'Seer viewing');
+          await waitFor(() => latest.current.players.filter((p) => p.a === 1 && p.r === 'seer').every((p) => p.rd === 1), 90000); if (!live()) return;
+        }
+        setDir({ on: true, label: 'Dawn' });
+        const resultO = mpResolveNight(latest.current.room);
+        await write(resultO.patch);
+        setDir({ on: false, label: '' });
+      } catch (e) { setDir({ on: false, label: '' }); }
+      return;
     }
     let nk = 1;
     const step = async (ns, label) => { nk += 1; setDir({ on: true, label }); await write({ ns, nk, cm: null, sp: null }); }; // each turn starts with a clean team chat
@@ -5957,6 +6008,15 @@ function MpMod({ room, players, me, write, director }) {
 }
 
 /* ---------- host who is also playing: spoiler-free controls only ---------- */
+function MpAutoNote({ room, players }) {
+  const { voters, voted } = mpTally(players);
+  const ph = room.ph;
+  const text = ph === 'reveal' ? `The night starts by itself when everyone has seen their card (${players.filter((p) => p.d === 1).length} of ${players.length}).`
+    : ph === 'night' ? 'The game is running the night for you.'
+    : room.vd === 1 ? 'The vote is closed. The next night starts shortly.' : `${voted} of ${voters.length} players have voted. The vote closes when everyone has voted.`;
+  return <Panel className="text-center text-xs text-slate-400"><span className="font-semibold uppercase tracking-widest text-slate-500">Auto-moderator</span><div className="mt-1" aria-live="polite">{text}</div></Panel>;
+}
+
 function MpHostPanel({ room, players, write, director }) {
   const ph = room.ph;
   const winner = mpWinner(players);
@@ -6031,6 +6091,21 @@ function MpRoom({ session, onExit, onPhase }) {
   writeRef.current = write;
   // A host who is also playing is a regular player: no Grimoire, no roles, only spoiler-free room controls.
   const hostPlays = isHost && !!room && !!room.hp && !!me;
+  // Playing + Hosting runs itself: no manual Next buttons. Moderator Only keeps the host controls.
+  const allSeen = players.length > 0 && players.every((p) => p.d === 1);
+  const autoWinner = ph === 'day' ? mpWinner(players) : '';
+  const hunterPending = players.some((p) => p.r === 'hunter' && p.a !== 1 && p.hs !== 1);
+  const autoFired = useRef('');
+  useEffect(() => {
+    if (!hostPlays || director.dir.on) return;
+    const key = `${ph}:${room.k}:${room.vd}:${autoWinner}`;
+    let t = 0;
+    if (ph === 'reveal' && allSeen) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, 1800);
+    else if (ph === 'night') t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start({ again: true }); } }, 6000); // only if the director is not running (for example after a refresh)
+    else if (ph === 'day' && autoWinner) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; write({ ph: 'over', w: autoWinner }); } }, hunterPending ? 20000 : 7000);
+    else if (ph === 'day' && room.vd === 1) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, hunterPending ? 30000 : 7000);
+    return () => clearTimeout(t);
+  }, [hostPlays, ph, room && room.k, room && room.vd, allSeen, autoWinner, hunterPending, director.dir.on]);
   const voteClosed = useRef('');
   useEffect(() => {
     if (!hostPlays || ph !== 'day' || room.vd === 1) return;
@@ -6110,7 +6185,7 @@ function MpRoom({ session, onExit, onPhase }) {
     else if (ph === 'night') body = <MpNight key={`n${room.k}`} me={me} players={players} room={room} write={write} immersive={!isHost} onLeave={() => setConfirmLeave(true)} />;
     else if (ph === 'day') body = <MpDay key={`d${room.k}`} me={me} players={players} room={room} write={write} />;
     else body = <MpOver room={room} players={players} meId={pid} />;
-    if (hostPlays && ph !== 'lobby') body = <div className="flex flex-1 flex-col gap-4">{body}<MpHostPanel room={room} players={players} write={write} director={director} /></div>;
+    if (hostPlays && ph !== 'lobby') body = <div className="flex flex-1 flex-col gap-4">{body}{ph === 'over' ? <MpHostPanel room={room} players={players} write={write} director={director} /> : <MpAutoNote room={room} players={players} />}</div>;
   } else {
     body = <MpMod room={room} players={players} me={me} write={write} director={director} />;
   }

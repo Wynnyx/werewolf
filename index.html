@@ -12,7 +12,7 @@
 <link rel="preload" as="image" href="images/loading-bg.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Figtree:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script>
   tailwind.config = {
@@ -84,6 +84,8 @@
   }
   .font-display { font-family: 'Cinzel', Georgia, serif; }
   button { font-family: inherit; }
+  html[lang=th] body, html[lang=th] .font-display, html[lang=th] button { font-family: 'Noto Sans Thai', 'Figtree', system-ui, sans-serif; }
+  html[lang=th] * { letter-spacing: normal !important; text-transform: none !important; }
   button:focus-visible, input:focus-visible {
     outline: 2px solid #CBD5E1;
     outline-offset: 2px;
@@ -1211,11 +1213,270 @@ const Sfx = (() => {
 ['pagehide', 'freeze'].forEach((n) => window.addEventListener(n, () => { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }));
 document.addEventListener('visibilitychange', () => { if (document.hidden) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } } });
 
+/* ------------------------------------------------------------------ */
+/* Language: English / Thai. A translator layer rewrites on-screen text  */
+/* and spoken lines to Thai; player names and room codes pass through.   */
+/* ------------------------------------------------------------------ */
+const LANG_KEY = 'nightfall.lang.v1';
+let langNow = (() => { try { return localStorage.getItem(LANG_KEY) === 'th' ? 'th' : 'en'; } catch (e) { return 'en'; } })();
+const langListeners = new Set();
+const getLang = () => langNow;
+function setLang(l) {
+  langNow = l === 'th' ? 'th' : 'en';
+  try { localStorage.setItem(LANG_KEY, langNow); } catch (e) { /* storage unavailable */ }
+  document.documentElement.lang = langNow;
+  langListeners.forEach((fn) => fn());
+}
+const useLang = () => React.useSyncExternalStore((fn) => { langListeners.add(fn); return () => langListeners.delete(fn); }, getLang);
+document.documentElement.lang = langNow;
+
+const TH_ROLE = { Werewolf: 'มนุษย์หมาป่า', Seer: 'ผู้หยั่งรู้', Witch: 'แม่มด', Bodyguard: 'บอดี้การ์ด', Hunter: 'นายพราน', Spellcaster: 'จอมเวทใบ้', Mayor: 'นายกเทศมนตรี', Villager: 'ชาวบ้าน' };
+const TH_PAIRS = [
+  // role names
+  ...Object.entries(TH_ROLE),
+  ['Werewolves', 'มนุษย์หมาป่า'], ['Villagers', 'ชาวบ้าน'],
+  ...Object.entries(TH_ROLE).flatMap(([en, th]) => [[`{#} ${en}`, `{1} ${th}`], [`{#} ${en}s`, `{1} ${th}`], [`Add ${en}`, `เพิ่ม${th}`], [`Remove ${en}`, `ลบ${th}`], [`${en} ability`, `ความสามารถของ${th}`], [`${en} card`, `ไพ่${th}`]]),
+  ['Village', 'ฝ่ายชาวบ้าน'], ['Wolf', 'หมาป่า'], ['Wolves', 'หมาป่า'], ['a Werewolf', 'มนุษย์หมาป่า'],
+  ['{#} Wolf', '{1} มนุษย์หมาป่า'], ['{#} Wolves', '{1} มนุษย์หมาป่า'],
+  ['Zero', 'ศูนย์'], ['One', 'หนึ่ง'], ['Two', 'สอง'], ['Three', 'สาม'], ['Four', 'สี่'], ['Five', 'ห้า'], ['Six', 'หก'], ['Seven', 'เจ็ด'], ['Eight', 'แปด'], ['Nine', 'เก้า'], ['Ten', 'สิบ'],
+  // home / setup
+  ['At Nightfall', 'เมื่อรัตติกาลมาเยือน'], ['WEREWOLF', 'มนุษย์หมาป่า'], ['MULTI-DEVICE', 'หลายเครื่อง'], ['Multi-Device', 'หลายเครื่อง'], ['Pass', 'ส่งต่อเครื่อง'],
+  ['Pass & Play', 'เล่นส่งต่อเครื่อง'], ['Home', 'หน้าหลัก'], ['Create a new game', 'สร้างเกมใหม่'], ['Choose players and cards from scratch', 'เลือกผู้เล่นและไพ่เองตั้งแต่ต้น'],
+  ['Recently Played', 'เล่นล่าสุด'], ['Popular Setups', 'ชุดเกมยอดนิยม'], ['Popular', 'ยอดนิยม'], ['Popular {#} player setup', 'ชุดเกมยอดนิยม {1} ผู้เล่น'],
+  ['Cards are picked for you. Tap one, then change any card you like.', 'เลือกไพ่ให้แล้ว แตะชุดใดชุดหนึ่ง แล้วปรับไพ่ตามที่ชอบได้เลย'],
+  ['Your games will show up here.', 'เกมของคุณจะแสดงที่นี่'], ['No saved games on this device.', 'ไม่มีเกมที่บันทึกไว้ในอุปกรณ์นี้'], ['My Games', 'เกมของฉัน'], ['Saved Games', 'เกมที่บันทึกไว้'], ['Active', 'กำลังเล่น'], ['Saved Setup', 'ชุดที่บันทึกไว้'],
+  ['Game Setup', 'ตั้งค่าเกม'], ['Game Name', 'ชื่อเกม'], ['e.g., Blood Moon Village', 'เช่น หมู่บ้านจันทร์เลือด'], ['Nightfall Village', 'หมู่บ้านราตรี'], ['Game #{#}', 'เกม #{1}'], ['Players', 'ผู้เล่น'], ['Fewer players', 'ลดผู้เล่น'], ['More players', 'เพิ่มผู้เล่น'],
+  ['Auto-Moderator', 'ผู้ดำเนินเกมอัตโนมัติ'],
+  ['Everyone gets a card! The phone speaks out loud and runs the Night phase automatically—no human moderator needed.', 'ทุกคนได้ไพ่! โทรศัพท์จะพูดออกเสียงและดำเนินช่วงกลางคืนให้อัตโนมัติ ไม่ต้องมีผู้ดำเนินเกมที่เป็นคน'],
+  ['Human Moderator mode: 1 person sits out without a card and runs the game manually using the Grimoire.', 'โหมดผู้ดำเนินเกมที่เป็นคน: 1 คนจะไม่ได้ไพ่ และดำเนินเกมเองโดยใช้คัมภีร์'],
+  ['Next: Choose Cards', 'ถัดไป: เลือกไพ่'], ['Choose Cards', 'เลือกไพ่'], ['Auto-fill', 'จัดให้อัตโนมัติ'], ['Clear', 'ล้าง'], ['Balanced deck', 'สำรับสมดุล'], ['Balance updates as you pick', 'ความสมดุลอัปเดตตามที่คุณเลือก'],
+  ['Favors the Village', 'เอื้อฝ่ายชาวบ้าน'], ['Favors the Werewolves', 'เอื้อฝ่ายมนุษย์หมาป่า'], ['At least 1 Werewolf required', 'ต้องมีมนุษย์หมาป่าอย่างน้อย 1 ตัว'],
+  ['Fill {#} more slots', 'ใส่ไพ่อีก {1} ช่อง'], ['Fill {#} more slot', 'ใส่ไพ่อีก {1} ช่อง'], ['Fill {#} more slots and add a Werewolf to continue.', 'ใส่ไพ่อีก {1} ช่องและเพิ่มมนุษย์หมาป่าเพื่อไปต่อ'], ['Fill {#} more slot and add a Werewolf to continue.', 'ใส่ไพ่อีก {1} ช่องและเพิ่มมนุษย์หมาป่าเพื่อไปต่อ'],
+  ['slots left', 'ช่องที่เหลือ'], ['{#} slots left', 'เหลืออีก {1} ช่อง'], ['{#} slot left', 'เหลืออีก {1} ช่อง'], ['{#} / {#} selected', 'เลือกแล้ว {1} / {2}'],
+  ['Start & Deal Cards', 'เริ่มและแจกไพ่'], ['Deal Cards & Start', 'แจกไพ่และเริ่มเกม'], ['Search roles', 'ค้นหาบทบาท'], ['Search roles...', 'ค้นหาบทบาท...'], ['Back to game setup', 'กลับไปตั้งค่าเกม'], ['Back to home', 'กลับหน้าหลัก'], ['Back to home screen', 'กลับหน้าหลัก'], ['Back to start', 'กลับไปหน้าเริ่มต้น'], ['Back', 'กลับ'],
+  ['All {#} slots are filled. Remove a card with − to make room for {}.', 'เต็มทั้ง {1} ช่องแล้ว ลบไพ่ด้วยปุ่ม − เพื่อเว้นที่ให้{2}'],
+  ['Only {#} {} card is allowed per game.', 'อนุญาตไพ่{2}ได้เพียง {1} ใบต่อเกม'], ['Only {#} {} cards are allowed per game.', 'อนุญาตไพ่{2}ได้เพียง {1} ใบต่อเกม'],
+  ['Add {}', 'เพิ่ม{1}'], ['Remove {}', 'ลบ {1}'], ['Delete {}', 'ลบ {1}'], ['Open {}', 'เปิด {1}'], ['Role Guide', 'คู่มือบทบาท'], ['Role guide', 'คู่มือบทบาท'], ['Close role guide', 'ปิดคู่มือบทบาท'], ['View Ability', 'ดูความสามารถ'],
+  // settings
+  ['Settings', 'การตั้งค่า'], ['Open Settings', 'เปิดการตั้งค่า'], ['Close settings', 'ปิดการตั้งค่า'], ['Sound', 'เสียง'], ['Game Music', 'เพลงในเกม'], ['Tap Blood Effects', 'เอฟเฟกต์เลือดเมื่อแตะ'], ['Reveal Fallen Cards', 'เปิดไพ่ผู้ที่ตกรอบ'],
+  ['Forest ambience and sound effects (not the game music). Starts on your first tap.', 'เสียงบรรยากาศป่าและเสียงเอฟเฟกต์ (ไม่รวมเพลงในเกม) เริ่มเมื่อคุณแตะครั้งแรก'],
+  ['Tense music while you set up a game and reveal cards. Works on its own, even with Sound off.', 'เพลงชวนระทึกขณะตั้งค่าเกมและเปิดไพ่ ใช้งานได้แยกต่างหาก แม้ปิดเสียงอยู่'],
+  ['Red dots burst from your finger on the home screen.', 'จุดสีแดงพุ่งออกจากปลายนิ้วของคุณบนหน้าหลัก'],
+  ['Night Phase Background', 'พื้นหลังช่วงกลางคืน'], ['Day Phase Background', 'พื้นหลังช่วงกลางวัน'], ['Mayor Card Art', 'ภาพไพ่นายกเทศมนตรี'],
+  ['Artwork behind the narrator’s night screens. Portrait photos fit best.', 'ภาพพื้นหลังหน้าจอกลางคืนของผู้บรรยาย ภาพแนวตั้งเหมาะที่สุด'], ['Artwork behind the dawn announcement, discussion and voting screens.', 'ภาพพื้นหลังหน้าประกาศรุ่งสาง การอภิปราย และการโหวต'],
+  ['Your own picture for the Mayor card. A portrait 3:4 image fits best.', 'รูปภาพของคุณเองสำหรับไพ่นายกเทศมนตรี ภาพแนวตั้ง 3:4 เหมาะที่สุด'],
+  ['Choose photo', 'เลือกรูปภาพ'], ['Reset to Default', 'คืนค่าเริ่มต้น'], ['Night background updated.', 'อัปเดตพื้นหลังกลางคืนแล้ว'], ['Day background updated.', 'อัปเดตพื้นหลังกลางวันแล้ว'], ['Mayor card art updated.', 'อัปเดตไพ่นายกเทศมนตรีแล้ว'],
+  ['Back to the default night background.', 'กลับไปใช้พื้นหลังกลางคืนเริ่มต้น'], ['Back to the default day background.', 'กลับไปใช้พื้นหลังกลางวันเริ่มต้น'], ['Back to the default Mayor card.', 'กลับไปใช้ไพ่นายกเทศมนตรีเริ่มต้น'],
+  ['Could not save. The photo is too large for this browser to keep.', 'บันทึกไม่ได้ รูปภาพใหญ่เกินกว่าที่เบราว์เซอร์นี้จะเก็บได้'], ['That file could not be read as an image.', 'อ่านไฟล์นั้นเป็นรูปภาพไม่ได้'], ['Cleared. Using the built-in default, if any.', 'ล้างแล้ว ใช้ค่าเริ่มต้นในตัว (ถ้ามี)'],
+  ['Multiplayer Server URL', 'URL เซิร์ฟเวอร์ผู้เล่นหลายคน'], ['Your free Firebase Realtime Database URL for Multi-Device rooms.', 'URL ฐานข้อมูล Firebase Realtime ฟรีของคุณสำหรับห้องแบบหลายเครื่อง'], ['Save', 'บันทึก'], ['Test', 'ทดสอบ'], ['Testing...', 'กำลังทดสอบ...'], ['Saved.', 'บันทึกแล้ว'],
+  ['Clear Saved Games', 'ล้างเกมที่บันทึกไว้'], ['Saved games cleared.', 'ล้างเกมที่บันทึกไว้แล้ว'], ['Delete this game?', 'ลบเกมนี้หรือไม่?'], ['Delete', 'ลบ'], ['Keep', 'เก็บไว้'], ['Reset', 'รีเซ็ต'], ['all {#} games', 'เกมทั้งหมด {1} เกม'], ['this game', 'เกมนี้'],
+  ['{#} saved game on this device.', 'มีเกมที่บันทึกไว้ {1} เกมในอุปกรณ์นี้'], ['{#} saved games on this device.', 'มีเกมที่บันทึกไว้ {1} เกมในอุปกรณ์นี้'],
+  // exits / dialogs
+  ['Exit', 'ออก'], ['Exit game', 'ออกจากเกม'], ['Exit game?', 'ออกจากเกมหรือไม่?'], ['Exit game and return Home?', 'ออกจากเกมและกลับหน้าหลักหรือไม่?'], ['Exit to Home', 'ออกไปหน้าหลัก'], ['Keep playing', 'เล่นต่อ'], ['Stay', 'อยู่ต่อ'], ['Cancel', 'ยกเลิก'], ['Confirm', 'ยืนยัน'], ['Leave night', 'ออกจากคืนนี้'], ['Leave room', 'ออกจากห้อง'], ['Got it', 'เข้าใจแล้ว'], ['Done', 'เสร็จสิ้น'],
+  ['Your game stays saved. You can resume it from My Games.', 'เกมของคุณยังคงถูกบันทึกไว้ คุณเล่นต่อได้จากเกมของฉัน'], ['The current match ends and you go back to the Home screen.', 'เกมนี้จะจบลงและคุณจะกลับสู่หน้าหลัก'],
+  ['The night\'s choices so far are discarded. You can start the night again from the Grimoire.', 'ตัวเลือกของคืนนี้ที่ทำไปแล้วจะถูกทิ้ง คุณเริ่มคืนใหม่ได้จากคัมภีร์'],
+  ['The cards dealt so far will be discarded. You can deal again any time from My Games.', 'ไพ่ที่แจกไปแล้วจะถูกทิ้ง คุณแจกใหม่ได้ทุกเมื่อจากเกมของฉัน'],
+  // reveal / shield
+  ['Enter your name, then tap the card', 'ใส่ชื่อของคุณ แล้วแตะที่ไพ่'], ['Enter your name...', 'ใส่ชื่อของคุณ...'], ['Your name', 'ชื่อของคุณ'], ['Tap the card to reveal', 'แตะไพ่เพื่อเปิด'], ['Tap the card to reveal your role', 'แตะไพ่เพื่อเปิดดูบทบาทของคุณ'],
+  ['Make sure nobody can see your screen before you reveal your card.', 'ตรวจสอบให้แน่ใจว่าไม่มีใครมองเห็นหน้าจอของคุณก่อนเปิดไพ่'], ['Shield your screen and make sure no other players are looking before you reveal your card.', 'ใช้มือบังหน้าจอและตรวจสอบว่าไม่มีผู้เล่นคนอื่นแอบมองก่อนเปิดไพ่'],
+  ['Hide & Pass to Next Player', 'ซ่อนและส่งต่อให้ผู้เล่นคนถัดไป'], ['Hide & Finish', 'ซ่อนและเสร็จสิ้น'], ['Enter your name first.', 'ใส่ชื่อของคุณก่อน'], ['An earlier player already used that name. Add an initial.', 'มีผู้เล่นก่อนหน้านี้ใช้ชื่อนี้แล้ว ลองเพิ่มตัวอักษรย่อ'],
+  ['All cards dealt!', 'แจกไพ่ครบแล้ว!'], ['Place the phone in the center of the table. Everyone close your eyes before starting.', 'วางโทรศัพท์ไว้กลางโต๊ะ ทุกคนหลับตาก่อนเริ่ม'], ['Pass the phone to the Moderator', 'ส่งโทรศัพท์ให้ผู้ดำเนินเกม'], ['Pass the phone to the', 'ส่งโทรศัพท์ให้'], ['Moderator', 'ผู้ดำเนินเกม'],
+  ['The next screen shows every role. Hold the button to open it.', 'หน้าจอถัดไปจะแสดงบทบาททุกคน กดปุ่มค้างไว้เพื่อเปิด'], ['Press & Hold to Unlock', 'กดค้างเพื่อปลดล็อก'], ['Keep holding…', 'กดค้างไว้...'], ['Press and hold for one and a half seconds to unlock the Moderator view', 'กดค้างหนึ่งวินาทีครึ่งเพื่อปลดล็อกมุมมองผู้ดำเนินเกม'],
+  ['Preparing the deck...', 'กำลังเตรียมสำรับไพ่...'], ['Night falls', 'ราตรีมาเยือน'],
+  // grimoire
+  ['Grimoire', 'คัมภีร์'], ['Open Grimoire', 'เปิดคัมภีร์'], ['Resume Grimoire', 'กลับสู่คัมภีร์'], ['Back to Game', 'กลับสู่เกม'], ['Spoiler Warning', 'คำเตือนสปอยล์'],
+  ['Opening the Grimoire reveals every player’s secret role.', 'การเปิดคัมภีร์จะเผยบทบาทลับของผู้เล่นทุกคน'], ['The Narrator is running the game, so you may not need it.', 'ผู้บรรยายกำลังดำเนินเกมอยู่ คุณอาจไม่จำเป็นต้องใช้'], ['Press & Hold to View', 'กดค้างเพื่อดู'], ['Press and hold for one and a half seconds to open the Grimoire', 'กดค้างหนึ่งวินาทีครึ่งเพื่อเปิดคัมภีร์'],
+  ['Moderator view. Keep the screen turned away from players.', 'มุมมองผู้ดำเนินเกม หันหน้าจอออกจากผู้เล่น'], ['Moderator view. Keep this screen turned away from the players.', 'มุมมองผู้ดำเนินเกม หันหน้าจอออกจากผู้เล่น'],
+  ['Werewolves alive', 'มนุษย์หมาป่าที่ยังรอด'], ['Village alive', 'ฝ่ายชาวบ้านที่ยังรอด'], ['Player Roster', 'รายชื่อผู้เล่น'], ['Alive', 'ยังมีชีวิต'], ['Eliminated', 'ถูกกำจัด'], ['Protected', 'ได้รับการปกป้อง'], ['Silenced', 'ถูกสาปให้เงียบ'], ['SILENCED', 'ถูกสาปให้เงียบ'],
+  ['{} is alive. Mark as eliminated', '{1} ยังมีชีวิตอยู่ แตะเพื่อทำเครื่องหมายว่าถูกกำจัด'], ['{} is eliminated. Mark as alive', '{1} ถูกกำจัดแล้ว แตะเพื่อทำเครื่องหมายว่ายังมีชีวิต'],
+  ['The Hunter chooses one player to take down now.', 'นายพรานเลือกผู้เล่นหนึ่งคนเพื่อพาไปด้วยตอนนี้'], ['The Hunter chooses one player to take down.', 'นายพรานเลือกผู้เล่นหนึ่งคนเพื่อพาไปด้วย'], ['The Hunter has no night action. Watch for their elimination during the day.', 'นายพรานไม่มีความสามารถกลางคืน ให้จับตาดูตอนเขาถูกกำจัดในตอนกลางวัน'],
+  ['Narrator', 'ผู้บรรยาย'], ['The narrator speaks the whole night aloud and passes the phone to each role in turn. You can hand it over and step away.', 'ผู้บรรยายจะอ่านออกเสียงตลอดคืนและส่งโทรศัพท์ให้แต่ละบทบาทตามลำดับ คุณส่งต่อแล้วถอยออกมาได้เลย'],
+  ['Spoken narration is not available on this device. The screens still guide each role, with timed pauses.', 'อุปกรณ์นี้ไม่รองรับเสียงบรรยาย หน้าจอจะยังนำทางแต่ละบทบาทโดยมีการหน่วงเวลาให้'],
+  ['Night Wake-Up Order', 'ลำดับการตื่นในยามค่ำคืน'], ['Reset night', 'รีเซ็ตคืนนี้'], ['No night roles in this deck.', 'ไม่มีบทบาทกลางคืนในสำรับนี้'], ['Night {#}', 'คืนที่ {1}'], ['Start Night {#}', 'เริ่มคืนที่ {1}'], ['Start Night {#} Anyway', 'เริ่มคืนที่ {1} ต่อไป'], ['Begin Night {#}', 'เริ่มคืนที่ {1}'], ['Begin Night {#} Anyway', 'เริ่มคืนที่ {1} ต่อไป'],
+  ['Play Again', 'เล่นอีกครั้ง'], ['Play Again (Same Setup)', 'เล่นอีกครั้ง (ชุดเดิม)'], ['Tap again to re-deal', 'แตะอีกครั้งเพื่อแจกไพ่ใหม่'], ['Tap again to start over', 'แตะอีกครั้งเพื่อเริ่มใหม่'], ['New Game', 'เกมใหม่'], ['Re-deal Same Setup', 'แจกไพ่ใหม่ด้วยชุดเดิม'], ['Reveal All Roles', 'เปิดเผยบทบาททั้งหมด'], ['Hide All Roles', 'ซ่อนบทบาททั้งหมด'], ['Every role', 'บทบาททั้งหมด'],
+  ['Werewolves wake and agree on one victim.', 'มนุษย์หมาป่าตื่นและตกลงเลือกเหยื่อหนึ่งคน'], ['Seer wakes and points at one player. Show a thumb up (Village) or down (Werewolf).', 'ผู้หยั่งรู้ตื่นและชี้ผู้เล่นหนึ่งคน ชูนิ้วโป้งขึ้น (ชาวบ้าน) หรือลง (มนุษย์หมาป่า)'], ['Bodyguard wakes and protects one player. Not the same player as last night.', 'บอดี้การ์ดตื่นและปกป้องผู้เล่นหนึ่งคน ห้ามเป็นคนเดียวกับคืนก่อน'],
+  ['Show the Witch tonight’s victim. She may save them and/or eliminate another player. Each potion is single use.', 'แสดงเหยื่อของคืนนี้ให้แม่มดดู เธออาจช่วยเหยื่อและ/หรือกำจัดผู้เล่นอีกคน ยาแต่ละขวดใช้ได้ครั้งเดียว'], ['Spellcaster wakes and silences one player for tomorrow’s discussion.', 'จอมเวทใบ้ตื่นและสาปผู้เล่นหนึ่งคนให้เงียบในการอภิปรายของพรุ่งนี้'],
+  // role texts
+  ['Wake at night and choose a victim.', 'ตื่นในยามค่ำคืนและเลือกเหยื่อ'], ['Inspect one player’s alignment each night.', 'ตรวจสอบฝ่ายของผู้เล่นหนึ่งคนทุกคืน'], ['Shield a player nightly, never the same twice.', 'ปกป้องผู้เล่นทุกคืน ห้ามซ้ำคนเดิม'], ['One potion to save, one to eliminate. Single use.', 'ยาหนึ่งขวดช่วยชีวิต อีกหนึ่งขวดกำจัด ใช้ได้ครั้งเดียว'],
+  ['Silence one player for the coming day discussion.', 'สาปผู้เล่นหนึ่งคนให้เงียบในการอภิปรายตอนกลางวัน'], ['If eliminated, take one player down with you.', 'หากถูกกำจัด พาผู้เล่นหนึ่งคนไปกับคุณ'], ['No night power. Use deduction to find the wolves.', 'ไม่มีพลังกลางคืน ใช้การวิเคราะห์เพื่อหามนุษย์หมาป่า'], ['Your vote counts twice.', 'คะแนนโหวตของคุณนับเป็นสองเท่า'],
+  ['Wakes each night (together with the other Werewolf, if there is one) to choose a victim. Wins when Werewolves match or outnumber the Village.', 'ตื่นทุกคืน (พร้อมมนุษย์หมาป่าอีกตัว หากมี) เพื่อเลือกเหยื่อ ชนะเมื่อมนุษย์หมาป่าเท่ากับหรือมากกว่าชาวบ้าน'], ['Wakes each night to choose a victim.', 'ตื่นทุกคืนเพื่อเลือกเหยื่อ'],
+  ['Wakes each night to inspect one player’s alignment.', 'ตื่นทุกคืนเพื่อตรวจสอบฝ่ายของผู้เล่นหนึ่งคน'], ['Inspects one player’s alignment each night.', 'ตรวจสอบฝ่ายของผู้เล่นหนึ่งคนทุกคืน'], ['Wakes each night to protect one player from elimination. Cannot protect the same player two nights in a row.', 'ตื่นทุกคืนเพื่อปกป้องผู้เล่นหนึ่งคนจากการถูกกำจัด ปกป้องคนเดิมสองคืนติดกันไม่ได้'],
+  ['Protects one player each night, never the same one twice running.', 'ปกป้องผู้เล่นหนึ่งคนทุกคืน ห้ามเป็นคนเดิมสองคืนติด'], ['Has two single-use potions: one saves the night’s victim, the other eliminates a player.', 'มียาสองขวดที่ใช้ได้ครั้งเดียว ขวดหนึ่งช่วยเหยื่อของคืนนั้น อีกขวดกำจัดผู้เล่นหนึ่งคน'], ['Two single-use potions: one to save, one to eliminate.', 'ยาสองขวดที่ใช้ได้ครั้งเดียว: ขวดหนึ่งช่วยชีวิต อีกขวดกำจัด'],
+  ['Wakes each night to silence one player for the upcoming day discussion.', 'ตื่นทุกคืนเพื่อสาปผู้เล่นหนึ่งคนให้เงียบในการอภิปรายตอนกลางวัน'], ['Silences one player for the next day’s discussion.', 'สาปผู้เล่นหนึ่งคนให้เงียบในการอภิปรายของวันถัดไป'], ['If eliminated at any time, immediately chooses one player to take down with them.', 'เมื่อถูกกำจัดไม่ว่าเวลาใด เลือกผู้เล่นหนึ่งคนเพื่อพาไปด้วยทันที'], ['If eliminated, takes one player down immediately.', 'หากถูกกำจัด พาผู้เล่นหนึ่งคนไปทันที'],
+  ['No night ability. Uses deduction during the day to find the Werewolves.', 'ไม่มีความสามารถกลางคืน ใช้การวิเคราะห์ในตอนกลางวันเพื่อหามนุษย์หมาป่า'], ['No night ability. Uses deduction to find the Werewolves.', 'ไม่มีความสามารถกลางคืน ใช้การวิเคราะห์เพื่อหามนุษย์หมาป่า'], ['Learn whether one player is a werewolf.', 'รู้ว่าผู้เล่นหนึ่งคนเป็นมนุษย์หมาป่าหรือไม่'],
+  // night (pass & play + multi-device)
+  ['Night {} Begins...', 'คืนที่{1}เริ่มต้นขึ้น...'], ['The village falls silent.', 'หมู่บ้านเงียบสงัด'], ['Close Your Eyes', 'หลับตาลง'], ['Keep them closed until the narrator says otherwise.', 'หลับตาไว้จนกว่าผู้บรรยายจะบอกให้ลืม'], ['Eyes closed', 'หลับตาอยู่'], ['eyes closed', 'หลับตาอยู่'], ['Listen to the narrator.', 'ฟังผู้บรรยาย'], ['Keep your eyes closed...', 'หลับตาไว้ต่อไป...'], ['The night is not over.', 'คืนนี้ยังไม่จบ'],
+  ['Only this role may look. Everyone else, eyes closed.', 'เฉพาะบทบาทนี้เท่านั้นที่ดูได้ คนอื่นหลับตา'], ['Only your role may look now. Everyone else has their eyes closed.', 'ตอนนี้เฉพาะบทบาทของคุณที่ดูได้ คนอื่นหลับตาอยู่'], ['Tap to Unlock Secretly', 'แตะเพื่อปลดล็อกอย่างลับ ๆ'], ['Close your eyes and stay silent. The night roles are at work.', 'หลับตาและเงียบไว้ บทบาทกลางคืนกำลังทำงาน'],
+  ['Night begins', 'ราตรีเริ่มต้น'], ['Night begins. Everyone, close your eyes.', 'ราตรีเริ่มต้นขึ้น ทุกคนในหมู่บ้านหลับตาลง'], ['{}, open your eyes.', '{1} ลืมตาขึ้น'], ['{}, close your eyes.', '{1} หลับตาลง'], ['Everyone, open your eyes. Morning has broken.', 'ทุกคนลืมตาขึ้น รุ่งอรุณมาถึงแล้ว'], ['Morning has broken', 'รุ่งอรุณมาถึงแล้ว'], ['Morning of day {#}', 'เช้าวันที่ {1}'],
+  ['Werewolves, choose who to hunt.', 'มนุษย์หมาป่า เลือกคนที่จะล่า'], ['Seer, choose who to inspect.', 'ผู้หยั่งรู้ เลือกคนที่จะตรวจสอบ'], ['Bodyguard, choose someone to protect.', 'บอดี้การ์ด เลือกคนที่จะปกป้อง'], ['Spellcaster, choose who to silence.', 'จอมเวทใบ้ เลือกคนที่จะสาปให้เงียบ'], ['Witch, you hold one save and one poison. Who do you wish to save or kill?', 'แม่มด เจ้ามียาช่วยหนึ่งขวดและยาพิษหนึ่งขวด เจ้าต้องการช่วยหรือสังหารใคร?'],
+  ['Tap a name to select. Nothing is revealed until you confirm.', 'แตะชื่อเพื่อเลือก จะไม่มีอะไรถูกเปิดเผยจนกว่าคุณจะยืนยัน'], ['Confirm Target', 'ยืนยันเป้าหมาย'], ['Confirm Inspection', 'ยืนยันการตรวจสอบ'], ['Confirm Protection', 'ยืนยันการปกป้อง'], ['Confirm Silence', 'ยืนยันการสาปให้เงียบ'], ['Confirm Save', 'ยืนยันการช่วยชีวิต'], ['Confirm Poison', 'ยืนยันการวางยาพิษ'],
+  ['Select a target', 'เลือกเป้าหมาย'], ['Select a player', 'เลือกผู้เล่น'], ['Select a player or Skip', 'เลือกผู้เล่นหรือข้าม'], ['Choice locked in. Wait for dawn.', 'ล็อกตัวเลือกแล้ว รอรุ่งสางได้เลย'], ['Lock In Victim', 'ล็อกเหยื่อ'], ['Choose your victim', 'เลือกเหยื่อของคุณ'], ['Your pack', 'ฝูงของคุณ'], ['Agree silently with your pack. The most votes wins.', 'ตกลงกันเงียบ ๆ กับฝูงของคุณ ใครได้คะแนนมากที่สุดคือเหยื่อ'], ['Agree silently, then one of you taps the name.', 'ตกลงกันเงียบ ๆ แล้วให้หนึ่งคนแตะชื่อ'],
+  ['{} is a WEREWOLF!', '{1} คือมนุษย์หมาป่า!'], ['{} is NOT a WEREWOLF!', '{1} ไม่ใช่มนุษย์หมาป่า!'], ['is a WEREWOLF!', 'คือมนุษย์หมาป่า!'], ['is NOT a WEREWOLF!', 'ไม่ใช่มนุษย์หมาป่า!'], ['{} is a Werewolf', '{1} คือมนุษย์หมาป่า'], ['{} is not a Werewolf', '{1} ไม่ใช่มนุษย์หมาป่า'], ['Inspect', 'ตรวจสอบ'], ['Inspect a player', 'ตรวจสอบผู้เล่น'], ['The spirits are answering...', 'วิญญาณกำลังตอบ...'],
+  ['Protect', 'ปกป้อง'], ['Protect a player', 'ปกป้องผู้เล่น'], ['Silence a player', 'สาปผู้เล่นให้เงียบ'], ['Cast Silence', 'สาปให้เงียบ'], ['You cannot protect {} two nights in a row.', 'คุณปกป้อง {1} สองคืนติดกันไม่ได้'], ['You cannot guard {} again tonight.', 'คุณปกป้อง {1} อีกครั้งในคืนนี้ไม่ได้'], ['last guarded {}', 'ปกป้อง {1} ล่าสุด'], ['no target', 'ไม่มีเป้าหมาย'], ['votes {}', 'โหวต {1}'],
+  ['The Werewolves chose', 'มนุษย์หมาป่าเลือก'], ['The wolves have not chosen yet', 'หมาป่ายังไม่ได้เลือก'], ['The wolves have not chosen yet.', 'หมาป่ายังไม่ได้เลือก'], ['Wolves are targeting {}.', 'หมาป่ากำลังเล็งเป้าไปที่ {1}'], ['Brew your potions', 'ปรุงยาของคุณ'], ['Save Target', 'ช่วยเป้าหมาย'], ['Saving {} ✓', 'กำลังช่วย {1} ✓'], ['Use healing potion', 'ใช้ยาฟื้นฟู'], ['Poison a player (optional)', 'วางยาพิษผู้เล่น (ไม่บังคับ)'],
+  ['Do Nothing Tonight', 'คืนนี้ไม่ทำอะไร'], ['Healing potion already used.', 'ใช้ยาฟื้นฟูไปแล้ว'], ['Poison already used.', 'ใช้ยาพิษไปแล้ว'], ['Your poison is already used.', 'คุณใช้ยาพิษไปแล้ว'], ['Your save potion is already used.', 'คุณใช้ยาช่วยชีวิตไปแล้ว'], ['Each potion can only be used once in the whole game.', 'ยาแต่ละชนิดใช้ได้เพียงครั้งเดียวตลอดทั้งเกม'],
+  ['{} choosing', '{1} กำลังเลือก'], ['{} sleeping', '{1} กำลังหลับ'], ['{} waking', '{1} กำลังตื่น'], ['Idle', 'ว่าง'], ['Speaking', 'กำลังพูด'], ['Dawn', 'รุ่งสาง'], ['Advance to Dawn', 'ข้ามไปรุ่งสาง'], ['Break Dawn Now', 'ให้รุ่งสางเดี๋ยวนี้'], ['Break Dawn Now ({#} still waiting)', 'ให้รุ่งสางเดี๋ยวนี้ (ยังรออีก {1} คน)'], ['Skip waiting', 'ข้ามการรอ'], ['Stop narrator', 'หยุดผู้บรรยาย'], ['Restart narrated night', 'เริ่มคืนที่มีเสียงบรรยายใหม่'], ['Pause', 'หยุดชั่วคราว'], ['Resume', 'เล่นต่อ'],
+  ['The narrator is not running.', 'ผู้บรรยายไม่ได้ทำงานอยู่'], ['The narrator is not running. Resume it to continue the night by voice.', 'ผู้บรรยายไม่ได้ทำงานอยู่ เริ่มต่อเพื่อดำเนินคืนนี้ด้วยเสียง'], ['The narrator is running the night.', 'ผู้บรรยายกำลังดำเนินคืนนี้'], ['The narrator speaks...', 'ผู้บรรยายกำลังพูด...'], ['Everyone closes their eyes', 'ทุกคนหลับตา'],
+  // dawn / day
+  ['Continue to the Day', 'ไปต่อสู่ตอนกลางวัน'], ['{} was found dead this morning.', '{1} ถูกพบเป็นศพในเช้านี้'], ['The night passed quietly. No one was eliminated.', 'คืนนี้ผ่านไปอย่างเงียบสงบ ไม่มีใครถูกกำจัด'], ['The Werewolves attacked overnight, but the victim was protected!', 'มนุษย์หมาป่าโจมตีในคืนที่ผ่านมา แต่เหยื่อได้รับการปกป้อง!'], ['They cannot be eliminated tonight.', 'พวกเขาไม่อาจถูกกำจัดในคืนนี้'], ['They may not speak during tomorrow’s discussion.', 'พวกเขาห้ามพูดในการอภิปรายของพรุ่งนี้'],
+  ['{} has been silenced for the day. They cannot speak or vote.', '{1} ถูกสาปให้เงียบตลอดวัน ห้ามพูดและห้ามโหวต'], ['{} has been silenced by the Spellcaster and cannot speak or vote today.', '{1} ถูกจอมเวทใบ้สาปให้เงียบ ห้ามพูดและห้ามโหวตในวันนี้'], ['{} have been silenced by the Spellcaster and cannot speak or vote today.', '{1} ถูกจอมเวทใบ้สาปให้เงียบ ห้ามพูดและห้ามโหวตในวันนี้'],
+  ['{} was the {}', '{1} คือ{2}'], ['{} was the {}.', '{1} คือ{2}'], ['{} was voted out by the village.', '{1} ถูกชาวบ้านโหวตกำจัด'], ['{} was eliminated by the village.', '{1} ถูกชาวบ้านกำจัด'], ['{} fired a last shot and took {} down.', '{1} ยิงนัดสุดท้ายและพา {2} ไปด้วย'], [' No one was eliminated.', ' ไม่มีใครถูกกำจัด'],
+  ['Day {#}', 'วันที่ {1}'], ['The Village Wakes', 'หมู่บ้านตื่นขึ้น'], ['The Vote', 'การโหวต'], ['Discussion', 'การอภิปราย'], ['Players still alive', 'ผู้เล่นที่ยังมีชีวิตอยู่'], ['Time is up. Time to vote.', 'หมดเวลา ถึงเวลาโหวต'], ['+1 min', '+1 นาที'], ['Start', 'เริ่ม'],
+  ['Start Voting', 'เริ่มโหวต'], ['Discuss and vote out loud together. Select the player with the most votes, or tap Skip Vote if the vote is tied.', 'ถกเถียงและโหวตด้วยเสียงร่วมกัน เลือกผู้เล่นที่ได้คะแนนมากที่สุด หรือแตะ "ข้ามการโหวต" หากคะแนนเสมอกัน'],
+  ['Confirm Elimination: {}', 'ยืนยันการกำจัด: {1}'], ['Skip Vote (Tie / No Elimination)', 'ข้ามการโหวต (เสมอ / ไม่กำจัดใคร)'], ['Skip (no elimination)', 'ข้าม (ไม่มีใครถูกกำจัด)'], ['Skip (no vote)', 'ข้าม (ไม่โหวต)'], ['Skip selected ✓', 'เลือกข้ามแล้ว ✓'], ['Confirm Vote: Skip', 'ยืนยันการโหวต: ข้าม'], ['Confirm Vote: {}', 'ยืนยันการโหวต: {1}'],
+  ['Pass the phone to {} — Eyes only!', 'ส่งโทรศัพท์ให้ {1} — เห็นได้เฉพาะคุณ!'], ['Eyes only!', 'เห็นได้เฉพาะคุณ!'], ['Everyone else look away while {} votes.', 'คนอื่นหันหน้าหนีขณะที่ {1} โหวต'], ['I\'m {}. Show my ballot', 'ฉันคือ {1} แสดงบัตรโหวตของฉัน'], ['{}, who do you vote to eliminate?', '{1} คุณโหวตกำจัดใคร?'], ['Ballot {#} of {#}', 'บัตรโหวตที่ {1} จาก {2}'], ['Ballot {#} of {#} · {} silenced, skipped', 'บัตรโหวตที่ {1} จาก {2} · {3} ถูกสาปให้เงียบ ข้ามไป'],
+  ['The vote is tied. No one is eliminated yet.', 'คะแนนเสมอกัน ยังไม่มีใครถูกกำจัด'], ['The vote was skipped. No one is eliminated.', 'ข้ามการโหวต ไม่มีใครถูกกำจัด'], ['The vote was tied. No one was eliminated.', 'คะแนนเสมอกัน ไม่มีใครถูกกำจัด'], ['Revote (tied players)', 'โหวตใหม่ (ผู้เล่นที่คะแนนเสมอ)'], ['Take your last shot', 'ยิงนัดสุดท้ายของคุณ'], ['{}, take your last shot', '{1} ยิงนัดสุดท้ายของคุณ'], ['Fire', 'ยิง'],
+  ['No Werewolves are left. The Village wins!', 'มนุษย์หมาป่าไม่เหลืออยู่แล้ว ฝ่ายชาวบ้านชนะ!'], ['The Werewolves match or outnumber the Village. The Werewolves win!', 'มนุษย์หมาป่าเท่ากับหรือมากกว่าชาวบ้าน มนุษย์หมาป่าชนะ!'], ['No Werewolves left. The Village wins.', 'มนุษย์หมาป่าไม่เหลืออยู่แล้ว ฝ่ายชาวบ้านชนะ'], ['No werewolves are left. The Village wins.', 'มนุษย์หมาป่าไม่เหลืออยู่แล้ว ฝ่ายชาวบ้านชนะ'], ['Werewolves match or outnumber the Village.', 'มนุษย์หมาป่าเท่ากับหรือมากกว่าชาวบ้าน'], ['The werewolves match or outnumber the Village.', 'มนุษย์หมาป่าเท่ากับหรือมากกว่าชาวบ้าน'],
+  ['Village wins', 'ฝ่ายชาวบ้านชนะ'], ['Village Wins', 'ฝ่ายชาวบ้านชนะ'], ['The Village wins', 'ฝ่ายชาวบ้านชนะ'], ['Wolves win', 'หมาป่าชนะ'], ['Werewolves Win', 'ฝ่ายมนุษย์หมาป่าชนะ'], ['The Werewolves win', 'ฝ่ายมนุษย์หมาป่าชนะ'], ['Game over', 'จบเกม'], ['End Game', 'จบเกม'], ['End Game Early', 'จบเกมก่อนกำหนด'],
+  // multi-device
+  ['Host a Room', 'สร้างห้อง'], ['Join a Room', 'เข้าร่วมห้อง'], ['Join Room', 'เข้าร่วมห้อง'], ['Create Room', 'สร้างห้อง'], ['Creating room...', 'กำลังสร้างห้อง...'], ['Joining...', 'กำลังเข้าร่วม...'], ['Enter', 'เข้า'], ['Room Code', 'รหัสห้อง'], ['Room code', 'รหัสห้อง'], ['Room code {}', 'รหัสห้อง {1}'], ['Room name', 'ชื่อห้อง'], ['Copy Code', 'คัดลอกรหัส'], ['Copied!', 'คัดลอกแล้ว!'], ['Enter a code from your host', 'ใส่รหัสจากเจ้าของห้อง'], ['Enter the 4-letter room code.', 'ใส่รหัสห้อง 4 ตัวอักษร'],
+  ['Create a code and run the game', 'สร้างรหัสและดำเนินเกม'], ['Everyone plays on their own phone. The host shares a 4-letter code and each player sees only their own card.', 'ทุกคนเล่นบนโทรศัพท์ของตัวเอง เจ้าของห้องแชร์รหัส 4 ตัวอักษร และผู้เล่นแต่ละคนจะเห็นเฉพาะไพ่ของตัวเอง'], ['Moderator Only', 'ผู้ดำเนินเกมเท่านั้น'], ['Playing + Hosting', 'เล่นและเป็นเจ้าของห้อง'], ['Host', 'เจ้าของห้อง'], ['Host role', 'บทบาทของเจ้าของห้อง'], ['Host controls', 'ตัวควบคุมเจ้าของห้อง'], ['You are moderating only.', 'คุณทำหน้าที่ดำเนินเกมอย่างเดียว'], ['You are playing and hosting.', 'คุณกำลังเล่นและเป็นเจ้าของห้อง'], ['You get a card and run the game.', 'คุณได้รับไพ่และดำเนินเกมไปด้วย'], ['You run the game without a card.', 'คุณดำเนินเกมโดยไม่มีไพ่'],
+  ['Lobby', 'ห้องรอ'], ['Lobby', 'ห้องรอ'], ['Players', 'ผู้เล่น'], ['No players yet. Share the room code.', 'ยังไม่มีผู้เล่น แชร์รหัสห้องได้เลย'], ['Waiting for the host to start the game...', 'กำลังรอเจ้าของห้องเริ่มเกม...'], ['Waiting for the others to look at their cards.', 'กำลังรอคนอื่นดูไพ่ของตัวเอง'], ['Ready ✓', 'พร้อมแล้ว ✓'], ['View my role', 'ดูบทบาทของฉัน'], ['This card belongs to', 'ไพ่ใบนี้เป็นของ'], ['Connecting to the room...', 'กำลังเชื่อมต่อกับห้อง...'], ['Looking for your room...', 'กำลังค้นหาห้องของคุณ...'],
+  ['Play Again With This Room', 'เล่นอีกครั้งในห้องนี้'], ['Close room', 'ปิดห้อง'], ['This closes the room for everyone. Players will be sent back out.', 'การทำเช่นนี้จะปิดห้องสำหรับทุกคน ผู้เล่นจะถูกส่งออก'], ['This room has closed', 'ห้องนี้ปิดแล้ว'], ['The host ended the session.', 'เจ้าของห้องจบเซสชันแล้ว'], ['The host may have removed you.', 'เจ้าของห้องอาจลบคุณออกจากห้อง'], ['You are no longer in this room', 'คุณไม่ได้อยู่ในห้องนี้แล้ว'], ['You will leave this room. You can rejoin with the code only while the game has not started.', 'คุณจะออกจากห้องนี้ คุณเข้าร่วมใหม่ด้วยรหัสได้เฉพาะตอนที่เกมยังไม่เริ่ม'],
+  ['No room with that code. Check the letters and try again.', 'ไม่พบห้องที่ใช้รหัสนี้ ตรวจสอบตัวอักษรแล้วลองอีกครั้ง'], ['That game has already started.', 'เกมนั้นเริ่มไปแล้ว'], ['That room is full ({#} players).', 'ห้องนั้นเต็มแล้ว ({1} คน)'], ['The host is choosing cards, so the room is closed to new players.', 'เจ้าของห้องกำลังเลือกไพ่ ห้องจึงปิดไม่รับผู้เล่นใหม่'], ['Someone in that room already uses this name. Add an initial.', 'มีคนในห้องนั้นใช้ชื่อนี้แล้ว ลองเพิ่มตัวอักษรย่อ'], ['Could not find a free room code. Try again.', 'หารหัสห้องที่ว่างไม่ได้ ลองอีกครั้ง'],
+  ['You are alive. Discuss and find the werewolves.', 'คุณยังมีชีวิตอยู่ ร่วมถกเถียงและหามนุษย์หมาป่าให้เจอ'], ['You are eliminated. You can still watch, but keep quiet.', 'คุณถูกกำจัดแล้ว ยังดูได้ แต่ต้องเงียบ'], ['You were eliminated. Choose one player to take down with you.', 'คุณถูกกำจัดแล้ว เลือกผู้เล่นหนึ่งคนเพื่อพาไปด้วย'], ['You have been eliminated. Keep quiet and keep your eyes closed.', 'คุณถูกกำจัดแล้ว เงียบไว้และหลับตาต่อไป'], ['You have been eliminated. Stay silent and keep your eyes closed.', 'คุณถูกกำจัดแล้ว เงียบไว้และหลับตาต่อไป'],
+  ['Trial vote', 'โหวตตัดสิน'], ['Cast Vote', 'ลงคะแนน'], ['Change Vote', 'เปลี่ยนคะแนน'], ['Voting disabled', 'ปิดการโหวต'], ['Vote closed', 'ปิดการโหวต'], ['The vote is closed.', 'ปิดการโหวตแล้ว'], ['The village has decided.', 'หมู่บ้านตัดสินใจแล้ว'], ['You cannot vote today.', 'วันนี้คุณโหวตไม่ได้'], ['Discuss, then vote for the player you want eliminated.', 'ถกเถียงกัน แล้วโหวตผู้เล่นที่คุณต้องการให้ถูกกำจัด'], ['Your vote: {}', 'คะแนนโหวตของคุณ: {1}'],
+  ['{#} of {#} voted', 'โหวตแล้ว {1} จาก {2}'], ['{#} of {#} players have voted. The vote closes by itself when everyone has.', '{1} จาก {2} คนโหวตแล้ว การโหวตจะปิดเองเมื่อทุกคนโหวตครบ'], ['The village is voting. {#} of {#} votes are in.', 'หมู่บ้านกำลังโหวต มีคะแนนเข้ามาแล้ว {1} จาก {2}'], ['No votes yet. Players vote on their own phones.', 'ยังไม่มีการโหวต ผู้เล่นโหวตบนโทรศัพท์ของตัวเอง'], ['Close Vote Now', 'ปิดการโหวตทันที'], ['Clear votes and revote', 'ล้างคะแนนและโหวตใหม่'], ['Eliminate', 'กำจัด'], ['Eliminate {}', 'กำจัด {1}'], ['It is a tie. Clear the votes and revote, or use Eliminate on a player below.', 'คะแนนเสมอกัน ล้างคะแนนแล้วโหวตใหม่ หรือกด "กำจัด" ที่ผู้เล่นด้านล่าง'], ['No one', 'ไม่มีใคร'],
+  ['Discuss, then vote.', 'ถกเถียงกัน แล้วโหวต'], ['Back to Game', 'กลับสู่เกม'],
+  // server setup
+  ['Connect a multiplayer server', 'เชื่อมต่อเซิร์ฟเวอร์ผู้เล่นหลายคน'], ['No multiplayer server is set up yet.', 'ยังไม่ได้ตั้งค่าเซิร์ฟเวอร์ผู้เล่นหลายคน'], ['Multi-Device rooms need a small free database so phones can share the game. It takes about two minutes and only the host has to do it once.', 'ห้องแบบหลายเครื่องต้องใช้ฐานข้อมูลฟรีขนาดเล็กเพื่อให้โทรศัพท์แชร์เกมร่วมกันได้ ใช้เวลาประมาณสองนาที และเจ้าของห้องทำเพียงครั้งเดียว'],
+  ['Create a free project', 'สร้างโปรเจกต์ฟรี'], ['Add a Realtime Database', 'เพิ่ม Realtime Database'], ['Open console.firebase.google.com and add a project (Google Analytics can be off).', 'เปิด console.firebase.google.com แล้วเพิ่มโปรเจกต์ (ปิด Google Analytics ได้)'], ['Build → Realtime Database → Create Database. Any region is fine.', 'Build → Realtime Database → Create Database เลือกภูมิภาคใดก็ได้'], ['Allow read and write', 'อนุญาตให้อ่านและเขียน'], ['Open the Rules tab, paste the rules below, then Publish.', 'เปิดแท็บ Rules วางกฎด้านล่าง แล้วกด Publish'],
+  ['These open rules suit a casual game among friends. Anyone with the URL could read the data, so do not store anything private there.', 'กฎแบบเปิดนี้เหมาะกับเกมสบาย ๆ ในหมู่เพื่อน ใครมี URL ก็อ่านข้อมูลได้ จึงไม่ควรเก็บข้อมูลส่วนตัวไว้ที่นั่น'], ['Copy rules', 'คัดลอกกฎ'], ['Copy the database URL', 'คัดลอก URL ฐานข้อมูล'], ['Paste it in Settings', 'วางไว้ในการตั้งค่า'], ['Settings → Multiplayer Server URL → Save.', 'การตั้งค่า → URL เซิร์ฟเวอร์ผู้เล่นหลายคน → บันทึก'], ['It looks like {}', 'หน้าตาประมาณ {1}'], ['Paste a database URL first.', 'วาง URL ฐานข้อมูลก่อน'], ['Connected. Multi-Device is ready.', 'เชื่อมต่อแล้ว โหมดหลายเครื่องพร้อมใช้งาน'],
+  ['Could not reach that address. Check the URL and your connection.', 'เข้าถึงที่อยู่นั้นไม่ได้ ตรวจสอบ URL และการเชื่อมต่อ'], ['Could not reach the server. Check your connection and the database URL in Settings.', 'เข้าถึงเซิร์ฟเวอร์ไม่ได้ ตรวจสอบการเชื่อมต่อและ URL ฐานข้อมูลในการตั้งค่า'], ['The database refused access. In Firebase, set the Realtime Database rules to allow read and write.', 'ฐานข้อมูลปฏิเสธการเข้าถึง ใน Firebase ให้ตั้งกฎของ Realtime Database ให้อ่านและเขียนได้'], ['The database refused access. Set its rules to allow read and write.', 'ฐานข้อมูลปฏิเสธการเข้าถึง ตั้งกฎให้อ่านและเขียนได้'],
+  ['The server answered with an error ({}). Check the database URL in Settings.', 'เซิร์ฟเวอร์ตอบกลับด้วยข้อผิดพลาด ({1}) ตรวจสอบ URL ฐานข้อมูลในการตั้งค่า'], ['The server answered with error {}.', 'เซิร์ฟเวอร์ตอบกลับด้วยข้อผิดพลาด {1}'], ['{} Retrying...', '{1} กำลังลองใหม่...'],
+  ['Mute ambient sound', 'ปิดเสียงบรรยากาศ'], ['Turn on ambient sound', 'เปิดเสียงบรรยากาศ'], ['Open Settings', 'เปิดการตั้งค่า'],
+  ['{#} of {#} acted', 'ดำเนินการแล้ว {1} จาก {2}'], ['{#} of {#} players have seen their card.', 'มี {1} จาก {2} คนดูไพ่ของตนแล้ว'], ['{#} of {#} ready', 'พร้อมแล้ว {1} จาก {2}'], ['{#} / {#} players', '{1} / {2} ผู้เล่น'],
+  ['Balance {}', 'ความสมดุล {1}'], ['Need at least {#} players to start. Ask friends to join with the code above.', 'ต้องมีผู้เล่นอย่างน้อย {1} คนจึงเริ่มได้ ชวนเพื่อนเข้าร่วมด้วยรหัสด้านบน'], ['Show a player’s role card when they are eliminated at dawn or by the village.', 'แสดงไพ่บทบาทของผู้เล่นเมื่อถูกกำจัดตอนรุ่งสางหรือโดยการโหวตของชาวบ้าน'],
+  ['I’m Ready', 'ฉันพร้อมแล้ว'], ['You’re ready', 'คุณพร้อมแล้ว'], ['Viewing…', 'กำลังดู…'], ['Ready', 'พร้อม'], ['Edit Setup', 'แก้ไขการตั้งค่า'], ['Preview Mode — deploy to Vercel for live multi-phone sync', 'โหมดตัวอย่าง — นำขึ้น Vercel เพื่อซิงก์หลายเครื่องแบบสด'],
+  ['Players: {}', 'ผู้เล่น: {1}'], ['→ {}', '→ {1}'], ['waiting...', 'กำลังรอ...'], [' saves victim', ' ช่วยเหยื่อ'], ['saves victim', 'ช่วยเหยื่อ'], ['heal ready', 'ยาฟื้นฟูพร้อม'], ['heal used', 'ใช้ยาฟื้นฟูแล้ว'], ['poison ready', 'ยาพิษพร้อม'], ['poison used', 'ใช้ยาพิษแล้ว'],
+  ['{} (you)', '{1} (คุณ)'], ['(you)', '(คุณ)'], ['{#} Players', '{1} ผู้เล่น'], ['{#} Players ·', '{1} ผู้เล่น ·'], ['{}: {}', '{1}: {2}'],
+  ['Opening the Grimoire reveals every player’s secret role. The Narrator is running the game, so you may not need it.', 'การเปิดคัมภีร์จะเผยบทบาทลับของผู้เล่นทุกคน ผู้บรรยายกำลังดำเนินเกมอยู่ คุณอาจไม่จำเป็นต้องใช้'],
+  ['Opening the Grimoire reveals every player’s secret role.', 'การเปิดคัมภีร์จะเผยบทบาทลับของผู้เล่นทุกคน'],
+  ['Restore', 'กู้คืน'], ['{#} to {#} players', '{1} ถึง {2} คน'], ['{#} of {#} votes are in.', 'มีคะแนนเข้ามาแล้ว {1} จาก {2}'], ['You have been silenced by the Spellcaster — you cannot speak or vote today.', 'คุณถูกจอมเวทใบ้สาปให้เงียบ — ห้ามพูดและห้ามโหวตในวันนี้'], ['{} 🤐', '{1} 🤐'], ['{} (you) 🤐', '{1} (คุณ) 🤐']
+];
+const trNorm = (s) => s.replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
+const TH_EXACT = new Map(); const TH_PATS = [];
+(() => {
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  TH_PAIRS.forEach(([en, th]) => {
+    const k = trNorm(en);
+    if (!/\{#?\}/.test(k)) { if (!TH_EXACT.has(k)) TH_EXACT.set(k, th); return; }
+    const parts = k.split(/\{#?\}/); const marks = k.match(/\{#?\}/g);
+    let re = '^'; parts.forEach((p, i) => { re += esc(p); if (i < marks.length) re += marks[i] === '{#}' ? '(\\d+)' : '(.+?)'; }); re += '$';
+    TH_PATS.push({ re: new RegExp(re, 's'), out: th, len: parts.join('').length });
+  });
+  TH_PATS.sort((a, b) => b.len - a.len);
+})();
+function trTh(s) {
+  const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(s);
+  const core = trNorm(m[2]);
+  if (!core || !/[A-Za-z]/.test(core)) return s;
+  let out = TH_EXACT.get(core);
+  if (out === undefined) {
+    for (const p of TH_PATS) {
+      const mm = p.re.exec(core);
+      if (mm) { out = p.out.replace(/\{(\d)\}/g, (_, i) => trTh(mm[Number(i)])); break; }
+    }
+  }
+  if (out === undefined) {
+    // Compound text: "A · B" or "A, B, C". Translate each part; keep the text as is when nothing changes.
+    for (const sep of [' · ', ', ']) {
+      if (core.includes(sep)) {
+        const parts = core.split(sep); const tp = parts.map((x) => trTh(x));
+        if (tp.some((x, i) => x !== parts[i])) { out = tp.join(sep); break; }
+      }
+    }
+  }
+  if (out === undefined && /[.!?] \S/.test(core)) {
+    const parts = core.split(/(?<=[.!?]) +/); const tp = parts.map((x) => trTh(x));
+    if (tp.some((x, i) => x !== parts[i])) out = tp.join(' ');
+  }
+  return out === undefined ? s : m[1] + out + m[3];
+}
+const trLine = (s) => (langNow === 'th' ? trTh(s) : s);
+
+const I18N = (() => {
+  const orig = new WeakMap(), wrote = new WeakMap(), attrState = new WeakMap();
+  const ATTRS = ['aria-label', 'placeholder', 'title', 'alt'];
+  const collect = () => typeof window !== 'undefined' && window.__collectUntranslated;
+  const note = (joined) => { if (collect() && langNow === 'en' && /[A-Za-z]{3}/.test(joined) && trTh(joined) === joined) console.log('UNTR\t' + joined.trim()); };
+  function runText(nodes) {
+    nodes.forEach((n) => { if (!(wrote.has(n) && wrote.get(n) === n.data)) orig.set(n, n.data); });
+    const joined = nodes.map((n) => orig.get(n)).join('');
+    if (!joined.trim()) return;
+    const out = langNow === 'th' ? trTh(joined) : joined;
+    note(joined);
+    nodes.forEach((n, i) => {
+      const want = out === joined ? orig.get(n) : (i === 0 ? out : '');
+      if (n.data !== want) n.data = want;
+      wrote.set(n, want);
+    });
+  }
+  function runOf(n) {
+    let a = n; while (a.previousSibling && a.previousSibling.nodeType === 3) a = a.previousSibling;
+    const run = []; while (a && a.nodeType === 3) { run.push(a); a = a.nextSibling; }
+    return run;
+  }
+  function attrs(el) {
+    let st = attrState.get(el);
+    for (const a of ATTRS) {
+      if (!el.hasAttribute(a)) continue;
+      const cur = el.getAttribute(a);
+      if (!st) { st = {}; attrState.set(el, st); }
+      if (!st[a] || st[a].wrote !== cur) st[a] = { orig: cur, wrote: cur };
+      const out = langNow === 'th' ? trTh(st[a].orig) : st[a].orig;
+      if (out !== cur) el.setAttribute(a, out);
+      st[a].wrote = out;
+      note(st[a].orig);
+    }
+  }
+  function walk(root) {
+    if (root.nodeType === 3) { runText(runOf(root)); return; }
+    if (root.nodeType !== 1) return;
+    const tag = root.tagName; if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'svg') return;
+    attrs(root);
+    let run = [];
+    root.childNodes.forEach((c) => {
+      if (c.nodeType === 3) run.push(c);
+      else { if (run.length) { runText(run); run = []; } walk(c); }
+    });
+    if (run.length) runText(run);
+  }
+  let started = false;
+  function start() {
+    if (started || !document.body) return; started = true;
+    const mo = new MutationObserver((recs) => {
+      for (const r of recs) {
+        if (r.type === 'characterData') runText(runOf(r.target));
+        else if (r.type === 'attributes') attrs(r.target);
+        else r.addedNodes.forEach((n) => walk(n));
+      }
+    });
+    mo.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+    langListeners.add(() => walk(document.body));
+    walk(document.body);
+  }
+  return { start, walk };
+})();
+if (document.body) I18N.start(); else document.addEventListener('DOMContentLoaded', () => I18N.start());
+
 const Narrator = (() => {
-  const ok = () => typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+  const supported = () => typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+  // In Thai mode, speech needs a Thai voice. If the device lists voices and none is Thai, narration falls back to the on-screen text with timed pauses.
+  const hasVoice = () => {
+    if (langNow !== 'th') return true;
+    try { const vs = window.speechSynthesis.getVoices(); return vs.length === 0 || vs.some((v) => /^th/i.test(v.lang)); } catch (e) { return false; }
+  };
+  const ok = () => supported() && hasVoice();
   const pickVoice = () => {
-    const vs = window.speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
+    const th = langNow === 'th';
+    const vs = window.speechSynthesis.getVoices().filter((v) => (th ? /^th/i.test(v.lang) : /^en/i.test(v.lang)));
+    if (th) return vs[0] || null;
     return vs.find((v) => /daniel|alex|fred|google uk english male|male/i.test(v.name)) || vs[0] || null;
+  };
+  const tune = (u) => {
+    if (langNow === 'th') { u.lang = 'th-TH'; u.rate = 0.9; u.pitch = 0.8; } else { u.lang = 'en-US'; u.rate = 0.82; u.pitch = 0.65; }
+    u.volume = 1;
   };
   return {
     ok,
@@ -1223,24 +1484,25 @@ const Narrator = (() => {
       if (!ok()) return;
       const synth = window.speechSynthesis;
       synth.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      const v = pickVoice(); if (v) u.voice = v;
-      u.rate = 0.82; u.pitch = 0.65; u.volume = 1;
+      const u = new SpeechSynthesisUtterance(trLine(text));
+      const v = pickVoice(); if (v) { try { u.voice = v; } catch (e) { /* engine picks by lang */ } }
+      tune(u);
       synth.speak(u);
     },
     // Speaks a line and resolves when it ends. A timer guards against engines that never fire "end" (or have no voice).
-    say: (text) => new Promise((resolve) => {
+    say: (raw) => new Promise((resolve) => {
       let done = false, t = 0;
+      const text = trLine(raw);
       const fin = () => { if (!done) { done = true; clearTimeout(t); resolve(); } };
-      const est = 1300 + text.split(/\s+/).length * 430;
+      const est = langNow === 'th' ? 1300 + text.length * 90 : 1300 + text.split(/\s+/).length * 430;
       if (!ok()) { t = setTimeout(fin, est); return; }
       t = setTimeout(fin, est + 5000);
       try {
         const synth = window.speechSynthesis;
         synth.cancel();
         const u = new SpeechSynthesisUtterance(text);
-        const v = pickVoice(); if (v) u.voice = v;
-        u.rate = 0.82; u.pitch = 0.65; u.volume = 1;
+        const v = pickVoice(); if (v) { try { u.voice = v; } catch (e) { /* engine picks by lang */ } }
+        tune(u);
         u.onend = fin; u.onerror = fin;
         synth.speak(u);
       } catch (e) { fin(); }
@@ -1399,6 +1661,7 @@ function BgRow({ rowStyle, store, title, desc, savedMsg, resetMsg, thumb = 'aspe
 
 function SettingsModal({ onClose, gameCount, onClearGames }) {
   const st = useSettings();
+  const uiLang = useLang();
   const [confirm, setConfirm] = useState(false);
   const [note, setNote] = useState('');
   useEffect(() => {
@@ -1421,6 +1684,16 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
 
         {(
           <div className="flex flex-col gap-3 overflow-y-auto px-5 pb-6">
+            <div className="rounded-2xl p-4" style={rowStyle}>
+              <div className="text-[15px] font-semibold" id="lang-label">Language / ภาษา</div>
+              <div role="radiogroup" aria-labelledby="lang-label" className="mt-2.5 grid grid-cols-2 gap-2">
+                {[['en', 'English'], ['th', 'ไทย (Thai)']].map(([k, label]) => (
+                  <button key={k} role="radio" aria-checked={uiLang === k} onClick={() => setLang(k)}
+                    className="min-h-[44px] rounded-xl px-3 text-sm font-semibold"
+                    style={{ background: uiLang === k ? '#B91C1C' : 'var(--card)', border: `1px solid ${uiLang === k ? '#F87171' : 'rgba(203,213,225,0.3)'}`, color: uiLang === k ? '#fff' : '#CBD5E1' }}>{label}</button>
+                ))}
+              </div>
+            </div>
             <div className="flex items-center justify-between gap-4 rounded-2xl p-4" style={rowStyle}>
               <div>
                 <div className="text-[15px] font-semibold" id="sound-label">Sound</div>

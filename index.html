@@ -239,6 +239,20 @@ const CupidIcon = (p) => (
     <path d="M6 58 L12 52 M6 58 L12 64" opacity="0" />
   </svg>
 );
+const ZombieIcon = (p) => (
+  <svg {...iconProps} {...p}>
+    <path d="M32 7 C18 7 12 19 14 31 C14 39 18 43 20 47 L20 57 L28 52 L32 57 L36 52 L44 57 L44 47 C46 43 50 39 50 31 C52 19 46 7 32 7Z" />
+    <circle cx="25" cy="28" r="4" /><circle cx="39" cy="28" r="4" />
+    <path d="M25 42 L29 39 L33 43 L37 39 L40 42" />
+  </svg>
+);
+const SniperIcon = (p) => (
+  <svg {...iconProps} {...p}>
+    <circle cx="32" cy="32" r="19" />
+    <path d="M32 5 V21 M32 43 V59 M5 32 H21 M43 32 H59" />
+    <circle cx="32" cy="32" r="3" fill="currentColor" />
+  </svg>
+);
 const ShadowIcon = (p) => (
   <svg {...iconProps} {...p}>
     <path d="M32 6 C18 8 12 22 14 36 L8 58 L22 50 L32 58 L42 50 L56 58 L50 36 C52 22 46 8 32 6Z" />
@@ -422,6 +436,20 @@ const ShadowArt = () => (
     <path d="M100 70 C64 74 52 112 56 150 L40 214 L74 192 L100 214 L126 192 L160 214 L144 150 C148 112 136 74 100 70Z" fill="#0A0A10" stroke="#94A3B8" strokeWidth="2" />
     <ellipse cx="100" cy="112" rx="20" ry="24" fill="#000" />
     <path d="M128 150 Q160 140 170 120" fill="none" stroke="#94A3B8" strokeWidth="4" strokeLinecap="round" />
+  </svg>
+);
+const ZombieArt = () => (
+  <svg {...artSvg}>
+    <rect width="200" height="267" fill="#04200F" />
+    <circle cx="150" cy="48" r="18" fill="#E2E8F0" opacity="0.8" />
+    <ZombieIcon x="30" y="62" width="140" height="140" className="text-emerald-300" />
+  </svg>
+);
+const SniperArt = () => (
+  <svg {...artSvg}>
+    <rect width="200" height="267" fill="#0B1534" />
+    <circle cx="48" cy="48" r="18" fill="#E2E8F0" opacity="0.8" />
+    <SniperIcon x="30" y="62" width="140" height="140" className="text-sky-300" />
   </svg>
 );
 const CupidArt = () => (
@@ -745,7 +773,7 @@ const ROLES_DATA = {
   },
   spellcaster: {
     id: 'spellcaster', balance: 1, Art: SpellcasterArt, imageUrl: 'images/spellcaster-card.jpg', blurb: 'Silence one player for the coming day discussion.', name: 'Spellcaster', team: 'village', max: 2, color: '#818CF8', Icon: WandIcon,
-    nightOrder: 7, nightPrompt: 'Spellcaster wakes and silences one player for tomorrow’s discussion.',
+    nightOrder: 8, nightPrompt: 'Spellcaster wakes and silences one player for tomorrow’s discussion.',
     short: 'Silences one player for the next day’s discussion.',
     ability: 'Wakes each night to silence one player for the upcoming day discussion.'
   },
@@ -769,7 +797,7 @@ const ROLES_DATA = {
   },
   shadow: {
     id: 'shadow', balance: -4, Art: ShadowArt, get imageUrl() { return shadowArtStore.get(); }, blurb: 'Redirect one night action to a new target.', name: 'Shadow Figure', team: 'werewolf', max: 1, color: '#FB7185', Icon: ShadowIcon,
-    nightOrder: 8, nightPrompt: 'Shadow Figure wakes last. Show the Werewolves\u2019 victim and the other night targets without saying who chose them. They may redirect one action to a new target, or skip.',
+    nightOrder: 10, nightPrompt: 'Shadow Figure wakes last. Show the Werewolves\u2019 victim and the other night targets without saying who chose them. They may redirect one action to a new target, or skip.',
     short: 'Redirects one night action to a new target.',
     ability: 'Each night, you may redirect one night action to a new target.'
   },
@@ -778,6 +806,18 @@ const ROLES_DATA = {
     nightOrder: 3, nightPrompt: 'First night only: Cupid wakes after the Seer and binds two players as Lovers. The Lovers are never woken; they learn their bond only when one of them dies.',
     short: 'Binds two players as Lovers on the first night.',
     ability: 'On the first night, bind two players together. If either one dies, their partner immediately perishes of heartbreak.'
+  },
+  zombie: {
+    id: 'zombie', balance: -5, Art: ZombieArt, imageUrl: 'images/zombie-card.jpg', blurb: 'Infect one player each night and grow the horde.', name: 'Zombie', team: 'zombie', max: 3, color: '#4ADE80', Icon: ZombieIcon, outbreak: true,
+    nightOrder: 9, nightPrompt: 'Zombies wake together and infect one player. The victim turns the following night.',
+    short: 'Infects one player each night.',
+    ability: 'Infect one player each night. Victims turn the following night and join the horde.'
+  },
+  sniper: {
+    id: 'sniper', balance: 3, Art: SniperArt, imageUrl: 'images/sniper-card.jpg', blurb: 'Scope one player each night and silence a Zombie vote.', name: 'Sniper', team: 'village', max: 1, color: '#60A5FA', Icon: SniperIcon, outbreak: true,
+    nightOrder: 7, nightPrompt: 'Sniper wakes and scopes one player. If that player is a Zombie, their vote is disabled tomorrow.',
+    short: 'Scopes a player each night. Shooting a Zombie disables its vote.',
+    ability: 'Each night, scope one player. If they are a Zombie, shoot to disable their vote tomorrow.'
   },
   villager: {
     id: 'villager', balance: 1, Art: VillagerArt, imageUrl: 'images/villager-card.jpg', blurb: 'No night power. Use deduction to find the wolves.', name: 'Villager', team: 'village', max: 10, color: '#CBD5E1', Icon: HouseIcon,
@@ -790,8 +830,37 @@ const ROLE_IDS = Object.keys(ROLES_DATA);
 const MIN_PLAYERS = 4;
 const MAX_PLAYERS = 15;
 
-const TEAM_LABEL = { village: 'Village', werewolf: 'Werewolf' };
-const teamColor = (team) => (team === 'werewolf' ? '#DC2626' : '#34D399');
+const TEAM_LABEL = { village: 'Village', werewolf: 'Werewolf', zombie: 'Zombie' };
+const teamColor = (team) => (team === 'werewolf' ? '#DC2626' : team === 'zombie' ? '#2DD4BF' : '#34D399');
+
+// Game mode: Classic hides the Outbreak roles (Zombie, Sniper) everywhere a deck is built.
+let gameMode = 'classic';
+const modeListeners = new Set();
+const getGameMode = () => gameMode;
+const setGameMode = (m) => { const n = m === 'outbreak' ? 'outbreak' : 'classic'; if (n !== gameMode) { gameMode = n; modeListeners.forEach((f) => f()); } };
+const useGameMode = () => React.useSyncExternalStore((f) => { modeListeners.add(f); return () => modeListeners.delete(f); }, getGameMode);
+const roleInMode = (id, mode) => !(ROLES_DATA[id] && ROLES_DATA[id].outbreak) || mode === 'outbreak';
+
+// Three-way outcome. items: { role, alive }. Returns '' | 'village' | 'werewolf' | 'zombie'.
+function threeWay(items) {
+  const live = items.filter((i) => i.alive && i.role);
+  if (!items.some((i) => i.role)) return '';
+  const wolves = live.filter((i) => i.role === 'werewolf').length; // the Shadow Figure loses with the last Werewolf
+  const evil = live.filter((i) => ROLES_DATA[i.role] && ROLES_DATA[i.role].team === 'werewolf').length;
+  const zombies = live.filter((i) => i.role === 'zombie').length;
+  const rest = live.length - evil - zombies;
+  if (zombies > 0) return zombies > live.length - zombies ? 'zombie' : ''; // strict majority of the living
+  if (wolves === 0) return 'village';
+  if (evil >= rest) return 'werewolf';
+  return '';
+}
+const winText = (w, hadZ) => (w === 'village' && hadZ ? 'No Werewolves or Zombies are left. The Village wins!' : WIN_UI[w].text);
+const WIN_UI = {
+  village: { name: 'The Village wins', btn: 'Village Wins', color: '#34D399', title: '#6EE7B7', bg: 'rgba(16,185,129,0.1)', text: 'No Werewolves are left. The Village wins!', banner: 'No werewolves are left. The Village wins.' },
+  werewolf: { name: 'The Werewolves win', btn: 'Werewolves Win', color: '#EF4444', title: '#FCA5A5', bg: 'rgba(220,38,38,0.12)', text: 'The Werewolves match or outnumber the Village. The Werewolves win!', banner: 'The werewolves match or outnumber the Village.' },
+  lovers: { name: 'The Lovers win', btn: 'Lovers Win', color: '#F472B6', title: '#F9A8D4', bg: 'rgba(244,114,182,0.12)', text: 'The Lovers win! Only the bound pair is left.', banner: 'Only the bound Lovers are left.' },
+  zombie: { name: 'The Zombies win', btn: 'Zombies Win', color: '#2DD4BF', title: '#5EEAD4', bg: 'rgba(13,148,136,0.18)', text: 'The Zombie horde holds the majority. The Zombies win!', banner: 'The Zombie horde holds a majority of the living.' }
+};
 
 /* ------------------------------------------------------------------ */
 /* Pure helpers                                                        */
@@ -835,7 +904,7 @@ function bestVillageFill(count, wolves) {
   walk(0, need);
   return best;
 }
-function autoFill(count) {
+function autoFill(count, mode = getGameMode()) {
   // 1 Werewolf (2 only when the table is too big to fill with one of each Village role),
   // then Village roles strictly by priority: Seer first, Villager last.
   const village = FILL_PRIORITY.filter((id) => ROLES_DATA[id] && ROLES_DATA[id].team === 'village');
@@ -846,6 +915,11 @@ function autoFill(count) {
   village.forEach((id) => { if (id === 'villager') return; const n = Math.min(1, left); deck[id] = n; left -= n; }); // one of each special role first
   const v = Math.min(ROLES_DATA.villager.max, left); deck.villager = v; left -= v;
   village.forEach((id) => { if (id === 'villager') return; const n = Math.min(ROLES_DATA[id].max - deck[id], left); deck[id] += n; left -= n; }); // then second copies
+  if (mode === 'outbreak' && count >= 6) { // Outbreak: one Zombie and one Sniper take two slots (plain Villagers first)
+    let need = 2;
+    ['villager', 'spellcaster', 'hunter'].forEach((id) => { const t = Math.min(need, deck[id]); deck[id] -= t; need -= t; });
+    deck.zombie = 1; deck.sniper = 1;
+  }
   return deck;
 }
 
@@ -967,6 +1041,7 @@ function RoleGuide({ onClose }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-display text-lg font-bold leading-tight">{r.name}</h3>
                       <TeamBadge team={r.team} />
+                      {r.outbreak && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-100" style={{ background: 'rgba(13,148,136,0.4)', border: '1px solid rgba(45,212,191,0.7)' }}>Outbreak Only</span>}
                     </div>
                     <p className="mt-1 text-sm leading-snug text-slate-300">{r.ability}</p>
                   </div>
@@ -2054,6 +2129,8 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
 }
 
 function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
+  const [step, setStep] = useState('mode'); // mode -> play
+  const startMode = useGameMode();
   const src = DEFAULT_BG;
   const st = useSettings();
   const atmos = useMemo(() => {
@@ -2149,6 +2226,23 @@ function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
         </div>
 
         <div className="mt-8 flex flex-col items-center gap-3.5">
+          {step === 'mode' ? (
+            <>
+              <button onClick={() => { setGameMode('classic'); setStep('play'); }} aria-label="Classic"
+                className="breathe mx-auto flex w-full max-w-[260px] flex-col items-center justify-center rounded-2xl py-3.5 text-white transition active:scale-[0.98] md:max-w-[340px] md:py-4">
+                <span className="text-xl font-bold tracking-wide md:text-2xl">Classic</span>
+                <span className="mt-0.5 text-xs font-semibold opacity-85">Villagers vs. Werewolves</span>
+              </button>
+              <button onClick={() => { setGameMode('outbreak'); setStep('play'); }} aria-label="Outbreak"
+                className="mx-auto flex w-full max-w-[260px] flex-col items-center justify-center rounded-2xl py-3.5 text-white transition active:scale-[0.98] md:max-w-[340px] md:py-4"
+                style={{ background: 'linear-gradient(180deg,#0F766E,#065F46)', border: '1px solid rgba(45,212,191,0.55)', boxShadow: '0 8px 26px -8px rgba(13,148,136,0.7)' }}>
+                <span className="text-xl font-bold tracking-wide md:text-2xl">Outbreak</span>
+                <span className="mt-0.5 px-2 text-center text-xs font-semibold opacity-85">Villagers vs. Werewolves vs. Zombies</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-[11px] font-bold uppercase tracking-[0.28em]" style={{ color: startMode === 'outbreak' ? '#5EEAD4' : '#FCA5A5', textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>{startMode === 'outbreak' ? 'Outbreak mode' : 'Classic mode'}</p>
           <button onClick={onPlay}
             className="breathe mx-auto flex w-full max-w-[260px] items-center justify-center gap-3 rounded-2xl py-4 text-xl md:max-w-[340px] md:py-5 md:text-2xl font-bold tracking-wide text-white transition active:scale-[0.98]">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M7 4 L20 12 L7 20Z" /></svg>
@@ -2160,6 +2254,10 @@ function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="6" width="9" height="15" rx="2" /><rect x="12" y="3" width="9" height="15" rx="2" /></svg>
             Multi-Device
           </button>
+              <button onClick={() => setStep('mode')} aria-label="Back to mode choice"
+                className="flex min-h-[44px] items-center rounded-xl px-4 text-sm font-semibold text-slate-200 hover:bg-white/10" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>&larr; Back</button>
+            </>
+          )}
         </div>
       </main>
 
@@ -2281,7 +2379,8 @@ function Home({ games, onBack, onCreate, onPreset, onResume, onRedeal, onEdit, o
   const [sheetId, setSheetId] = useState(null);
   useEffect(() => { Sfx.preload(); }, []);
   const sheetGame = games.find((g) => g.id === sheetId);
-  const presets = useMemo(() => POPULAR_COUNTS.map((c) => ({ count: c, deck: autoFill(c) })), []);
+  const pmode = useGameMode();
+  const presets = useMemo(() => POPULAR_COUNTS.map((c) => ({ count: c, deck: autoFill(c, pmode) })), [pmode]);
   return (
     <Screen wide>
       <header className="flex items-center justify-between pb-5">
@@ -2448,8 +2547,10 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart, startLabel = 'Star
     setDeck({ ...deck, [id]: next });
     if (d > 0) Sfx.select(); else Sfx.deselect();
   };
+  const gmode = useGameMode();
   const needle = q.trim().toLowerCase();
   const visible = ROLE_IDS.filter((id) => {
+    if (!roleInMode(id, gmode)) return false; // Classic hides the Outbreak roles
     if (!needle) return true;
     const r = ROLES_DATA[id];
     return [r.name, r.ability, r.short, r.blurb, TEAM_LABEL[r.team]].join(' ').toLowerCase().includes(needle);
@@ -2824,10 +2925,10 @@ function StatusChip({ active, onClick, color, children }) {
 /* ------------------------------------------------------------------ */
 /* Automated night: shared pieces, Pass & Play loop, day trial        */
 /* ------------------------------------------------------------------ */
-const NIGHT_ORDER = ['werewolf', 'seer', 'cupid', 'medusa', 'bodyguard', 'witch', 'spellcaster', 'shadow'];
+const NIGHT_ORDER = ['werewolf', 'seer', 'cupid', 'medusa', 'bodyguard', 'witch', 'sniper', 'spellcaster', 'zombie', 'shadow'];
 const NIGHT_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 const nightWord = (n) => NIGHT_WORDS[n] || String(n);
-const roleLabel = (id) => (id === 'werewolf' ? 'Werewolves' : id === 'seerResult' ? 'Seer' : id === 'lovers' ? 'Lovers' : ROLES_DATA[id].name);
+const roleLabel = (id) => (id === 'werewolf' ? 'Werewolves' : id === 'zombie' ? 'Zombie Horde' : id === 'infected' ? 'Infected Player' : id === 'seerResult' ? 'Seer' : id === 'lovers' ? 'Lovers' : ROLES_DATA[id].name);
 const NIGHT_PROMPT = {
   cupid: 'Cupid, choose two players to bind as Lovers.',
   lovers: 'Lovers, look at your partner.',
@@ -2838,11 +2939,14 @@ const NIGHT_PROMPT = {
   seer: 'Seer, choose who to inspect.',
   bodyguard: 'Bodyguard, choose someone to protect.',
   witch: 'Witch, you hold one save and one poison. Who do you wish to save or kill?',
-  spellcaster: 'Spellcaster, choose who to silence.'
+  spellcaster: 'Spellcaster, choose who to silence.',
+  sniper: 'Sniper, choose who to scope.',
+  zombie: 'Zombies, choose who to infect.',
+  infected: 'YOU HAVE BEEN INFECTED!'
 };
 const PROTECTED_LINE = 'The Werewolves attacked overnight, but the victim was protected!';
 const stoneLine = (name) => `${name} has been turned to stone until dusk. They cannot speak or vote.`;
-function dawnLines(saved, deadNames, silencedName, stonedName, brokenNames = []) {
+function dawnLines(saved, deadNames, silencedName, stonedName, brokenNames = [], sniperHit = false) {
   const out = [];
   if (saved) out.push(deadNames.length || brokenNames.length ? PROTECTED_LINE : PROTECTED_LINE + ' No one was eliminated.');
   deadNames.forEach((n) => out.push(`${n} was found dead this morning.`));
@@ -2850,6 +2954,7 @@ function dawnLines(saved, deadNames, silencedName, stonedName, brokenNames = [])
   if (!out.length) out.push('The night passed quietly. No one was eliminated.');
   if (silencedName) out.push(`${silencedName} has been silenced for the day. They cannot speak or vote.`);
   if (stonedName) out.push(stoneLine(stonedName));
+  if (sniperHit) out.push('A sniper shot echoed through the night!');
   return out;
 }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -2865,6 +2970,8 @@ function nightActions(c) {
   if (c.witchSave && hasV(c.werewolf)) out.push({ key: 'witchSave', target: c.werewolf });
   if (hasV(c.witchPoison)) out.push({ key: 'witchPoison', target: c.witchPoison });
   if (hasV(c.spellcaster)) out.push({ key: 'spellcaster', target: c.spellcaster });
+  if (hasV(c.sniper)) out.push({ key: 'sniper', target: c.sniper });
+  if (hasV(c.zombie)) out.push({ key: 'zombie', target: c.zombie });
   return out;
 }
 // Applies the Shadow Figure's redirect { key, to } to the choices. A Shadow Figure that Medusa's gaze lands on is blocked.
@@ -3061,7 +3168,7 @@ function StoneVision({ text = 'Your vision was turned to stone tonight.' }) {
 function ActHeader({ role, sub, prompt }) {
   return (
     <div className="mb-4 text-center">
-      <RoleChip role={role === 'seerResult' ? 'seer' : role === 'lovers' ? 'cupid' : role} />
+      <RoleChip role={role === 'seerResult' ? 'seer' : role === 'lovers' ? 'cupid' : role === 'infected' ? 'zombie' : role} />
       <h2 className="font-display cap-in mt-3 text-2xl font-bold leading-snug text-slate-50">{prompt || NIGHT_PROMPT[role]}</h2>
       {sub && <p className="mt-2 text-sm text-slate-400">{sub}</p>}
     </div>
@@ -3079,9 +3186,9 @@ function NightCard({ player, line }) {
 }
 
 // The Shadow Figure's screen: anonymous action list, then a new target. Used by Pass & Play, Multi-Device auto and manual.
-const SHADOW_VERB = { medusa: 'Medusa turns {} to stone', bodyguard: 'Bodyguard protects {}', seer: 'Seer inspects {}', witchSave: 'Witch heals {}', witchPoison: 'Witch poisons {}', spellcaster: 'Spellcaster silences {}' };
+const SHADOW_VERB = { medusa: 'Medusa turns {} to stone', bodyguard: 'Bodyguard protects {}', seer: 'Seer inspects {}', witchSave: 'Witch heals {}', witchPoison: 'Witch poisons {}', spellcaster: 'Spellcaster silences {}', sniper: 'Sniper scopes {}', zombie: 'Zombie Infect \u2192 {}' };
 const shadowActionLabel = (key, name) => (SHADOW_VERB[key] || '{}').replace('{}', name);
-function ShadowAct({ actions, victimName, alive, nm, stoned, onDone, header }) {
+function ShadowAct({ actions, victimName, alive, wolves = [], nm, stoned, onDone, header }) {
   const order = useMemo(() => shuffle(actions.map((_, i) => i)), []);
   const [act, setAct] = useState(null);
   const [skip, setSkip] = useState(false);
@@ -3129,7 +3236,7 @@ function ShadowAct({ actions, victimName, alive, nm, stoned, onDone, header }) {
           {chosen && !skip && (
             <>
               <div className="mb-2 mt-4 text-center text-xs font-semibold uppercase tracking-widest text-slate-400">Choose a new target for that action</div>
-              <PickList players={alive} value={pick === null ? '' : pick} onChange={(v) => setPick(v === '' ? null : v)} disabled={[chosen.target]} />
+              <PickList players={alive} badges={wolves} value={pick === null ? '' : pick} onChange={(v) => setPick(v === '' ? null : v)} disabled={[chosen.target]} />
             </>
           )}
           <Btn className="mt-3" variant="secondary" onClick={() => { setSkip(!skip); setAct(null); setPick(null); }}>{skip ? 'Skip selected ✓' : 'Skip / Leave Actions Unchanged'}</Btn>
@@ -3156,11 +3263,45 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
   const choose = (v) => setPick(v === '' ? null : v);
 
   if (role === 'werewolf') {
+    const solo = alive.filter((p) => p.role === 'werewolf').length === 1; // a lone Werewolf has no pack: hide their own name
     return (
       <div className="flex flex-1 flex-col">
-        <ActHeader role={role} sub="Agree silently, then one of you taps the name." />
-        <PickList players={opts(alive.filter((p) => !hideSelf || !actor || p.id !== actor.id))} team={alive.filter((p) => p.role === 'werewolf' || p.role === 'shadow').map((p) => p.id)} value={val} onChange={choose} />
+        <ActHeader role={role} prompt={solo ? 'Werewolf, choose who to hunt.' : undefined} sub={solo ? 'Choose silently, then tap the name.' : 'Agree silently, then one of you taps the name.'} />
+        <PickList players={opts(alive.filter((p) => !(solo || hideSelf) || !actor || p.id !== actor.id))} team={alive.filter((p) => p.role === 'werewolf' || p.role === 'shadow').map((p) => p.id)} value={val} onChange={choose} />
         <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ werewolf: pick })}>{pick === null ? 'Select a target' : 'Confirm Target'}</Btn>
+      </div>
+    );
+  }
+  if (role === 'zombie') {
+    const zs = alive.filter((p) => p.role === 'zombie');
+    const solo = zs.length <= 1;
+    return (
+      <div className="flex flex-1 flex-col">
+        <ActHeader role={role} prompt={solo ? 'Zombie, choose who to infect.' : undefined} sub={solo ? 'The bite turns them the following night.' : 'Agree silently. One bite per night for the whole horde.'} />
+        <PickList players={opts(alive.filter((p) => !(solo || hideSelf) || !actor || p.id !== actor.id))} team={solo ? [] : zs.map((p) => p.id)} teamLabel="Zombie team" TeamIcon={ZombieIcon} value={val} onChange={choose} />
+        <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ zombie: pick })}>{pick === null ? 'Select a target' : 'Confirm Infection'}</Btn>
+      </div>
+    );
+  }
+  if (role === 'sniper') {
+    return (
+      <div className="flex flex-1 flex-col">
+        <ActHeader role={role} sub="If they are a Zombie, you shoot and their vote is disabled tomorrow." />
+        <PickList players={opts(alive.filter((p) => p.id !== actor.id))} value={val} onChange={choose} />
+        <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ sniper: pick })}>{pick === null ? 'Select a player' : 'Confirm Scope'}</Btn>
+      </div>
+    );
+  }
+  if (role === 'infected') {
+    return (
+      <div className="flex flex-1 flex-col">
+        <ActHeader role={role} />
+        <Panel className="text-center" style={{ border: '1px solid rgba(45,212,191,0.65)', background: 'rgba(13,148,136,0.22)' }}>
+          <ZombieIcon width="48" height="48" className="mx-auto text-emerald-300" />
+          <div className="font-display mt-2 text-xl font-bold text-slate-50">You are now a Zombie</div>
+          <p className="mt-2 text-sm text-slate-300">Your old powers are gone. From now on you wake with the Zombie Horde and win with them.</p>
+        </Panel>
+        <Btn className="mt-5" onClick={() => onDone({})}>I Understand</Btn>
       </div>
     );
   }
@@ -3176,7 +3317,7 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
   if (role === 'shadow') {
     const stoned = hasV(choices.medusa) && choices.medusa === actor.id;
     return <ShadowAct header={<ActHeader role="shadow" />} actions={nightActions(choices)} victimName={hasV(choices.werewolf) ? nm(choices.werewolf) : 'No one'}
-      alive={opts(alive)} nm={nm} stoned={stoned} onDone={(r) => onDone({ shadow: r })} />;
+      alive={opts(alive.filter((p) => !hideSelf || !actor || p.id !== actor.id))} wolves={alive.filter((p) => p.role === 'werewolf').map((p) => p.id)} nm={nm} stoned={stoned} onDone={(r) => onDone({ shadow: r })} />;
   }
   if (role === 'seerResult') {
     const sv = seerOverride || seerVision(choices, choices.shadow, (players.find((p) => p.alive && p.role === 'shadow') || {}).id, actor.id, players);
@@ -3290,10 +3431,18 @@ function resolveNightPP(players, c0, night) {
   const partnerOf = (id) => { if (pair) { if (pair[0] === id) return pair[1]; if (pair[1] === id) return pair[0]; } const q = byId.get(id); return q && has(q.lover) ? q.lover : null; };
   const brokenIds = [];
   dead.slice().forEach((id) => { const pid = partnerOf(id); if (pid !== null && byId.get(pid) && byId.get(pid).alive && !dead.includes(pid)) { dead.push(pid); brokenIds.push(pid); } });
+  // Outbreak: the horde's single bite lands unless the target died, was guarded, or was healed; the Sniper hits an active Zombie.
+  const biteT = has(c.zombie) && !blocked('zombie') ? c.zombie : null;
+  const biteP = biteT !== null ? byId.get(biteT) : null;
+  const bitten = biteP && biteP.alive && !dead.includes(biteT) && biteT !== guarded && !(witchSave && biteT === saveTarget) && biteP.role !== 'zombie' ? biteT : null;
+  const shotT = has(c.sniper) && !blocked('sniper') ? c.sniper : null;
+  const shotP = shotT !== null ? byId.get(shotT) : null;
+  const shotHit = shotP && shotP.alive && shotP.role === 'zombie' && !dead.includes(shotT) ? shotT : null;
   const myGuard = has(c0.bodyguard) && !blocked('bodyguard') ? c0.bodyguard : null; // Bodyguard and Medusa remember what they picked themselves
   const next = players.map((p) => {
-    const q = { ...p, nn: night, protectedTag: p.id === guarded, silencedTag: p.alive && p.id === silenced, stoneTag: p.alive && p.id === stoneId };
-    if (dead.includes(p.id)) { q.alive = false; q.protectedTag = false; q.silencedTag = false; q.stoneTag = false; }
+    const q = { ...p, nn: night, protectedTag: p.id === guarded, silencedTag: p.alive && p.id === silenced, stoneTag: p.alive && p.id === stoneId, shotTag: p.id === shotHit, justTurned: false };
+    if (p.id === bitten) q.bitten = night;
+    if (dead.includes(p.id)) { q.alive = false; q.protectedTag = false; q.silencedTag = false; q.stoneTag = false; q.shotTag = false; q.bitten = 0; }
     if (pair && (p.id === pair[0] || p.id === pair[1])) q.lover = partnerOf(p.id);
     if (p.role === 'bodyguard' && p.alive && myGuard !== null) q.lastGuard = myGuard;
     if (p.role === 'medusa' && p.alive) q.lastStone = has(c0.medusa) ? c0.medusa : null;
@@ -3302,7 +3451,7 @@ function resolveNightPP(players, c0, night) {
   });
   const silencedName = silenced !== null && byId.get(silenced) && !dead.includes(silenced) ? byId.get(silenced).name : '';
   const stonedName = stoneId !== null && !dead.includes(stoneId) ? stoned.name : '';
-  return { next, dead, broken: brokenIds, saved, victim, silenced, silencedName, stoned: stonedName ? stoneId : null, stonedName, lines: dawnLines(saved, dead.filter((id) => !brokenIds.includes(id)).map((id) => byId.get(id).name), silencedName, stonedName, brokenIds.map((id) => byId.get(id).name)) };
+  return { next, dead, broken: brokenIds, saved, victim, silenced, silencedName, stoned: stonedName ? stoneId : null, stonedName, lines: dawnLines(saved, dead.filter((id) => !brokenIds.includes(id)).map((id) => byId.get(id).name), silencedName, stonedName, brokenIds.map((id) => byId.get(id).name), shotHit !== null), bitten, shotHit };
 }
 
 // Pass & Play: the narrator runs the whole night by voice. One device, passed to each role in turn.
@@ -3310,6 +3459,14 @@ function NightLoopPP({ players, night, onFinish, onExit }) {
   const roles = useMemo(() => {
     const list = NIGHT_ORDER.filter((r) => (r !== 'cupid' || night === 1) && players.some((p) => p.alive && p.role === r));
     if (list.includes('seer') && (list.includes('shadow') || list.includes('medusa'))) list.push('seerResult'); // the Seer's vision waits until Medusa and the Shadow Figure have acted
+    const turned = players.find((p) => p.alive && p.justTurned); // a bitten player wakes alone, at their old role's turn, to learn they were infected
+    if (turned) {
+      const key = NIGHT_ORDER.indexOf(turned.former) < 0 ? NIGHT_ORDER.indexOf('zombie') : NIGHT_ORDER.indexOf(turned.former);
+      const strict = NIGHT_ORDER.indexOf(turned.former) >= 0; // no night power: wake just before the Zombie Horde
+      let at = list.findIndex((r) => { const ix = NIGHT_ORDER.indexOf(r) < 0 ? 99 : NIGHT_ORDER.indexOf(r); return strict ? ix > key : ix >= key; });
+      if (at < 0) at = list.length;
+      list.splice(at, 0, 'infected');
+    }
     return list;
   }, []);
   const deferSeer = useMemo(() => players.some((p) => p.alive && (p.role === 'shadow' || p.role === 'medusa')), []);
@@ -3358,7 +3515,7 @@ function NightLoopPP({ players, night, onFinish, onExit }) {
     return () => { off = true; };
   }, [st]);
 
-  const actorOf = (role) => players.find((p) => p.alive && p.role === (role === 'seerResult' ? 'seer' : role));
+  const actorOf = (role) => (role === 'infected' ? players.find((p) => p.alive && p.justTurned) : players.find((p) => p.alive && p.role === (role === 'seerResult' ? 'seer' : role)));
   let body = null, dawn = false, shake = false, flash = false;
   if (st.k === 'title') body = <LockView key="t" title={`Night ${nightWord(night)} Begins...`} sub="The village falls silent." />;
   else if (st.k === 'close') body = <LockView key="c" eye title="Close Your Eyes" sub="Keep them closed until the narrator says otherwise." count={count} />;
@@ -3417,6 +3574,7 @@ function NightStartCard({ night, onStart, over }) {
 }
 
 const StonedBadge = () => <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-100" style={{ background: 'rgba(13,148,136,0.45)', border: '1px solid rgba(45,212,191,0.75)' }}>STONED</span>;
+const ShotBadge = () => <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-sky-100" style={{ background: 'rgba(37,99,235,0.45)', border: '1px solid rgba(96,165,250,0.75)' }}>NO VOTE</span>;
 const SilencedBadge = () => <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-100" style={{ background: 'rgba(109,40,217,0.45)', border: '1px solid rgba(167,139,250,0.7)' }}>SILENCED</span>;
 
 // Pass & Play day: recap the dawn, talk, then each voter takes the phone and casts a secret ballot. Silenced players cannot vote.
@@ -3444,14 +3602,16 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
   const [shot, setShot] = useState(null);
   const [broken, setBroken] = useState([]);
   const alive = players.filter((p) => p.alive);
-  const voters = alive.filter((p) => !p.silencedTag && !p.stoneTag);
+  const voters = alive.filter((p) => !p.silencedTag && !p.stoneTag && !p.shotTag);
   const silenced = alive.filter((p) => p.silencedTag);
   const stoneds = alive.filter((p) => p.stoneTag);
   const targets = alive; // a stoned player cannot vote, but can still be voted out
   const wolves = alive.filter((p) => p.role === 'werewolf').length; // the Shadow Figure loses with the last Werewolf
   const evil = alive.filter((p) => ROLES_DATA[p.role].team === 'werewolf').length;
   const village = alive.length - evil;
-  const over = loversFaction(players) ? { ...LOVERS_WIN, kind: 'lovers' } : wolves === 0 ? { text: 'No Werewolves are left. The Village wins!', color: '#34D399', kind: 'village' } : evil >= village ? { text: 'The Werewolves match or outnumber the Village. The Werewolves win!', color: '#F87171', kind: 'werewolf' } : null;
+  const tw = threeWay(players.map((p) => ({ role: p.role, alive: p.alive })));
+  const hadZ = players.some((p) => p.role === 'zombie');
+  const over = loversFaction(players) ? { ...LOVERS_WIN, kind: 'lovers' } : tw ? { text: winText(tw, hadZ), color: WIN_UI[tw].color, kind: tw } : null;
   const sung = useRef('');
   useEffect(() => { if (over && sung.current !== over.kind) { sung.current = over.kind; Sfx.win(over.kind); } if (!over) sung.current = ''; }, [over && over.kind]);
   // Eliminates players; a Lover's partner dies of heartbreak with them. Returns the heartbroken players.
@@ -3525,7 +3685,7 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
           <Panel className="mt-3" style={{ background: 'rgba(21,26,36,0.82)' }}>
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Players still alive</h2>
             <ul className="flex flex-col gap-1.5">
-              {alive.map((p) => <li key={p.id} className="flex items-center justify-between gap-2 text-[15px] font-semibold text-slate-100"><span>{p.name}</span><span className="flex gap-1.5">{p.silencedTag && <SilencedBadge />}{p.stoneTag && <StonedBadge />}</span></li>)}
+              {alive.map((p) => <li key={p.id} className="flex items-center justify-between gap-2 text-[15px] font-semibold text-slate-100"><span>{p.name}</span><span className="flex gap-1.5">{p.silencedTag && <SilencedBadge />}{p.stoneTag && <StonedBadge />}{p.shotTag && <ShotBadge />}</span></li>)}
             </ul>
           </Panel>
         </>
@@ -3651,7 +3811,11 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
   const [mode, setMode] = useState(autoNight ? 'night' : 'grimoire'); // grimoire | night | day
   const [night, setNight] = useState(() => players.reduce((m, p) => Math.max(m, p.nn || 0), 0) + 1);
   const [info, setInfo] = useState(null);
-  const clearSilence = () => { if (players.some((p) => p.silencedTag || p.stoneTag)) setPlayers(players.map((p) => ({ ...p, silencedTag: false, stoneTag: false }))); };
+  // Dusk: tags wear off, and anyone bitten the night before turns into a Zombie (nn = the night that is about to start).
+  const clearSilence = (nn) => {
+    const conv = (p) => !!nn && p.alive && p.bitten && p.bitten < nn;
+    if (players.some((p) => p.silencedTag || p.stoneTag || p.shotTag || conv(p))) setPlayers(players.map((p) => ({ ...p, silencedTag: false, stoneTag: false, shotTag: false, ...(conv(p) ? { role: 'zombie', former: p.role, bitten: 0, justTurned: true } : {}) })));
+  };
   useEffect(() => { if (autoNight) clearSilence(); }, []);
   const [checked, setChecked] = useState({});
   const [confirmExit, setConfirmExit] = useState(false);
@@ -3684,8 +3848,12 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
 
   let status = null;
   if (loversFaction(players)) status = { text: 'The Lovers win! Only the bound pair is left.', color: '#F472B6' };
-  else if (wolvesAlive === 0) status = { text: 'No Werewolves left. The Village wins.', color: '#34D399' };
-  else if (evilAlive >= villageAlive) status = { text: 'Werewolves match or outnumber the Village.', color: '#F87171' };
+  else {
+    const tw3 = threeWay(players.map((p) => ({ role: p.role, alive: p.alive })));
+    if (tw3 === 'village') status = { text: 'No Werewolves left. The Village wins.', color: '#34D399' };
+    else if (tw3 === 'werewolf') status = { text: 'Werewolves match or outnumber the Village.', color: '#F87171' };
+    else if (tw3 === 'zombie') status = { text: 'The Zombie horde holds the majority. The Zombies win.', color: '#2DD4BF' };
+  }
 
   const body = (mode === 'night') ? (
     <NightLoopPP key={night} players={players} night={night}
@@ -3694,7 +3862,7 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
   ) : (mode === 'day') ? (
     <DayTrial players={players} setPlayers={setPlayers} night={night} info={info}
       onAgain={onAgain} onHome={() => { setPeek(false); onHome(); }}
-      onNight={() => { clearSilence(); setNight(night + 1); setInfo(null); setMode('night'); }} />
+      onNight={() => { clearSilence(night + 1); setNight(night + 1); setInfo(null); setMode('night'); }} />
   ) : null;
   if (body) {
     return (
@@ -3809,7 +3977,7 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
         </ul>
       </section>
 
-      {narrator && <NightStartCard night={night} over={!!status && wolvesAlive === 0} onStart={() => { clearSilence(); setInfo(null); setMode('night'); }} />}
+      {narrator && <NightStartCard night={night} over={!!status} onStart={() => { clearSilence(night); setInfo(null); setMode('night'); }} />}
 
       {/* Night guide */}
       <section className="mt-6 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
@@ -3883,7 +4051,7 @@ const STORE_KEY = 'nightfall.games.v1';
 //  pl[pid]: { n name, o join order, r roleId, a alive 1/0, d ready 1/0, t night target pid, nd night action done,
 //             ws witch save this night, wsu / wpu potion used, lp bodyguard (or Medusa) last target, hs hunter shot used, s silenced, x stoned until dusk, sa Shadow Figure's chosen action, lv Lovers partner pid, t2 Cupid's second pick, la Lover has seen their partner, rd Seer saw the final vision, lf left }
 const SESSION_KEY = 'nightfall.mp.v1';
-const MP_ACTIVE = ['werewolf', 'seer', 'cupid', 'medusa', 'bodyguard', 'witch', 'spellcaster', 'shadow'];
+const MP_ACTIVE = ['werewolf', 'seer', 'cupid', 'medusa', 'bodyguard', 'witch', 'sniper', 'spellcaster', 'zombie', 'shadow'];
 const mpActive = (role, k) => MP_ACTIVE.includes(role) && (role !== 'cupid' || k === 1); // Cupid only acts on the first night
 const MP_MIN = 4;
 const MP_MAX = 15;
@@ -3988,7 +4156,7 @@ async function mpCreateRoomImpl(name, hostPlays, roomName) {
     if (!existing) { code = c; break; }
   }
   if (!code) throw new Error('no-code');
-  const room = { v: 1, host: pid, hp: hostPlays ? 1 : 0, rn: (roomName || '').trim() || 'Nightfall Village', hn: hostPlays ? name : 'Moderator', ph: 'lobby', k: 0, lk: 0, w: '', ts: Date.now() };
+  const room = { v: 1, host: pid, hp: hostPlays ? 1 : 0, rn: (roomName || '').trim() || 'Nightfall Village', hn: hostPlays ? name : 'Moderator', md: getGameMode(), ph: 'lobby', k: 0, lk: 0, w: '', ts: Date.now() };
   if (hostPlays) room.pl = { [pid]: { n: name, o: 1, a: 1, d: 0 } };
   await Mp.put(`rooms/${code}`, room);
   return { code, pid, host: true, local: Mp.local };
@@ -4025,15 +4193,9 @@ function mpJoinErrorText(e) {
 const roomPlayers = (room) => Object.entries((room && room.pl) || {}).map(([id, p]) => ({ id, ...p })).sort((a, b) => (a.o || 0) - (b.o || 0));
 const mpNightRoles = (players) => Array.from(new Set(players.map((p) => p.r).filter((r) => MP_ACTIVE.includes(r)))).sort((a, b) => ROLES_DATA[a].nightOrder - ROLES_DATA[b].nightOrder);
 function mpWinner(players) {
-  const live = players.filter((p) => p.a === 1 && p.r);
   if (!players.some((p) => p.r)) return '';
-  const wolves = live.filter((p) => p.r === 'werewolf').length; // the Shadow Figure loses with the last Werewolf
-  const evil = live.filter((p) => ROLES_DATA[p.r] && ROLES_DATA[p.r].team === 'werewolf').length;
-  const others = live.length - evil;
   if (loversFaction(players.map((p) => ({ id: p.id, role: p.r, alive: p.a === 1 && !!p.r, lover: p.lv })).filter((i) => i.role))) return 'lovers';
-  if (wolves === 0) return 'village';
-  if (evil >= others) return 'werewolf';
-  return '';
+  return threeWay(players.map((p) => ({ role: p.r, alive: p.a === 1 })));
 }
 // What the wolf pack has chosen so far (most votes wins; ties go to the earliest joined target).
 function mpWolfVictim(players) {
@@ -4052,7 +4214,7 @@ function mpDealPatch(room, deck) {
   const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0 };
   players.forEach((p, i) => {
     const b = `pl/${p.id}/`;
-    Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0, [b + 'v']: '', [b + 'lv']: '', [b + 't2']: '', [b + 'la']: 0 });
+    Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0, [b + 'v']: '', [b + 'lv']: '', [b + 't2']: '', [b + 'la']: 0, [b + 'bt']: 0, [b + 'jt']: 0, [b + 'sn']: 0, [b + 'fr']: '' });
   });
   return patch;
 }
@@ -4060,7 +4222,7 @@ function mpLobbyPatch(room) {
   const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null, vd: null, cm: null, sp: null };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
-    ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'x', 'sa', 'rd', 'lf', 'v', 'lv', 't2', 'la'].forEach((f) => { patch[b + f] = null; });
+    ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'x', 'sa', 'rd', 'lf', 'v', 'lv', 't2', 'la', 'bt', 'jt', 'sn', 'fr'].forEach((f) => { patch[b + f] = null; });
     patch[b + 'a'] = 1; patch[b + 'd'] = 0;
   });
   return patch;
@@ -4069,7 +4231,8 @@ function mpNightPatch(room) {
   const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1, cm: null, sp: null, vd: null, bn: nextBgIdx('night', room.bn) };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
-    patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0; patch[b + 'v'] = ''; patch[b + 's'] = 0; patch[b + 'x'] = 0; patch[b + 'sa'] = ''; patch[b + 'rd'] = 0; patch[b + 'la'] = 0; patch[b + 't2'] = ''; // dusk: the stone wears off
+    patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0; patch[b + 'v'] = ''; patch[b + 's'] = 0; patch[b + 'x'] = 0; patch[b + 'sa'] = ''; patch[b + 'rd'] = 0; patch[b + 'la'] = 0; patch[b + 't2'] = ''; patch[b + 'sn'] = 0; patch[b + 'jt'] = 0; // dusk: the stone wears off
+    if (p.a === 1 && p.bt && p.bt < patch.k) { patch[b + 'r'] = 'zombie'; patch[b + 'fr'] = p.r; patch[b + 'jt'] = 1; patch[b + 'bt'] = 0; } // bitten last night: turns now
   });
   return patch;
 }
@@ -4091,7 +4254,7 @@ function mpChoices(ps) {
     medusa: mpStoneTarget(ps) || null, werewolf: victim, seer: pick('seer'), bodyguard: pick('bodyguard'),
     witchSave: !!(witch && witch.ws === 1 && !witch.wsu && victim),
     witchPoison: witch && witch.t && !witch.wpu && byId[witch.t] ? witch.t : null,
-    spellcaster: pick('spellcaster')
+    spellcaster: pick('spellcaster'), sniper: pick('sniper'), zombie: pick('zombie')
   };
 }
 function mpShadowRedirect(ps) {
@@ -4134,19 +4297,26 @@ function mpResolveNight(room) {
   const brokenIds = [];
   dead.slice().forEach((id) => { const pid = byId[id] && byId[id].lv; if (pid && byId[pid] && byId[pid].a === 1 && !dead.includes(pid)) { dead.push(pid); brokenIds.push(pid); } });
 
-  const lines = dawnLines(saved, dead.filter((id) => !brokenIds.includes(id)).map((id) => byId[id].n), '', '', brokenIds.map((id) => byId[id].n));
+  // Outbreak: the horde's single bite lands unless the target died, was guarded or was healed; the Sniper hits an active Zombie.
+  const biteT = c.zombie && !blocked('zombie') ? c.zombie : '';
+  const biteP = biteT ? byId[biteT] : null;
+  const bitten = biteP && biteP.a === 1 && !dead.includes(biteT) && biteT !== guarded && !(saveTarget && biteT === saveTarget) && biteP.r !== 'zombie' ? biteT : '';
+  const shotT = c.sniper && !blocked('sniper') ? c.sniper : '';
+  const shotHit = shotT && byId[shotT] && byId[shotT].a === 1 && byId[shotT].r === 'zombie' && !dead.includes(shotT) ? shotT : '';
+  const lines = dawnLines(saved, dead.filter((id) => !brokenIds.includes(id)).map((id) => byId[id].n), '', '', brokenIds.map((id) => byId[id].n), !!shotHit);
   const silencedAlive = silenced && !dead.includes(silenced) ? silenced : '';
   const stonedAlive = stoneId && !dead.includes(stoneId) ? stoneId : '';
   const an = { k: room.k || 0, t: Date.now(), l: Object.fromEntries(lines.map((t, i) => [i, t])), sv: saved ? 1 : 0, si: silencedAlive, st: stonedAlive };
   if (dead.length && getSettings().revealDead) an.rv = Object.fromEntries(dead.map((id) => [id, byId[id].r]));
   const patch = { ph: 'day', an, ns: null, nk: null, bd: nextBgIdx('day', room.bd) };
-  ps.forEach((p) => { patch[`pl/${p.id}/s`] = silencedAlive && p.id === silencedAlive ? 1 : 0; patch[`pl/${p.id}/x`] = stonedAlive && p.id === stonedAlive ? 1 : 0; });
+  ps.forEach((p) => { patch[`pl/${p.id}/s`] = silencedAlive && p.id === silencedAlive ? 1 : 0; patch[`pl/${p.id}/x`] = stonedAlive && p.id === stonedAlive ? 1 : 0; patch[`pl/${p.id}/sn`] = shotHit && p.id === shotHit ? 1 : 0; });
+  if (bitten) patch[`pl/${bitten}/bt`] = room.k || 1;
   dead.forEach((id) => { patch[`pl/${id}/a`] = 0; });
   witches.forEach((w) => { if (witchSaves) patch[`pl/${w.id}/wsu`] = 1; if (poison) patch[`pl/${w.id}/wpu`] = 1; }); // teammates share the potions
   // Bodyguard and Medusa remember what they picked themselves, even when the Shadow Figure moved it.
   bgs.forEach((b) => { if (!blocked('bodyguard')) patch[`pl/${b.id}/lp`] = b.t; });
   alive.filter((p) => p.r === 'medusa').forEach((m) => { patch[`pl/${m.id}/lp`] = c0.medusa || ''; });
-  return { patch, dead, saved, victim, guarded, silenced: silencedAlive, stoned: stonedAlive, lines, silencedLine: silencedAlive ? `${byId[silencedAlive].n} has been silenced for the day. They cannot speak or vote.` : '', stonedLine: stonedAlive ? stoneLine(byId[stonedAlive].n) : '' };
+  return { patch, dead, saved, victim, guarded, bitten, shotHit, silenced: silencedAlive, stoned: stonedAlive, lines, silencedLine: silencedAlive ? `${byId[silencedAlive].n} has been silenced for the day. They cannot speak or vote.` : '', stonedLine: stonedAlive ? stoneLine(byId[stonedAlive].n) : '' };
 }
 
 /* ------------------------------------------------------------------ */
@@ -4454,7 +4624,7 @@ function MpReveal({ me, ready, readyCount, total, onReady }) {
   );
 }
 
-function PickList({ players, value, onChange, disabled = [], locked, team = [] }) {
+function PickList({ players, value, onChange, disabled = [], locked, team = [], teamLabel = 'Werewolf team', TeamIcon = WolfIcon, badges = [] }) {
   return (
     <ul className="flex flex-col gap-2" role="listbox">
       {players.map((p) => {
@@ -4467,8 +4637,8 @@ function PickList({ players, value, onChange, disabled = [], locked, team = [] }
               className={`flex min-h-[52px] w-full items-center justify-between rounded-xl px-4 text-left text-[15px] font-semibold transition active:scale-[0.99] ${mate ? '' : 'disabled:opacity-40'}`}
               style={mate ? { background: 'rgba(127,29,29,0.25)', border: '1px solid rgba(239,68,68,0.55)', color: '#FCA5A5' }
                 : { background: sel ? 'rgba(109,40,217,0.4)' : 'var(--card-2)', border: `${sel ? 2 : 1}px solid ${sel ? '#C4B5FD' : 'var(--line)'}`, boxShadow: sel ? '0 0 18px -4px rgba(167,139,250,0.7)' : 'none', color: '#E6EAF2' }}>
-              {mate ? <><span>{p.n}</span><span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider"><WolfIcon width="18" height="18" aria-hidden="true" />Werewolf team</span></>
-                : <>{p.n}{sel && <span aria-hidden="true" className="text-lg">✓</span>}</>}
+              {mate ? <><span>{p.n}</span><span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider"><TeamIcon width="18" height="18" aria-hidden="true" />{teamLabel}</span></>
+                : <><span className="flex items-center gap-2">{p.n}{badges.includes(p.id) && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-200" style={{ background: 'rgba(127,29,29,0.5)', border: '1px solid rgba(239,68,68,0.75)' }}>Werewolf</span>}</span>{sel && <span aria-hidden="true" className="text-lg">✓</span>}</>}
             </button>
           </li>
         );
@@ -4698,7 +4868,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
   const chatGroup = group.length > 1 && me.a === 1 && me.r === role && me.nd !== 1;
   const [spL, setSpL] = useState(null);
   const wrap = (body, pitch) => <NightStage fixed={!!immersive} pitch={pitch} onExit={immersive ? onLeave : undefined}>{!pitch && partner && <LoverBadge name={partner.n} className="mb-3" />}{body}{!pitch && chatGroup && <TeamChat me={me} group={group} room={room} write={write} tag={tag} />}</NightStage>;
-  const mine = me.a === 1 && ((!!role && me.r === role && me.nd !== 1) || (viewing && me.r === 'seer' && me.rd !== 1)) && sent !== tag;
+  const mine = me.a === 1 && ((!!role && me.r === role && me.nd !== 1) || (viewing && me.r === 'seer' && me.rd !== 1) || (role === 'infected' && me.jt === 1)) && sent !== tag;
 
   if (ns === 'i') return wrap(<LockView key="i" title={`Night ${nightWord(room.k)} Begins...`} sub="The village falls silent." />);
   if (ns === 'c') return wrap(<LockView key="c" eye title="Close Your Eyes" sub="Keep them closed until the narrator says otherwise." count={n} />);
@@ -4721,6 +4891,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
       setSent(tag);
       const gp = (fn) => { const o = {}; (group.length ? group : [me]).forEach((g) => Object.assign(o, fn(g))); return o; }; // one confirmed action covers the whole wake-up group
       if (viewing) write({ [`pl/${me.id}/rd`]: 1 });
+      else if (role === 'infected') write({ [`pl/${me.id}/jt`]: 2 });
       else if (role === 'cupid') write({ [`pl/${me.id}/t`]: c.cupid[0], [`pl/${me.id}/t2`]: c.cupid[1], [`pl/${me.id}/nd`]: 1, [`pl/${c.cupid[0]}/lv`]: c.cupid[1], [`pl/${c.cupid[1]}/lv`]: c.cupid[0] });
       else if (role === 'shadow') write({ [`pl/${me.id}/t`]: c.shadow ? c.shadow.to : '', [`pl/${me.id}/sa`]: c.shadow ? c.shadow.key : '', [`pl/${me.id}/nd`]: 1 });
       else if (role === 'witch') write(gp((g) => ({ [`pl/${g.id}/t`]: c.witchPoison === null || c.witchPoison === undefined ? '' : c.witchPoison, [`pl/${g.id}/ws`]: c.witchSave ? 1 : 0, [`pl/${g.id}/nd`]: 1 })));
@@ -4752,7 +4923,16 @@ function useNightDirector({ room, players, write }) {
     const live = () => runId.current === my;
     const room0 = latest.current.room;
     const nightNo = opts && opts.again ? (room0.k || 1) : (room0.k || 0) + 1;
-    const roles = NIGHT_ORDER.filter((r) => mpActive(r, nightNo) && latest.current.players.some((p) => p.a === 1 && p.r === r));
+    const pred = latest.current.players.map((p) => (p.a === 1 && p.bt && p.bt < nightNo ? { ...p, r: 'zombie', fr: p.r, jt: 1 } : p)); // what dusk will turn into Zombies
+    const roles = NIGHT_ORDER.filter((r) => mpActive(r, nightNo) && pred.some((p) => p.a === 1 && p.r === r));
+    const turned = pred.find((p) => p.a === 1 && p.jt === 1 && p.fr && p.r === 'zombie' && latest.current.players.find((q) => q.id === p.id).r !== 'zombie');
+    if (turned) {
+      const key = NIGHT_ORDER.indexOf(turned.fr) < 0 ? NIGHT_ORDER.indexOf('zombie') : NIGHT_ORDER.indexOf(turned.fr);
+      const strict = NIGHT_ORDER.indexOf(turned.fr) >= 0;
+      let at = roles.findIndex((r) => { const ix = NIGHT_ORDER.indexOf(r) < 0 ? 99 : NIGHT_ORDER.indexOf(r); return strict ? ix > key : ix >= key; });
+      if (at < 0) at = roles.length;
+      roles.splice(at, 0, 'infected');
+    }
     let nk = 1;
     const step = async (ns, label) => { nk += 1; setDir({ on: true, label }); await write({ ns, nk, cm: null, sp: null }); }; // each turn starts with a clean team chat
     try {
@@ -4769,8 +4949,9 @@ function useNightDirector({ room, players, write }) {
         skip.current = false;
         const t0 = Date.now();
         while (live()) {
-          const holders = latest.current.players.filter((p) => p.a === 1 && p.r === r);
-          if (holders.every((p) => p.nd === 1) || skip.current || Date.now() - t0 > 90000) break;
+          const holders = r === 'infected' ? latest.current.players.filter((p) => p.a === 1 && p.jt === 1) : latest.current.players.filter((p) => p.a === 1 && p.r === r);
+          if (r === 'infected' ? holders.length === 0 : holders.every((p) => p.nd === 1)) break;
+          if (skip.current || Date.now() - t0 > 90000) break;
           await wait(500);
         }
         if (!live()) return;
@@ -4808,7 +4989,7 @@ function useNightDirector({ room, players, write }) {
 function mpTally(players) {
   const byId = Object.fromEntries(players.map((p) => [p.id, p]));
   const alive = players.filter((p) => p.a === 1);
-  const voters = alive.filter((p) => p.s !== 1 && p.x !== 1);
+  const voters = alive.filter((p) => p.s !== 1 && p.x !== 1 && p.sn !== 1);
   const tally = {};
   voters.forEach((p) => { if (p.v && byId[p.v] && byId[p.v].a === 1) tally[p.v] = (tally[p.v] || 0) + (p.r === 'mayor' ? 2 : 1); });
   const ranked = Object.keys(tally).sort((x, y) => tally[y] - tally[x]);
@@ -4838,7 +5019,7 @@ function MpVote({ me, players, room, write }) {
   const { voters, voted } = mpTally(players);
   const [pick, setPick] = useState(me.v || '');
   const stonedMe = me.x === 1;
-  const silenced = me.s === 1 || stonedMe;
+  const silenced = me.s === 1 || stonedMe || me.sn === 1;
   const nm = (id) => (players.find((p) => p.id === id) || {}).n || '?';
   if (room.vd === 1) return <Panel className="text-center text-sm text-slate-300">The village has decided.</Panel>;
   if (me.a !== 1) return <Panel className="text-center text-sm text-slate-400">The village is voting. {voted} of {voters.length} votes are in.</Panel>;
@@ -4846,7 +5027,7 @@ function MpVote({ me, players, room, write }) {
     <Panel id="mp-vote">
       <h3 className="font-display text-lg font-bold">Trial vote</h3>
       {me.r === 'mayor' && !silenced && <MayorNote className="mt-2" />}
-      <p className="mb-3 mt-1 text-xs text-slate-300">{stonedMe ? 'You are turned to stone and cannot vote today.' : silenced ? 'You cannot vote today.' : 'Discuss, then vote for the player you want eliminated.'} {voted} of {voters.length} votes are in.</p>
+      <p className="mb-3 mt-1 text-xs text-slate-300">{stonedMe ? 'You are turned to stone and cannot vote today.' : me.sn === 1 ? 'The Sniper shot you. You cannot vote today.' : silenced ? 'You cannot vote today.' : 'Discuss, then vote for the player you want eliminated.'} {voted} of {voters.length} votes are in.</p>
       <PickList players={alive.filter((p) => p.id !== me.id)} value={silenced ? '' : pick} onChange={setPick} locked={silenced} />
       <Btn className="mt-3" disabled={silenced || !pick || pick === me.v} onClick={() => write({ [`pl/${me.id}/v`]: pick })}>{silenced ? 'Voting disabled' : me.v ? 'Change Vote' : 'Cast Vote'}</Btn>
       {!silenced && me.v && <p className="mt-2 text-center text-xs text-emerald-300">Your vote: {nm(me.v)}</p>}
@@ -4885,7 +5066,7 @@ function StatusBadges({ players, meId }) {
       {players.map((p) => (
         <span key={p.id} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold"
           style={p.a === 1 ? { background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.4)', color: '#A7F3D0' } : { background: 'rgba(100,116,139,0.12)', border: '1px solid rgba(100,116,139,0.35)', color: '#94A3B8', textDecoration: 'line-through' }}>
-          {p.n}{p.id === meId ? ' (you)' : ''}{p.s === 1 && p.a === 1 ? ' 🤐' : ''}{p.x === 1 && p.a === 1 ? ' 🗿 STONED' : ''}
+          {p.n}{p.id === meId ? ' (you)' : ''}{p.s === 1 && p.a === 1 ? ' 🤐' : ''}{p.x === 1 && p.a === 1 ? ' 🗿 STONED' : ''}{p.sn === 1 && p.a === 1 ? ' 🎯 NO VOTE' : ''}
         </span>
       ))}
     </div>
@@ -4924,6 +5105,8 @@ function MpDay({ me, players, room, write }) {
           ? <Panel className="text-center text-sm font-semibold text-teal-100" style={{ border: '1px solid rgba(45,212,191,0.7)', background: 'rgba(13,148,136,0.25)' }} role="alert">You have been turned to stone by Medusa until dusk &mdash; you cannot speak or vote today.</Panel>
         : me.s === 1
           ? <Panel className="text-center text-sm font-semibold text-violet-100" style={{ border: '1px solid rgba(167,139,250,0.7)', background: 'rgba(109,40,217,0.25)' }} role="alert">You have been silenced by the Spellcaster &mdash; you cannot speak or vote today.</Panel>
+          : me.sn === 1
+            ? <Panel className="text-center text-sm font-semibold text-sky-100" style={{ border: '1px solid rgba(96,165,250,0.7)', background: 'rgba(37,99,235,0.25)' }} role="alert">The Sniper shot you &mdash; your vote is disabled for today.</Panel>
           : <Panel className="text-center text-sm text-slate-300">You are alive. Discuss and find the werewolves.</Panel>}
       {hunterShot && (
         <Panel style={{ border: '1px solid rgba(245,158,11,0.6)' }}>
@@ -4943,13 +5126,13 @@ function MpDay({ me, players, room, write }) {
 }
 
 function MpOver({ room, players, meId }) {
-  const village = room.w === 'village', lovers = room.w === 'lovers';
+  const W = WIN_UI[room.w] || WIN_UI.werewolf;
   useEffect(() => { Sfx.win(room.w === 'zombie' ? 'zombie' : room.w); }, []);
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <Panel className="text-center" style={{ border: `1px solid ${lovers ? '#F472B6' : village ? '#34D399' : '#EF4444'}`, background: lovers ? 'rgba(244,114,182,0.12)' : village ? 'rgba(16,185,129,0.1)' : 'rgba(220,38,38,0.12)' }}>
+      <Panel className="text-center" style={{ border: `1px solid ${W.color}`, background: W.bg }}>
         <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-300">Game over</div>
-        <h2 className="font-display mt-1 text-3xl font-black" style={{ color: lovers ? '#F9A8D4' : village ? '#6EE7B7' : '#FCA5A5' }}>{lovers ? 'The Lovers win' : village ? 'The Village wins' : 'The Werewolves win'}</h2>
+        <h2 className="font-display mt-1 text-3xl font-black" style={{ color: W.title }}>{W.name}</h2>
       </Panel>
       <ul className="flex flex-col gap-2">
         {players.map((p) => (
@@ -4992,9 +5175,9 @@ function MpMod({ room, players, me, write, director }) {
   const playAgain = () => write(mpLobbyPatch(room));
 
   const winBanner = winner && (ph === 'night' || ph === 'day') && (
-    <Panel style={{ border: `1px solid ${winner === 'lovers' ? '#F472B6' : winner === 'village' ? '#34D399' : '#EF4444'}`, background: winner === 'lovers' ? 'rgba(244,114,182,0.12)' : winner === 'village' ? 'rgba(16,185,129,0.1)' : 'rgba(220,38,38,0.12)' }}>
-      <p className="text-sm font-semibold text-slate-100">{winner === 'lovers' ? 'Only the bound Lovers are left.' : winner === 'village' ? 'No werewolves are left. The Village wins.' : 'The werewolves match or outnumber the Village.'}</p>
-      <Btn className="mt-3" onClick={() => endGame(winner)}>End Game: {winner === 'lovers' ? 'Lovers Win' : winner === 'village' ? 'Village Wins' : 'Werewolves Win'}</Btn>
+    <Panel style={{ border: `1px solid ${(WIN_UI[winner] || WIN_UI.werewolf).color}`, background: (WIN_UI[winner] || WIN_UI.werewolf).bg }}>
+      <p className="text-sm font-semibold text-slate-100">{(WIN_UI[winner] || WIN_UI.werewolf).banner}</p>
+      <Btn className="mt-3" onClick={() => endGame(winner)}>End Game: {(WIN_UI[winner] || WIN_UI.werewolf).btn}</Btn>
     </Panel>
   );
 
@@ -5011,6 +5194,9 @@ function MpMod({ room, players, me, write, director }) {
         if (p.lv) tags.push(`lover of ${nm(p.lv)}`);
         if (p.s === 1 && ph === 'day') tags.push('silenced');
         if (p.x === 1 && ph === 'day') tags.push('stoned');
+        if (p.sn === 1 && ph === 'day') tags.push('no vote (sniped)');
+        if (p.fr) tags.push(`was ${ROLES_DATA[p.fr] ? ROLES_DATA[p.fr].name : p.fr}`);
+        if (p.bt && p.a === 1) tags.push('infected');
         if (p.r === 'medusa' && p.lp) tags.push(`last stoned ${nm(p.lp)}`);
         if (p.r === 'bodyguard' && p.lp) tags.push(`last guarded ${nm(p.lp)}`);
         return (
@@ -5097,7 +5283,7 @@ function MpMod({ room, players, me, write, director }) {
         {ph === 'day' && <Btn onClick={startNight}>Start Night {(room.k || 0) + 1}</Btn>}
         {(ph === 'night' || ph === 'day') && (
           confirmEnd
-            ? <div className="flex gap-2"><Btn variant="secondary" onClick={() => endGame('village')}>Village wins</Btn><Btn variant="secondary" onClick={() => endGame('werewolf')}>Wolves win</Btn><Btn variant="secondary" onClick={() => endGame('lovers')}>Lovers win</Btn><Btn variant="ghost" onClick={() => setConfirmEnd(false)}>Cancel</Btn></div>
+            ? <div className="flex gap-2"><Btn variant="secondary" onClick={() => endGame('village')}>Village wins</Btn><Btn variant="secondary" onClick={() => endGame('werewolf')}>Wolves win</Btn><Btn variant="secondary" onClick={() => endGame('lovers')}>Lovers win</Btn>{getGameMode() === 'outbreak' && <Btn variant="secondary" onClick={() => endGame('zombie')}>Zombies win</Btn>}<Btn variant="ghost" onClick={() => setConfirmEnd(false)}>Cancel</Btn></div>
             : <Btn variant="ghost" onClick={() => setConfirmEnd(true)}>End Game Early</Btn>
         )}
       </div>
@@ -5166,6 +5352,7 @@ function MpRoom({ session, onExit, onPhase }) {
   useEffect(() => { if (room && typeof room.bn === 'number') setBgIdx('night', room.bn); }, [room && room.bn, room && room.k]);
   useEffect(() => { if (room && typeof room.bd === 'number') setBgIdx('day', room.bd); }, [room && room.bd, room && room.k]);
   useEffect(() => () => onPhase(''), []);
+  useEffect(() => { if (room && room.md) setGameMode(room.md); }, [room && room.md]); // everyone plays the host's mode
   useEffect(() => { if (cardsStep) setDeck(autoFill(players.length)); }, [cardsStep, players.length]);
   useEffect(() => { if (ph !== 'lobby' && cardsStep) setCardsStep(false); }, [ph]);
 

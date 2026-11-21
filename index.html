@@ -227,6 +227,18 @@ const MedusaIcon = (p) => (
     <path d="M20 40 Q8 44 10 54 M44 40 Q56 44 54 54" />
   </svg>
 );
+const HeartIcon = (p) => (
+  <svg {...iconProps} {...p}>
+    <path d="M32 54 C10 38 6 24 12 16 C18 8 29 10 32 19 C35 10 46 8 52 16 C58 24 54 38 32 54Z" />
+  </svg>
+);
+const CupidIcon = (p) => (
+  <svg {...iconProps} {...p}>
+    <path d="M32 50 C16 39 13 29 17 23 C21 17 29 19 32 25 C35 19 43 17 47 23 C51 29 48 39 32 50Z" />
+    <path d="M6 58 L58 6 M58 6 H44 M58 6 V20" />
+    <path d="M6 58 L12 52 M6 58 L12 64" opacity="0" />
+  </svg>
+);
 const ShadowIcon = (p) => (
   <svg {...iconProps} {...p}>
     <path d="M32 6 C18 8 12 22 14 36 L8 58 L22 50 L32 58 L42 50 L56 58 L50 36 C52 22 46 8 32 6Z" />
@@ -410,6 +422,18 @@ const ShadowArt = () => (
     <path d="M100 70 C64 74 52 112 56 150 L40 214 L74 192 L100 214 L126 192 L160 214 L144 150 C148 112 136 74 100 70Z" fill="#0A0A10" stroke="#94A3B8" strokeWidth="2" />
     <ellipse cx="100" cy="112" rx="20" ry="24" fill="#000" />
     <path d="M128 150 Q160 140 170 120" fill="none" stroke="#94A3B8" strokeWidth="4" strokeLinecap="round" />
+  </svg>
+);
+const CupidArt = () => (
+  <svg {...artSvg}>
+    <defs>
+      <linearGradient id="cu-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1E2A52" /><stop offset="1" stopColor="#0A0D1F" /></linearGradient>
+    </defs>
+    <rect width="200" height="267" fill="url(#cu-bg)" />
+    <Stars pts={[[24, 28, 1.2], [168, 22, 1], [30, 210, 1]]} fill="#E2E8F0" />
+    <circle cx="150" cy="48" r="18" fill="#E2E8F0" opacity="0.8" />
+    <path d="M100 196 C52 160 44 120 62 100 C80 82 98 92 100 112 C102 92 120 82 138 100 C156 120 148 160 100 196Z" fill="#9F1239" stroke="#F9A8D4" strokeWidth="3" />
+    <path d="M40 226 L160 86 M160 86 H132 M160 86 V114" fill="none" stroke="#E2E8F0" strokeWidth="4" strokeLinecap="round" />
   </svg>
 );
 const MedusaArt = () => (
@@ -748,6 +772,12 @@ const ROLES_DATA = {
     nightOrder: 6, nightPrompt: 'Shadow Figure wakes last. Show the Werewolves\u2019 victim and the other night targets without saying who chose them. They may redirect one action to a new target, or skip.',
     short: 'Redirects one night action to a new target.',
     ability: 'Each night, you may redirect one night action to a new target.'
+  },
+  cupid: {
+    id: 'cupid', balance: -3, Art: CupidArt, imageUrl: 'images/cupid-card.jpg', blurb: 'Bind two players together on the first night.', name: 'Cupid', team: 'village', max: 1, color: '#F472B6', Icon: CupidIcon,
+    nightOrder: 0, nightPrompt: 'First night only: Cupid wakes before the Werewolves and binds two players as Lovers. The Lovers then wake to see each other.',
+    short: 'Binds two players as Lovers on the first night.',
+    ability: 'On the first night, bind two players together. If either one dies, their partner immediately perishes of heartbreak.'
   },
   villager: {
     id: 'villager', balance: 1, Art: VillagerArt, imageUrl: 'images/villager-card.jpg', blurb: 'No night power. Use deduction to find the wolves.', name: 'Villager', team: 'village', max: 1, color: '#CBD5E1', Icon: HouseIcon,
@@ -1611,18 +1641,18 @@ const Narrator = (() => {
   const supported = () => typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
   // In Thai mode, speech needs a Thai voice. If the device lists voices and none is Thai, narration falls back to the on-screen text with timed pauses.
   const hasVoice = () => {
-    if (langNow !== 'th') return true;
+    return true;
     try { const vs = window.speechSynthesis.getVoices(); return vs.length === 0 || vs.some((v) => /^th/i.test(v.lang)); } catch (e) { return false; }
   };
   const ok = () => supported() && hasVoice();
   const pickVoice = () => {
-    const th = langNow === 'th';
+    const th = false;
     const vs = window.speechSynthesis.getVoices().filter((v) => (th ? /^th/i.test(v.lang) : /^en/i.test(v.lang)));
     if (th) return vs[0] || null;
     return vs.find((v) => /daniel|alex|fred|google uk english male|male/i.test(v.name)) || vs[0] || null;
   };
   const tune = (u) => {
-    if (langNow === 'th') { u.lang = 'th-TH'; u.rate = 0.9; u.pitch = 0.8; } else { u.lang = 'en-US'; u.rate = 0.82; u.pitch = 0.65; }
+    u.lang = 'en-US'; u.rate = 0.82; u.pitch = 0.65; // narrator audio is English only
     u.volume = 1;
   };
   return {
@@ -1631,7 +1661,7 @@ const Narrator = (() => {
       if (!ok()) return;
       const synth = window.speechSynthesis;
       synth.cancel();
-      const u = new SpeechSynthesisUtterance(trLine(text));
+      const u = new SpeechSynthesisUtterance(text);
       const v = pickVoice(); if (v) { try { u.voice = v; } catch (e) { /* engine picks by lang */ } }
       tune(u);
       synth.speak(u);
@@ -1639,9 +1669,9 @@ const Narrator = (() => {
     // Speaks a line and resolves when it ends. A timer guards against engines that never fire "end" (or have no voice).
     say: (raw) => new Promise((resolve) => {
       let done = false, t = 0;
-      const text = trLine(raw);
+      const text = raw;
       const fin = () => { if (!done) { done = true; clearTimeout(t); resolve(); } };
-      const est = langNow === 'th' ? 1300 + text.length * 90 : 1300 + text.split(/\s+/).length * 430;
+      const est = 1300 + text.split(/\s+/).length * 430;
       if (!ok()) { t = setTimeout(fin, est); return; }
       t = setTimeout(fin, est + 5000);
       try {
@@ -2740,11 +2770,13 @@ function StatusChip({ active, onClick, color, children }) {
 /* ------------------------------------------------------------------ */
 /* Automated night: shared pieces, Pass & Play loop, day trial        */
 /* ------------------------------------------------------------------ */
-const NIGHT_ORDER = ['werewolf', 'medusa', 'seer', 'bodyguard', 'witch', 'spellcaster', 'shadow'];
+const NIGHT_ORDER = ['cupid', 'werewolf', 'medusa', 'seer', 'bodyguard', 'witch', 'spellcaster', 'shadow'];
 const NIGHT_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 const nightWord = (n) => NIGHT_WORDS[n] || String(n);
-const roleLabel = (id) => (id === 'werewolf' ? 'Werewolves' : id === 'seerResult' ? 'Seer' : ROLES_DATA[id].name);
+const roleLabel = (id) => (id === 'werewolf' ? 'Werewolves' : id === 'seerResult' ? 'Seer' : id === 'lovers' ? 'Lovers' : ROLES_DATA[id].name);
 const NIGHT_PROMPT = {
+  cupid: 'Cupid, choose two players to bind as Lovers.',
+  lovers: 'Lovers, look at your partner.',
   shadow: 'Shadow Figure, choose an action to redirect.',
   seerResult: 'Seer, here is your vision.',
   medusa: 'Medusa, choose who to turn to stone.',
@@ -2756,10 +2788,11 @@ const NIGHT_PROMPT = {
 };
 const PROTECTED_LINE = 'The Werewolves attacked overnight, but the victim was protected!';
 const stoneLine = (name) => `${name} has been turned to stone until dusk. They cannot speak or vote.`;
-function dawnLines(saved, deadNames, silencedName, stonedName) {
+function dawnLines(saved, deadNames, silencedName, stonedName, brokenNames = []) {
   const out = [];
-  if (saved) out.push(deadNames.length ? PROTECTED_LINE : PROTECTED_LINE + ' No one was eliminated.');
+  if (saved) out.push(deadNames.length || brokenNames.length ? PROTECTED_LINE : PROTECTED_LINE + ' No one was eliminated.');
   deadNames.forEach((n) => out.push(`${n} was found dead this morning.`));
+  brokenNames.forEach((n) => out.push(`${n} died of heartbreak.`));
   if (!out.length) out.push('The night passed quietly. No one was eliminated.');
   if (silencedName) out.push(`${silencedName} has been silenced for the day. They cannot speak or vote.`);
   if (stonedName) out.push(stoneLine(stonedName));
@@ -2793,6 +2826,47 @@ function applyShadow(c, sh, shadowId) {
 function seerVision(c, sh, shadowId, seerId) {
   const c2 = applyShadow(c, sh, shadowId);
   return { target: hasV(c2.seer) ? c2.seer : null, stoned: hasV(c2.medusa) && c2.medusa === seerId };
+}
+
+/* Cupid helpers. Items look like { id, role, alive, lover } (Pass & Play) */
+// Lovers on opposite teams form a secret faction. It wins when only the pair remains (or the pair plus Cupid).
+function loversFaction(items) {
+  const alive = items.filter((i) => i.alive);
+  const a = alive.find((i) => hasV(i.lover) && alive.some((x) => x.id === i.lover));
+  if (!a) return false;
+  const b = alive.find((x) => x.id === a.lover);
+  if ((ROLES_DATA[a.role].team === 'werewolf') === (ROLES_DATA[b.role].team === 'werewolf')) return false;
+  if (alive.length === 2) return true;
+  if (alive.length === 3) { const o = alive.find((x) => x.id !== a.id && x.id !== b.id); return !!o && o.role === 'cupid'; }
+  return false;
+}
+const LOVERS_WIN = { text: 'The Lovers win! Only the bound pair is left.', color: '#F472B6' };
+function LoverBadge({ name, className = '' }) {
+  return (
+    <div role="note" className={'flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-pink-200 ' + className}
+      style={{ background: 'rgba(244,114,182,0.14)', border: '1px solid rgba(244,114,182,0.55)' }}>
+      <HeartIcon width="18" height="18" className="text-pink-300" /> Lovers with {name}
+    </div>
+  );
+}
+// Cupid's pick-two list: tapping a third player replaces the oldest pick.
+function PairList({ players, value, onChange, locked }) {
+  return (
+    <ul className="flex flex-col gap-2" role="listbox" aria-multiselectable="true">
+      {players.map((p) => {
+        const sel = value.includes(p.id);
+        return (
+          <li key={p.id}>
+            <button role="option" aria-selected={sel} disabled={locked} onClick={() => onChange(sel ? value.filter((x) => x !== p.id) : value.length < 2 ? [...value, p.id] : [value[1], p.id])}
+              className="flex min-h-[52px] w-full items-center justify-between rounded-xl px-4 text-left text-[15px] font-semibold transition active:scale-[0.99] disabled:opacity-40"
+              style={{ background: sel ? 'rgba(190,24,93,0.35)' : 'var(--card-2)', border: `${sel ? 2 : 1}px solid ${sel ? '#F9A8D4' : 'var(--line)'}`, boxShadow: sel ? '0 0 18px -4px rgba(244,114,182,0.7)' : 'none', color: '#E6EAF2' }}>
+              {p.n}{sel && <HeartIcon width="20" height="20" className="text-pink-300" />}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 // Day artwork (or the dawn gradient) with the 0.65 readability overlay. Sits behind content.
@@ -2924,7 +2998,7 @@ function StoneVision({ text = 'Your vision was turned to stone tonight.' }) {
 function ActHeader({ role, sub, prompt }) {
   return (
     <div className="mb-4 text-center">
-      <RoleChip role={role === 'seerResult' ? 'seer' : role} />
+      <RoleChip role={role === 'seerResult' ? 'seer' : role === 'lovers' ? 'cupid' : role} />
       <h2 className="font-display cap-in mt-3 text-2xl font-bold leading-snug text-slate-50">{prompt || NIGHT_PROMPT[role]}</h2>
       {sub && <p className="mt-2 text-sm text-slate-400">{sub}</p>}
     </div>
@@ -3004,11 +3078,12 @@ function ShadowAct({ actions, victimName, alive, nm, stoned, onDone, header }) {
 }
 
 // One role's secret choice screen on a single shared device. Names only, never anyone's role.
-function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOverride }) {
+function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOverride, hideSelf }) {
   const alive = players.filter((p) => p.alive);
   const opts = (list) => list.map((p) => ({ id: p.id, n: p.name }));
   const nm = (id) => (players.find((p) => p.id === id) || {}).name || '?';
   const [pick, setPick] = useState(null);
+  const [pair, setPair] = useState([]);
   const [save, setSave] = useState(false);
   const [seen, setSeen] = useState(null);
   const val = pick === null ? '' : pick;
@@ -3018,8 +3093,32 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
     return (
       <div className="flex flex-1 flex-col">
         <ActHeader role={role} sub="Agree silently, then one of you taps the name." />
-        <PickList players={opts(alive)} team={alive.filter((p) => p.role === 'werewolf' || p.role === 'shadow').map((p) => p.id)} value={val} onChange={choose} />
+        <PickList players={opts(alive.filter((p) => !hideSelf || !actor || p.id !== actor.id))} team={alive.filter((p) => p.role === 'werewolf' || p.role === 'shadow').map((p) => p.id)} value={val} onChange={choose} />
         <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ werewolf: pick })}>{pick === null ? 'Select a target' : 'Confirm Target'}</Btn>
+      </div>
+    );
+  }
+  if (role === 'cupid') {
+    return (
+      <div className="flex flex-1 flex-col">
+        <ActHeader role={role} sub="Tap two players. You may include yourself." />
+        <PairList players={opts(alive)} value={pair} onChange={setPair} />
+        <Btn className="mt-5" disabled={pair.length < 2} onClick={() => onDone({ cupid: pair })}>{pair.length < 2 ? 'Select two players' : 'Confirm Lovers'}</Btn>
+      </div>
+    );
+  }
+  if (role === 'lovers') {
+    const pr = choices.cupid || [];
+    const la = players.find((x) => x.id === pr[0]), lb = players.find((x) => x.id === pr[1]);
+    return (
+      <div className="flex flex-1 flex-col">
+        <ActHeader role={role} />
+        <Panel className="text-center" style={{ border: '1px solid rgba(244,114,182,0.55)', background: 'rgba(131,24,67,0.25)' }}>
+          <HeartIcon width="44" height="44" className="mx-auto text-pink-300" />
+          <div className="font-display mt-2 text-2xl font-bold text-slate-50">{la ? la.name : '?'} &hearts; {lb ? lb.name : '?'}</div>
+          <p className="mt-2 text-sm text-slate-300">If either of you dies, the other dies of heartbreak.</p>
+        </Panel>
+        <Btn className="mt-5" onClick={() => onDone({})}>Done</Btn>
       </div>
     );
   }
@@ -3134,10 +3233,16 @@ function resolveNightPP(players, c0, night) {
   const dead = [];
   if (victim !== null && !saved) dead.push(victim);
   if (poison !== null && poison !== guarded && !dead.includes(poison)) dead.push(poison);
+  // Cupid's Lovers: when one dies from any cause the other dies of heartbreak (even if the Bodyguard guarded them).
+  const pair = Array.isArray(c0.cupid) && c0.cupid.length === 2 ? c0.cupid : null;
+  const partnerOf = (id) => { if (pair) { if (pair[0] === id) return pair[1]; if (pair[1] === id) return pair[0]; } const q = byId.get(id); return q && has(q.lover) ? q.lover : null; };
+  const brokenIds = [];
+  dead.slice().forEach((id) => { const pid = partnerOf(id); if (pid !== null && byId.get(pid) && byId.get(pid).alive && !dead.includes(pid)) { dead.push(pid); brokenIds.push(pid); } });
   const myGuard = has(c0.bodyguard) && !blocked('bodyguard') ? c0.bodyguard : null; // Bodyguard and Medusa remember what they picked themselves
   const next = players.map((p) => {
     const q = { ...p, nn: night, protectedTag: p.id === guarded, silencedTag: p.alive && p.id === silenced, stoneTag: p.alive && p.id === stoneId };
     if (dead.includes(p.id)) { q.alive = false; q.protectedTag = false; q.silencedTag = false; q.stoneTag = false; }
+    if (pair && (p.id === pair[0] || p.id === pair[1])) q.lover = partnerOf(p.id);
     if (p.role === 'bodyguard' && p.alive && myGuard !== null) q.lastGuard = myGuard;
     if (p.role === 'medusa' && p.alive) q.lastStone = has(c0.medusa) ? c0.medusa : null;
     if (p.role === 'witch') { if (witchSave && victim !== null) q.saveUsed = true; if (poison !== null) q.poisonUsed = true; }
@@ -3145,13 +3250,14 @@ function resolveNightPP(players, c0, night) {
   });
   const silencedName = silenced !== null && byId.get(silenced) && !dead.includes(silenced) ? byId.get(silenced).name : '';
   const stonedName = stoneId !== null && !dead.includes(stoneId) ? stoned.name : '';
-  return { next, dead, saved, victim, silenced, silencedName, stoned: stonedName ? stoneId : null, stonedName, lines: dawnLines(saved, dead.map((id) => byId.get(id).name), silencedName, stonedName) };
+  return { next, dead, broken: brokenIds, saved, victim, silenced, silencedName, stoned: stonedName ? stoneId : null, stonedName, lines: dawnLines(saved, dead.filter((id) => !brokenIds.includes(id)).map((id) => byId.get(id).name), silencedName, stonedName, brokenIds.map((id) => byId.get(id).name)) };
 }
 
 // Pass & Play: the narrator runs the whole night by voice. One device, passed to each role in turn.
 function NightLoopPP({ players, night, onFinish, onExit }) {
   const roles = useMemo(() => {
-    const list = NIGHT_ORDER.filter((r) => players.some((p) => p.alive && p.role === r));
+    const list = NIGHT_ORDER.filter((r) => (r !== 'cupid' || night === 1) && players.some((p) => p.alive && p.role === r));
+    if (list.includes('cupid')) list.splice(list.indexOf('cupid') + 1, 0, 'lovers'); // after Cupid binds them, the Lovers wake to see each other
     if (list.includes('shadow') && list.includes('seer')) list.push('seerResult'); // the Seer's vision waits until the Shadow Figure has acted
     return list;
   }, []);
@@ -3203,7 +3309,7 @@ function NightLoopPP({ players, night, onFinish, onExit }) {
     return () => { off = true; };
   }, [st]);
 
-  const actorOf = (role) => players.find((p) => p.alive && p.role === (role === 'seerResult' ? 'seer' : role));
+  const actorOf = (role) => players.find((p) => p.alive && p.role === (role === 'seerResult' ? 'seer' : role === 'lovers' ? 'cupid' : role));
   let body = null, dawn = false, shake = false, flash = false;
   if (st.k === 'title') body = <LockView key="t" title={`Night ${nightWord(night)} Begins...`} sub="The village falls silent." />;
   else if (st.k === 'close') body = <LockView key="c" eye title="Close Your Eyes" sub="Keep them closed until the narrator says otherwise." count={count} />;
@@ -3287,6 +3393,7 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
   const [out, setOut] = useState(null);
   const [hunter, setHunter] = useState(null);
   const [shot, setShot] = useState(null);
+  const [broken, setBroken] = useState([]);
   const alive = players.filter((p) => p.alive);
   const voters = alive.filter((p) => !p.silencedTag && !p.stoneTag);
   const silenced = alive.filter((p) => p.silencedTag);
@@ -3295,8 +3402,14 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
   const wolves = alive.filter((p) => p.role === 'werewolf').length; // the Shadow Figure loses with the last Werewolf
   const evil = alive.filter((p) => ROLES_DATA[p.role].team === 'werewolf').length;
   const village = alive.length - evil;
-  const over = wolves === 0 ? { text: 'No Werewolves are left. The Village wins!', color: '#34D399' } : evil >= village ? { text: 'The Werewolves match or outnumber the Village. The Werewolves win!', color: '#F87171' } : null;
-  const kill = (ids) => setPlayers(players.map((p) => (ids.includes(p.id) ? { ...p, alive: false, protectedTag: false, silencedTag: false, stoneTag: false } : p)));
+  const over = loversFaction(players) ? LOVERS_WIN : wolves === 0 ? { text: 'No Werewolves are left. The Village wins!', color: '#34D399' } : evil >= village ? { text: 'The Werewolves match or outnumber the Village. The Werewolves win!', color: '#F87171' } : null;
+  // Eliminates players; a Lover's partner dies of heartbreak with them. Returns the heartbroken players.
+  const kill = (ids) => {
+    const all = [...ids], hb = [];
+    ids.forEach((id) => { const me = players.find((x) => x.id === id); const q = me && hasV(me.lover) ? players.find((x) => x.id === me.lover) : null; if (q && q.alive && !all.includes(q.id)) { all.push(q.id); hb.push(q); } });
+    setPlayers(players.map((p) => (all.includes(p.id) ? { ...p, alive: false, protectedTag: false, silencedTag: false, stoneTag: false } : p)));
+    return hb;
+  };
   const opts = (list) => list.map((p) => ({ id: p.id, n: p.name }));
   const nm = (id) => (players.find((p) => p.id === id) || {}).name || '?';
   const mayorAlive = alive.some((p) => p.role === 'mayor' && !p.stoneTag);
@@ -3308,7 +3421,7 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
     const top = ranked.length ? ranked[0] : null;
     const tie = ranked.length > 1 && tally[ranked[1]] === tally[top];
     setRes({ tally, ranked, top, tie, skipped: ranked.length === 0, tied: tie ? ranked.filter((id) => tally[id] === tally[top]) : [] });
-    if (top !== null && !tie) { const p = players.find((x) => x.id === top); kill([top]); setOut(p); if (p.role === 'hunter') setHunter(p); }
+    if (top !== null && !tie) { const p = players.find((x) => x.id === top); const hb = kill([top]); setOut(p); setBroken(hb); const hh = [p, ...hb].find((x) => x.role === 'hunter'); if (hh) setHunter(hh); }
     setPhase('result');
   };
   const cast = () => {
@@ -3317,7 +3430,7 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
     if (bi + 1 < voters.length) { setBi(bi + 1); setHold(true); } else tallyUp(all);
   };
   const startVote = (tiedIds) => {
-    setPick(null); setOut(null); setRes(null);
+    setPick(null); setOut(null); setRes(null); setBroken([]);
     if (mayorAlive) {
       setCands(Array.isArray(tiedIds) ? tiedIds : null); setBallots({}); setBi(0); setHold(true);
       if (voters.length === 0) { setRes({ tally: {}, ranked: [], top: null, tie: false, skipped: true }); setPhase('result'); } else setPhase('ballots');
@@ -3325,12 +3438,12 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
   };
   const eliminate = () => {
     const p = players.find((x) => x.id === pick); if (!p) return;
-    kill([p.id]); setOut(p); setRes({ tally: {}, ranked: [], top: p.id, tie: false, skipped: false });
-    if (p.role === 'hunter') setHunter(p);
+    const hb = kill([p.id]); setOut(p); setBroken(hb); setRes({ tally: {}, ranked: [], top: p.id, tie: false, skipped: false });
+    const hh = [p, ...hb].find((x) => x.role === 'hunter'); if (hh) setHunter(hh);
     setPhase('result');
   };
   const skipVote = () => { setOut(null); setRes({ tally: {}, ranked: [], top: null, tie: false, skipped: true }); setPhase('result'); };
-  const fire = () => { const t = players.find((x) => x.id === shot); if (!t) return; kill([t.id]); setOut(t); setHunter(null); setShot(null); };
+  const fire = () => { const t = players.find((x) => x.id === shot); if (!t) return; const hb = kill([t.id]); setOut(t); setBroken(hb); setHunter(null); setShot(null); };
 
   return (
     <DayStage>
@@ -3417,6 +3530,7 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
             <p className="font-display text-xl font-bold text-slate-50">{out ? `${out.name} was voted out by the village.` : res.tie ? 'The vote is tied. No one is eliminated yet.' : 'The vote was skipped. No one is eliminated.'}</p>
             {false && <ul className="mt-3 flex flex-col gap-1 text-sm text-slate-200">{res.ranked.map((id) => <li key={id} className="flex justify-between"><span>{nm(id)}</span><span className="tabular-nums text-slate-400">{res.tally[id]}</span></li>)}</ul>}
             {out && reveal && <div className="mt-3"><NightCard player={out} line={`${out.name} was the ${ROLES_DATA[out.role].name}`} /></div>}
+            {out && broken.map((b) => <p key={b.id} className="font-display mt-3 text-lg font-bold text-pink-300">{`${b.name} died of heartbreak.`}</p>)}
           </Panel>
           {over && <p role="status" className="mt-3 rounded-xl px-4 py-3 text-center text-sm font-bold" style={{ color: over.color, background: 'rgba(10,10,18,0.8)', border: `1px solid ${over.color}66` }}>{over.text}</p>}
           {hunter && (
@@ -3458,6 +3572,28 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
   );
 }
 
+// Human-moderator tool: record which two players Cupid bound.
+function LoversPanel({ players, onBind }) {
+  const [a, setA] = useState('');
+  const [b, setB] = useState('');
+  const cur = players.find((p) => hasV(p.lover));
+  const curB = cur ? players.find((p) => p.id === cur.lover) : null;
+  const sel = (v, set, label) => (
+    <select aria-label={label} value={v} onChange={(e) => set(e.target.value === '' ? '' : Number(e.target.value))} className="min-h-[44px] flex-1 rounded-lg px-2 text-sm text-slate-100" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>
+      <option value="">{label}</option>
+      {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+    </select>
+  );
+  return (
+    <section className="mt-5 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid rgba(244,114,182,0.4)' }}>
+      <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-pink-300"><HeartIcon width="14" height="14" />Cupid&rsquo;s Lovers</h2>
+      {cur && curB && <p className="mt-2 text-sm text-slate-200">{cur.name} &hearts; {curB.name}. If one dies, the other dies of heartbreak.</p>}
+      <div className="mt-3 flex gap-2">{sel(a, setA, 'First Lover')}{sel(b, setB, 'Second Lover')}</div>
+      <Btn className="mt-3" variant="secondary" disabled={a === '' || b === '' || a === b} onClick={() => { onBind(a, b); setA(''); setB(''); }}>{cur ? 'Change Lovers' : 'Bind Lovers'}</Btn>
+    </section>
+  );
+}
+
 function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, onHome }) {
   const [peek, setPeek] = useState(false); // Grimoire overlay during a running night or day
   const [warn, setWarn] = useState(false);
@@ -3477,6 +3613,13 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
   }, [confirm]);
 
   const update = (id, patch) => setPlayers(players.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  // Eliminating a Lover also eliminates their partner (heartbreak).
+  const toggleAlive = (p) => {
+    if (!p.alive) return update(p.id, { alive: true });
+    const partner = hasV(p.lover) ? players.find((x) => x.id === p.lover && x.alive) : null;
+    setPlayers(players.map((x) => (x.id === p.id || (partner && x.id === partner.id) ? { ...x, alive: false, protectedTag: false, silencedTag: false, stoneTag: false } : x)));
+  };
+  const bind = (a, b) => setPlayers(players.map((x) => (x.id === a ? { ...x, lover: b } : x.id === b ? { ...x, lover: a } : { ...x, lover: null })));
 
   const wolvesAlive = players.filter((p) => p.alive && p.role === 'werewolf').length;
   const evilAlive = players.filter((p) => p.alive && ROLES_DATA[p.role].team === 'werewolf').length;
@@ -3489,7 +3632,8 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
   const hasHunter = players.some((p) => p.role === 'hunter');
 
   let status = null;
-  if (wolvesAlive === 0) status = { text: 'No Werewolves left. The Village wins.', color: '#34D399' };
+  if (loversFaction(players)) status = { text: 'The Lovers win! Only the bound pair is left.', color: '#F472B6' };
+  else if (wolvesAlive === 0) status = { text: 'No Werewolves left. The Village wins.', color: '#34D399' };
   else if (evilAlive >= villageAlive) status = { text: 'Werewolves match or outnumber the Village.', color: '#F87171' };
 
   const body = (mode === 'night') ? (
@@ -3565,6 +3709,8 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
         </p>
       )}
 
+      {players.some((p) => p.role === 'cupid') && <LoversPanel players={players} onBind={bind} />}
+
       {/* Roster */}
       <section className="mt-5">
         <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Player Roster</h2>
@@ -3583,9 +3729,10 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
                     <div className="flex items-center gap-2">
                       <span className="font-display text-sm font-bold" style={{ color: r.color }}>{r.name}</span>
                       <TeamBadge team={r.team} />
+                      {hasV(p.lover) && <span className="flex items-center gap-1 text-[11px] font-bold text-pink-300"><HeartIcon width="12" height="12" />{(players.find((x) => x.id === p.lover) || {}).name}</span>}
                     </div>
                   </div>
-                  <button onClick={() => update(p.id, p.alive ? { alive: false, protectedTag: false, silencedTag: false, stoneTag: false } : { alive: true })}
+                  <button onClick={() => toggleAlive(p)}
                     aria-pressed={!p.alive}
                     aria-label={`${p.name} is ${p.alive ? 'alive. Mark as eliminated' : 'eliminated. Mark as alive'}`}
                     className="min-h-[44px] shrink-0 rounded-lg px-3 text-xs font-bold uppercase tracking-wider"
@@ -3683,9 +3830,10 @@ const STORE_KEY = 'nightfall.games.v1';
 //  w: winner ('village' | 'werewolf')          hp: 1 when the host also plays
 //  an: { k, l:{0:'text'}, sv, si, x:{ts:'text'} }   morning announcement
 //  pl[pid]: { n name, o join order, r roleId, a alive 1/0, d ready 1/0, t night target pid, nd night action done,
-//             ws witch save this night, wsu / wpu potion used, lp bodyguard (or Medusa) last target, hs hunter shot used, s silenced, x stoned until dusk, sa Shadow Figure's chosen action, rd Seer saw the final vision, lf left }
+//             ws witch save this night, wsu / wpu potion used, lp bodyguard (or Medusa) last target, hs hunter shot used, s silenced, x stoned until dusk, sa Shadow Figure's chosen action, lv Lovers partner pid, t2 Cupid's second pick, la Lover has seen their partner, rd Seer saw the final vision, lf left }
 const SESSION_KEY = 'nightfall.mp.v1';
-const MP_ACTIVE = ['werewolf', 'medusa', 'seer', 'bodyguard', 'witch', 'spellcaster', 'shadow'];
+const MP_ACTIVE = ['cupid', 'werewolf', 'medusa', 'seer', 'bodyguard', 'witch', 'spellcaster', 'shadow'];
+const mpActive = (role, k) => MP_ACTIVE.includes(role) && (role !== 'cupid' || k === 1); // Cupid only acts on the first night
 const MP_MIN = 4;
 const MP_MAX = 8;
 const CODE_WORDS = ['WOLF', 'MOON', 'FANG', 'HOWL', 'PACK', 'CLAW', 'DARK', 'BONE', 'MIST', 'GRIM', 'CROW', 'BATS', 'DUSK', 'DAWN', 'HUNT', 'PREY', 'FEAR', 'GORE', 'MAUL', 'OMEN'];
@@ -3831,6 +3979,7 @@ function mpWinner(players) {
   const wolves = live.filter((p) => p.r === 'werewolf').length; // the Shadow Figure loses with the last Werewolf
   const evil = live.filter((p) => ROLES_DATA[p.r] && ROLES_DATA[p.r].team === 'werewolf').length;
   const others = live.length - evil;
+  if (loversFaction(players.map((p) => ({ id: p.id, role: p.r, alive: p.a === 1 && !!p.r, lover: p.lv })).filter((i) => i.role))) return 'lovers';
   if (wolves === 0) return 'village';
   if (evil >= others) return 'werewolf';
   return '';
@@ -3852,7 +4001,7 @@ function mpDealPatch(room, deck) {
   const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0 };
   players.forEach((p, i) => {
     const b = `pl/${p.id}/`;
-    Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0, [b + 'v']: '' });
+    Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0, [b + 'v']: '', [b + 'lv']: '', [b + 't2']: '', [b + 'la']: 0 });
   });
   return patch;
 }
@@ -3860,7 +4009,7 @@ function mpLobbyPatch(room) {
   const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null, vd: null };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
-    ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'x', 'sa', 'rd', 'lf', 'v'].forEach((f) => { patch[b + f] = null; });
+    ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'x', 'sa', 'rd', 'lf', 'v', 'lv', 't2', 'la'].forEach((f) => { patch[b + f] = null; });
     patch[b + 'a'] = 1; patch[b + 'd'] = 0;
   });
   return patch;
@@ -3869,7 +4018,7 @@ function mpNightPatch(room) {
   const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1, vd: null, bn: nextBgIdx('night', room.bn) };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
-    patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0; patch[b + 'v'] = ''; patch[b + 's'] = 0; patch[b + 'x'] = 0; patch[b + 'sa'] = ''; patch[b + 'rd'] = 0; // dusk: the stone wears off
+    patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0; patch[b + 'v'] = ''; patch[b + 's'] = 0; patch[b + 'x'] = 0; patch[b + 'sa'] = ''; patch[b + 'rd'] = 0; patch[b + 'la'] = 0; patch[b + 't2'] = ''; // dusk: the stone wears off
   });
   return patch;
 }
@@ -3930,8 +4079,11 @@ function mpResolveNight(room) {
   let saved = false;
   if (victim) { if (victim === guarded || (saveTarget && victim === saveTarget)) saved = true; else dead.push(victim); }
   if (poison && poison !== guarded && !dead.includes(poison)) dead.push(poison);
+  // Lovers: a partner dies of heartbreak with them, even if the Bodyguard guarded that partner.
+  const brokenIds = [];
+  dead.slice().forEach((id) => { const pid = byId[id] && byId[id].lv; if (pid && byId[pid] && byId[pid].a === 1 && !dead.includes(pid)) { dead.push(pid); brokenIds.push(pid); } });
 
-  const lines = dawnLines(saved, dead.map((id) => byId[id].n));
+  const lines = dawnLines(saved, dead.filter((id) => !brokenIds.includes(id)).map((id) => byId[id].n), '', '', brokenIds.map((id) => byId[id].n));
   const silencedAlive = silenced && !dead.includes(silenced) ? silenced : '';
   const stonedAlive = stoneId && !dead.includes(stoneId) ? stoneId : '';
   const an = { k: room.k || 0, t: Date.now(), l: Object.fromEntries(lines.map((t, i) => [i, t])), sv: saved ? 1 : 0, si: silencedAlive, st: stonedAlive };
@@ -4292,6 +4444,7 @@ function SleepPanel({ me, text }) {
 
 function MpNightManual({ me, players, room, write }) {
   const [pick, setPick] = useState('');
+  const [pair, setPair] = useState([]);
   const [save, setSave] = useState(false);
   const role = me.r;
   const alive = players.filter((p) => p.a === 1);
@@ -4300,7 +4453,7 @@ function MpNightManual({ me, players, room, write }) {
   const lock = (extra) => write({ [`pl/${me.id}/t`]: pick || '', [`pl/${me.id}/nd`]: 1, ...(extra || {}) });
 
   if (me.a !== 1) return <SleepPanel me={me} text="You have been eliminated. Keep quiet and keep your eyes closed." />;
-  if (!MP_ACTIVE.includes(role)) return <SleepPanel me={me} text="Close your eyes and stay silent. The night roles are at work." />;
+  if (!mpActive(role, room.k)) return <SleepPanel me={me} text="Close your eyes and stay silent. The night roles are at work." />;
 
   const header = (title, sub) => (
     <div className="mb-4 text-center">
@@ -4315,12 +4468,22 @@ function MpNightManual({ me, players, room, write }) {
     </div>
   );
 
+  if (role === 'cupid') {
+    const [la, lb] = done ? [me.t, me.t2] : pair;
+    return (
+      <div className="flex flex-1 flex-col">
+        {header('Bind two Lovers', 'Tap two players. You may include yourself.')}
+        <PairList players={alive.map((p) => ({ id: p.id, n: p.n }))} value={done ? [me.t, me.t2] : pair} onChange={setPair} locked={done} />
+        {done ? lockedNote : <Btn className="mt-4" disabled={pair.length < 2} onClick={() => write({ [`pl/${me.id}/t`]: la, [`pl/${me.id}/t2`]: lb, [`pl/${me.id}/nd`]: 1, [`pl/${la}/lv`]: lb, [`pl/${lb}/lv`]: la })}>{pair.length < 2 ? 'Select two players' : 'Confirm Lovers'}</Btn>}
+      </div>
+    );
+  }
   if (role === 'werewolf') {
     const pack = players.filter((p) => p.r === 'werewolf' && p.id !== me.id);
     return (
       <div className="flex flex-1 flex-col">
         {header('Choose your victim', 'Agree silently with your pack. The most votes wins.')}
-        <PickList players={alive} team={alive.filter((p) => p.r === 'werewolf' || p.r === 'shadow').map((p) => p.id)} value={done ? me.t : pick} onChange={setPick} locked={done} />
+        <PickList players={alive.filter((p) => p.id !== me.id)} team={alive.filter((p) => p.r === 'werewolf' || p.r === 'shadow').map((p) => p.id)} value={done ? me.t : pick} onChange={setPick} locked={done} />
         {pack.length > 0 && (
           <div className="mt-3 rounded-xl p-3 text-xs text-slate-300" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
             <div className="mb-1 font-semibold uppercase tracking-widest text-slate-400">Your pack</div>
@@ -4332,7 +4495,7 @@ function MpNightManual({ me, players, room, write }) {
     );
   }
   if (role === 'shadow') {
-    const others = players.filter((p) => p.a === 1 && p.r !== 'shadow' && MP_ACTIVE.includes(p.r));
+    const others = players.filter((p) => p.a === 1 && p.r !== 'shadow' && mpActive(p.r, room.k));
     const waiting = others.some((p) => p.nd !== 1);
     const c = mpChoices(players);
     const mineSa = me.sa ? (nightActions(c).find((a) => a.key === me.sa) || null) : null;
@@ -4430,13 +4593,16 @@ function MpNightManual({ me, players, room, write }) {
 
 // Multi-Device automated night, phone side. The host's narrator sets room.ns; each phone shows only what its role may see.
 function MpNight(props) {
-  return props.room.ns ? <MpNightAuto {...props} /> : <MpNightManual me={props.me} players={props.players} room={props.room} write={props.write} />;
+  if (props.room.ns) return <MpNightAuto {...props} />;
+  const pt = props.me.lv && props.me.a === 1 ? props.players.find((x) => x.id === props.me.lv) : null;
+  return <>{pt && <LoverBadge name={pt.n} className="mb-3" />}<MpNightManual me={props.me} players={props.players} room={props.room} write={props.write} /></>;
 }
 
 function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
   const ns = room.ns || '';
   const role = ns.indexOf('r:') === 0 ? ns.slice(2) : '';
   const viewing = ns === 'v:seer'; // the Seer's final vision, after the Shadow Figure has acted
+  const lovers = ns === 'l'; // the Lovers wake together to see who they are bound to
   const tag = `${ns}:${room.nk}`;
   const [n, setN] = useState(5);
   const [opened, setOpened] = useState('');
@@ -4448,16 +4614,30 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
     return () => clearInterval(t);
   }, [ns, room.nk]);
 
-  const wrap = (body, pitch) => <NightStage fixed={!!immersive} pitch={pitch} onExit={immersive ? onLeave : undefined}>{body}</NightStage>;
-  const mine = me.a === 1 && ((!!role && me.r === role && me.nd !== 1) || (viewing && me.r === 'seer' && me.rd !== 1)) && sent !== tag;
+  const partner = me.lv && me.a === 1 ? players.find((x) => x.id === me.lv) : null;
+  const wrap = (body, pitch) => <NightStage fixed={!!immersive} pitch={pitch} onExit={immersive ? onLeave : undefined}>{!pitch && partner && (me.la === 1 || room.k > 1) && <LoverBadge name={partner.n} className="mb-3" />}{body}</NightStage>;
+  const mine = me.a === 1 && ((!!role && me.r === role && me.nd !== 1) || (viewing && me.r === 'seer' && me.rd !== 1) || (lovers && !!partner && me.la !== 1)) && sent !== tag;
 
   if (ns === 'i') return wrap(<LockView key="i" title={`Night ${nightWord(room.k)} Begins...`} sub="The village falls silent." />);
   if (ns === 'c') return wrap(<LockView key="c" eye title="Close Your Eyes" sub="Keep them closed until the narrator says otherwise." count={n} />);
   if (mine && opened !== tag) {
     return wrap(
       <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
-        <LockView key={'u' + tag} title={roleLabel(viewing ? 'seer' : role)} sub="Only your role may look now. Everyone else has their eyes closed." />
+        <LockView key={'u' + tag} title={roleLabel(viewing ? 'seer' : lovers ? 'lovers' : role)} sub="Only your role may look now. Everyone else has their eyes closed." />
         <Btn className="max-w-xs" onClick={() => setOpened(tag)}>Tap to Unlock Secretly</Btn>
+      </div>
+    );
+  }
+  if (mine && lovers) {
+    return wrap(
+      <div className="flex flex-1 flex-col">
+        <ActHeader role="lovers" />
+        <Panel className="text-center" style={{ border: '1px solid rgba(244,114,182,0.55)', background: 'rgba(131,24,67,0.25)' }}>
+          <HeartIcon width="44" height="44" className="mx-auto text-pink-300" />
+          <div className="font-display mt-2 text-2xl font-bold text-slate-50">You are bound to {partner.n}</div>
+          <p className="mt-2 text-sm text-slate-300">If either of you dies, the other dies of heartbreak.</p>
+        </Panel>
+        <Btn className="mt-5" onClick={() => { setSent(tag); write({ [`pl/${me.id}/la`]: 1 }); }}>Done</Btn>
       </div>
     );
   }
@@ -4469,6 +4649,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
     const submit = (c) => {
       setSent(tag);
       if (viewing) write({ [`pl/${me.id}/rd`]: 1 });
+      else if (role === 'cupid') write({ [`pl/${me.id}/t`]: c.cupid[0], [`pl/${me.id}/t2`]: c.cupid[1], [`pl/${me.id}/nd`]: 1, [`pl/${c.cupid[0]}/lv`]: c.cupid[1], [`pl/${c.cupid[1]}/lv`]: c.cupid[0] });
       else if (role === 'shadow') write({ [`pl/${me.id}/t`]: c.shadow ? c.shadow.to : '', [`pl/${me.id}/sa`]: c.shadow ? c.shadow.key : '', [`pl/${me.id}/nd`]: 1 });
       else if (role === 'witch') write({ [`pl/${me.id}/t`]: c.witchPoison === null || c.witchPoison === undefined ? '' : c.witchPoison, [`pl/${me.id}/ws`]: c.witchSave ? 1 : 0, [`pl/${me.id}/nd`]: 1 });
       else write({ [`pl/${me.id}/t`]: c[role] || '', [`pl/${me.id}/nd`]: 1 });
@@ -4477,7 +4658,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
       const sv = mpSeerView(players, me.id);
       return wrap(<NightActPP key={tag} role="seerResult" players={adapted} actor={actor} choices={mpChoices(players)} onDone={submit} seerOverride={sv} />);
     }
-    return wrap(<NightActPP key={tag} role={role} players={adapted} actor={actor} choices={mpChoices(players)} deferSeer={shadowAlive} onDone={submit} />);
+    return wrap(<NightActPP key={tag} role={role} players={adapted} actor={actor} choices={mpChoices(players)} deferSeer={shadowAlive} hideSelf onDone={submit} />);
   }
   const text = me.a !== 1 ? 'You have been eliminated. Stay silent and keep your eyes closed.' : 'The night is not over.';
   return wrap(<LockView key={'z' + tag} title="Keep your eyes closed..." sub={text} />, true);
@@ -4498,7 +4679,8 @@ function useNightDirector({ room, players, write }) {
     const my = ++runId.current;
     const live = () => runId.current === my;
     const room0 = latest.current.room;
-    const roles = NIGHT_ORDER.filter((r) => latest.current.players.some((p) => p.a === 1 && p.r === r));
+    const nightNo = opts && opts.again ? (room0.k || 1) : (room0.k || 0) + 1;
+    const roles = NIGHT_ORDER.filter((r) => mpActive(r, nightNo) && latest.current.players.some((p) => p.a === 1 && p.r === r));
     let nk = 1;
     const step = async (ns, label) => { nk += 1; setDir({ on: true, label }); await write({ ns, nk }); };
     try {
@@ -4523,6 +4705,22 @@ function useNightDirector({ room, players, write }) {
         await step('z', `${roleLabel(r)} sleeping`);
         await Narrator.say(`${roleLabel(r)}, close your eyes.`); if (!live()) return;
         await wait(2200); if (!live()) return;
+        if (r === 'cupid') {
+          await step('z', 'Lovers waking');
+          await Narrator.say('Lovers, open your eyes.'); if (!live()) return;
+          await step('l', 'Lovers looking');
+          skip.current = false;
+          const t2 = Date.now();
+          while (live()) {
+            const lov = latest.current.players.filter((p) => p.a === 1 && p.lv);
+            if (lov.every((p) => p.la === 1) || skip.current || Date.now() - t2 > 60000) break;
+            await wait(500);
+          }
+          if (!live()) return;
+          await step('z', 'Lovers sleeping');
+          await Narrator.say('Lovers, close your eyes.'); if (!live()) return;
+          await wait(2200); if (!live()) return;
+        }
       }
       if (roles.includes('shadow') && roles.includes('seer')) {
         await step('z', 'Seer waking for the final vision');
@@ -4576,6 +4774,8 @@ function mpVotePatch(players, id, opts) {
     patch[`pl/${id}/a`] = 0;
     patch[`an/x/${ts}a`] = `${t.n} was voted out by the village.`;
     if (getSettings().revealDead && ROLES_DATA[t.r]) patch[`an/x/${ts}b`] = `${t.n} was the ${ROLES_DATA[t.r].name}.`;
+    const pt = t.lv ? players.find((x) => x.id === t.lv && x.a === 1) : null;
+    if (pt) { patch[`pl/${pt.id}/a`] = 0; patch[`an/x/${ts}c`] = `${pt.n} died of heartbreak.`; }
   } else if (o.tie) patch[`an/x/${ts}a`] = 'The vote was tied. No one was eliminated.';
   return patch;
 }
@@ -4650,10 +4850,13 @@ function MpDay({ me, players, room, write }) {
   const shoot = () => {
     const t = players.find((p) => p.id === target);
     if (!t) return;
-    write({ [`pl/${t.id}/a`]: 0, [`pl/${me.id}/hs`]: 1, [`an/x/${String(Date.now())}`]: `${me.n} fired a last shot and took ${t.n} down.` });
+    const pt = t.lv ? players.find((x) => x.id === t.lv && x.a === 1) : null;
+    const ts = String(Date.now());
+    write({ [`pl/${t.id}/a`]: 0, [`pl/${me.id}/hs`]: 1, [`an/x/${ts}`]: `${me.n} fired a last shot and took ${t.n} down.`, ...(pt ? { [`pl/${pt.id}/a`]: 0, [`an/x/${ts}h`]: `${pt.n} died of heartbreak.` } : {}) });
   };
   return (
     <div className={`flex flex-1 flex-col gap-4 ${fx ? 'dawn-shake' : ''}`}>
+      {me.lv && me.a === 1 && players.some((x) => x.id === me.lv) && <LoverBadge name={players.find((x) => x.id === me.lv).n} />}
       {fx && (
         <div className="pointer-events-none fixed inset-0 z-40 flex items-start justify-center overflow-hidden" aria-hidden="true">
           <div className="dawn-flash absolute inset-0" />
@@ -4687,12 +4890,12 @@ function MpDay({ me, players, room, write }) {
 }
 
 function MpOver({ room, players, meId }) {
-  const village = room.w === 'village';
+  const village = room.w === 'village', lovers = room.w === 'lovers';
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <Panel className="text-center" style={{ border: `1px solid ${village ? '#34D399' : '#EF4444'}`, background: village ? 'rgba(16,185,129,0.1)' : 'rgba(220,38,38,0.12)' }}>
+      <Panel className="text-center" style={{ border: `1px solid ${lovers ? '#F472B6' : village ? '#34D399' : '#EF4444'}`, background: lovers ? 'rgba(244,114,182,0.12)' : village ? 'rgba(16,185,129,0.1)' : 'rgba(220,38,38,0.12)' }}>
         <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-300">Game over</div>
-        <h2 className="font-display mt-1 text-3xl font-black" style={{ color: village ? '#6EE7B7' : '#FCA5A5' }}>{village ? 'The Village wins' : 'The Werewolves win'}</h2>
+        <h2 className="font-display mt-1 text-3xl font-black" style={{ color: lovers ? '#F9A8D4' : village ? '#6EE7B7' : '#FCA5A5' }}>{lovers ? 'The Lovers win' : village ? 'The Village wins' : 'The Werewolves win'}</h2>
       </Panel>
       <ul className="flex flex-col gap-2">
         {players.map((p) => (
@@ -4715,7 +4918,7 @@ function MpMod({ room, players, me, write, director }) {
   const nightRoles = useMemo(() => mpNightRoles(players), [players]);
   const alive = players.filter((p) => p.a === 1);
   const winner = mpWinner(players);
-  const actors = alive.filter((p) => MP_ACTIVE.includes(p.r));
+  const actors = alive.filter((p) => mpActive(p.r, room.k));
   const pending = actors.filter((p) => p.nd !== 1);
   const allReady = players.length > 0 && players.every((p) => p.d === 1);
   const victim = mpWolfVictim(players);
@@ -4727,27 +4930,31 @@ function MpMod({ room, players, me, write, director }) {
   const toggleAlive = (p) => {
     const patch = { [`pl/${p.id}/a`]: p.a === 1 ? 0 : 1 };
     if (p.a === 1) patch[`an/x/${String(Date.now())}`] = `${p.n} was eliminated by the village.`;
+    const pt = p.a === 1 && p.lv ? players.find((x) => x.id === p.lv && x.a === 1) : null;
+    if (pt) { patch[`pl/${pt.id}/a`] = 0; patch[`an/x/${String(Date.now())}h`] = `${pt.n} died of heartbreak.`; }
     write(patch);
   };
   const endGame = (w) => write({ ph: 'over', w });
   const playAgain = () => write(mpLobbyPatch(room));
 
   const winBanner = winner && (ph === 'night' || ph === 'day') && (
-    <Panel style={{ border: `1px solid ${winner === 'village' ? '#34D399' : '#EF4444'}`, background: winner === 'village' ? 'rgba(16,185,129,0.1)' : 'rgba(220,38,38,0.12)' }}>
-      <p className="text-sm font-semibold text-slate-100">{winner === 'village' ? 'No werewolves are left. The Village wins.' : 'The werewolves match or outnumber the Village.'}</p>
-      <Btn className="mt-3" onClick={() => endGame(winner)}>End Game: {winner === 'village' ? 'Village Wins' : 'Werewolves Win'}</Btn>
+    <Panel style={{ border: `1px solid ${winner === 'lovers' ? '#F472B6' : winner === 'village' ? '#34D399' : '#EF4444'}`, background: winner === 'lovers' ? 'rgba(244,114,182,0.12)' : winner === 'village' ? 'rgba(16,185,129,0.1)' : 'rgba(220,38,38,0.12)' }}>
+      <p className="text-sm font-semibold text-slate-100">{winner === 'lovers' ? 'Only the bound Lovers are left.' : winner === 'village' ? 'No werewolves are left. The Village wins.' : 'The werewolves match or outnumber the Village.'}</p>
+      <Btn className="mt-3" onClick={() => endGame(winner)}>End Game: {winner === 'lovers' ? 'Lovers Win' : winner === 'village' ? 'Village Wins' : 'Werewolves Win'}</Btn>
     </Panel>
   );
 
   const grimoire = (
     <ul className="flex flex-col gap-2">
       {players.map((p) => {
-        const actor = MP_ACTIVE.includes(p.r);
+        const actor = mpActive(p.r, room.k);
         let detail = '';
-        if (ph === 'night' && p.a === 1 && actor && p.r === 'shadow') detail = p.nd === 1 ? (p.sa ? `redirects an action → ${nm(p.t)}` : 'no redirect') : 'waiting...';
+        if (ph === 'night' && p.a === 1 && actor && p.r === 'cupid') detail = p.nd === 1 ? `binds ${nm(p.t)} and ${nm(p.t2)}` : 'waiting...';
+        else if (ph === 'night' && p.a === 1 && actor && p.r === 'shadow') detail = p.nd === 1 ? (p.sa ? `redirects an action → ${nm(p.t)}` : 'no redirect') : 'waiting...';
         else if (ph === 'night' && p.a === 1 && actor) detail = p.nd === 1 ? (p.t ? `→ ${nm(p.t)}` : 'no target') + (p.r === 'witch' && p.ws === 1 ? ' · saves victim' : '') : 'waiting...';
         const tags = [];
         if (p.r === 'witch') tags.push(`heal ${p.wsu === 1 ? 'used' : 'ready'}`, `poison ${p.wpu === 1 ? 'used' : 'ready'}`);
+        if (p.lv) tags.push(`lover of ${nm(p.lv)}`);
         if (p.s === 1 && ph === 'day') tags.push('silenced');
         if (p.x === 1 && ph === 'day') tags.push('stoned');
         if (p.r === 'medusa' && p.lp) tags.push(`last stoned ${nm(p.lp)}`);
@@ -4836,7 +5043,7 @@ function MpMod({ room, players, me, write, director }) {
         {ph === 'day' && <Btn onClick={startNight}>Start Night {(room.k || 0) + 1}</Btn>}
         {(ph === 'night' || ph === 'day') && (
           confirmEnd
-            ? <div className="flex gap-2"><Btn variant="secondary" onClick={() => endGame('village')}>Village wins</Btn><Btn variant="secondary" onClick={() => endGame('werewolf')}>Wolves win</Btn><Btn variant="ghost" onClick={() => setConfirmEnd(false)}>Cancel</Btn></div>
+            ? <div className="flex gap-2"><Btn variant="secondary" onClick={() => endGame('village')}>Village wins</Btn><Btn variant="secondary" onClick={() => endGame('werewolf')}>Wolves win</Btn><Btn variant="secondary" onClick={() => endGame('lovers')}>Lovers win</Btn><Btn variant="ghost" onClick={() => setConfirmEnd(false)}>Cancel</Btn></div>
             : <Btn variant="ghost" onClick={() => setConfirmEnd(true)}>End Game Early</Btn>
         )}
       </div>

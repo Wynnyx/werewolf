@@ -720,32 +720,32 @@ function PlayingCard({ role }) {
 /* ------------------------------------------------------------------ */
 const ROLES_DATA = {
   werewolf: {
-    id: 'werewolf', balance: -6, Art: WerewolfArt, imageUrl: 'images/werewolf-card.jpg', blurb: 'Wake at night and choose a victim.', name: 'Werewolf', team: 'werewolf', max: 2, color: '#DC2626', Icon: WolfIcon,
-    nightOrder: 2, nightPrompt: 'Werewolves wake and agree on one victim.',
+    id: 'werewolf', balance: -6, Art: WerewolfArt, imageUrl: 'images/werewolf-card.jpg', blurb: 'Wake at night and choose a victim.', name: 'Werewolf', team: 'werewolf', max: 4, color: '#DC2626', Icon: WolfIcon,
+    nightOrder: 1, nightPrompt: 'Werewolves wake and agree on one victim.',
     short: 'Wakes each night to choose a victim.',
     ability: 'Wakes each night (together with the other Werewolf, if there is one) to choose a victim. Wins when Werewolves match or outnumber the Village.'
   },
   seer: {
-    id: 'seer', balance: 7, Art: SeerArt, imageUrl: 'images/seer-card.jpg', blurb: 'Inspect one player\u2019s alignment each night.', name: 'Seer', team: 'village', max: 1, color: '#A78BFA', Icon: EyeIcon,
-    nightOrder: 3, nightPrompt: 'Seer wakes and points at one player. Show a thumb up (Village) or down (Werewolf).',
+    id: 'seer', balance: 7, Art: SeerArt, imageUrl: 'images/seer-card.jpg', blurb: 'Inspect one player\u2019s alignment each night.', name: 'Seer', team: 'village', max: 2, color: '#A78BFA', Icon: EyeIcon,
+    nightOrder: 2, nightPrompt: 'Seer wakes and points at one player. Show a thumb up (Village) or down (Werewolf).',
     short: 'Inspects one player’s alignment each night.',
     ability: 'Wakes each night to inspect one player’s alignment.'
   },
   bodyguard: {
-    id: 'bodyguard', balance: 3, Art: BodyguardArt, imageUrl: 'images/bodyguard-card.jpg', blurb: 'Shield a player nightly, never the same twice.', name: 'Bodyguard', team: 'village', max: 1, color: '#34D399', Icon: ShieldIcon,
-    nightOrder: 1, nightPrompt: 'Bodyguard wakes and protects one player. Not the same player as last night.',
+    id: 'bodyguard', balance: 3, Art: BodyguardArt, imageUrl: 'images/bodyguard-card.jpg', blurb: 'Shield a player nightly, never the same twice.', name: 'Bodyguard', team: 'village', max: 2, color: '#34D399', Icon: ShieldIcon,
+    nightOrder: 5, nightPrompt: 'Bodyguard wakes and protects one player. Not the same player as last night.',
     short: 'Protects one player each night, never the same one twice running.',
     ability: 'Wakes each night to protect one player from elimination. Cannot protect the same player two nights in a row.'
   },
   witch: {
-    id: 'witch', balance: 4, Art: WitchArt, imageUrl: 'images/witch-card.jpg', blurb: 'One potion to save, one to eliminate. Single use.', name: 'Witch', team: 'village', max: 1, color: '#D946EF', Icon: PotionIcon,
-    nightOrder: 4, nightPrompt: 'Show the Witch tonight’s victim. She may save them and/or eliminate another player. Each potion is single use.',
+    id: 'witch', balance: 4, Art: WitchArt, imageUrl: 'images/witch-card.jpg', blurb: 'One potion to save, one to eliminate. Single use.', name: 'Witch', team: 'village', max: 2, color: '#D946EF', Icon: PotionIcon,
+    nightOrder: 6, nightPrompt: 'Show the Witch tonight’s victim. She may save them and/or eliminate another player. Each potion is single use.',
     short: 'Two single-use potions: one to save, one to eliminate.',
     ability: 'Has two single-use potions: one saves the night’s victim, the other eliminates a player.'
   },
   spellcaster: {
-    id: 'spellcaster', balance: 1, Art: SpellcasterArt, imageUrl: 'images/spellcaster-card.jpg', blurb: 'Silence one player for the coming day discussion.', name: 'Spellcaster', team: 'village', max: 1, color: '#818CF8', Icon: WandIcon,
-    nightOrder: 5, nightPrompt: 'Spellcaster wakes and silences one player for tomorrow’s discussion.',
+    id: 'spellcaster', balance: 1, Art: SpellcasterArt, imageUrl: 'images/spellcaster-card.jpg', blurb: 'Silence one player for the coming day discussion.', name: 'Spellcaster', team: 'village', max: 2, color: '#818CF8', Icon: WandIcon,
+    nightOrder: 7, nightPrompt: 'Spellcaster wakes and silences one player for tomorrow’s discussion.',
     short: 'Silences one player for the next day’s discussion.',
     ability: 'Wakes each night to silence one player for the upcoming day discussion.'
   },
@@ -762,25 +762,25 @@ const ROLES_DATA = {
     ability: 'Your vote counts twice.'
   },
   medusa: {
-    id: 'medusa', balance: 4, Art: MedusaArt, get imageUrl() { return medusaArtStore.get(); }, blurb: 'Turn one player to stone until dusk.', name: 'Medusa', team: 'village', max: 1, color: '#2DD4BF', Icon: MedusaIcon,
-    nightOrder: 0.5, nightPrompt: 'Medusa wakes and may turn one player to stone until dusk, or skips. Not the same player as last night.',
+    id: 'medusa', balance: 4, Art: MedusaArt, get imageUrl() { return medusaArtStore.get(); }, blurb: 'Turn one player to stone until dusk.', name: 'Medusa', team: 'village', max: 2, color: '#2DD4BF', Icon: MedusaIcon,
+    nightOrder: 4, nightPrompt: 'Medusa wakes and may turn one player to stone until dusk, or skips. Not the same player as last night.',
     short: 'Turns one player to stone until dusk.',
     ability: 'Each night, you may turn one player to stone until dusk, blocking their action.'
   },
   shadow: {
     id: 'shadow', balance: -4, Art: ShadowArt, get imageUrl() { return shadowArtStore.get(); }, blurb: 'Redirect one night action to a new target.', name: 'Shadow Figure', team: 'werewolf', max: 1, color: '#FB7185', Icon: ShadowIcon,
-    nightOrder: 6, nightPrompt: 'Shadow Figure wakes last. Show the Werewolves\u2019 victim and the other night targets without saying who chose them. They may redirect one action to a new target, or skip.',
+    nightOrder: 8, nightPrompt: 'Shadow Figure wakes last. Show the Werewolves\u2019 victim and the other night targets without saying who chose them. They may redirect one action to a new target, or skip.',
     short: 'Redirects one night action to a new target.',
     ability: 'Each night, you may redirect one night action to a new target.'
   },
   cupid: {
     id: 'cupid', balance: -3, Art: CupidArt, imageUrl: 'images/cupid-card.jpg', blurb: 'Bind two players together on the first night.', name: 'Cupid', team: 'village', max: 1, color: '#F472B6', Icon: CupidIcon,
-    nightOrder: 0, nightPrompt: 'First night only: Cupid wakes before the Werewolves and binds two players as Lovers. The Lovers then wake to see each other.',
+    nightOrder: 3, nightPrompt: 'First night only: Cupid wakes after the Seer and binds two players as Lovers. The Lovers are never woken; they learn their bond only when one of them dies.',
     short: 'Binds two players as Lovers on the first night.',
     ability: 'On the first night, bind two players together. If either one dies, their partner immediately perishes of heartbreak.'
   },
   villager: {
-    id: 'villager', balance: 1, Art: VillagerArt, imageUrl: 'images/villager-card.jpg', blurb: 'No night power. Use deduction to find the wolves.', name: 'Villager', team: 'village', max: 1, color: '#CBD5E1', Icon: HouseIcon,
+    id: 'villager', balance: 1, Art: VillagerArt, imageUrl: 'images/villager-card.jpg', blurb: 'No night power. Use deduction to find the wolves.', name: 'Villager', team: 'village', max: 10, color: '#CBD5E1', Icon: HouseIcon,
     nightOrder: null, nightPrompt: null,
     short: 'No night ability. Uses deduction to find the Werewolves.',
     ability: 'No night ability. Uses deduction during the day to find the Werewolves.'
@@ -788,7 +788,7 @@ const ROLES_DATA = {
 };
 const ROLE_IDS = Object.keys(ROLES_DATA);
 const MIN_PLAYERS = 4;
-const MAX_PLAYERS = 8;
+const MAX_PLAYERS = 15;
 
 const TEAM_LABEL = { village: 'Village', werewolf: 'Werewolf' };
 const teamColor = (team) => (team === 'werewolf' ? '#DC2626' : '#34D399');
@@ -839,11 +839,13 @@ function autoFill(count) {
   // 1 Werewolf (2 only when the table is too big to fill with one of each Village role),
   // then Village roles strictly by priority: Seer first, Villager last.
   const village = FILL_PRIORITY.filter((id) => ROLES_DATA[id] && ROLES_DATA[id].team === 'village');
-  const wolves = count - 1 <= village.reduce((n, id) => n + ROLES_DATA[id].max, 0) ? 1 : 2;
+  const wolves = count <= 7 ? 1 : Math.min(ROLES_DATA.werewolf.max, Math.floor((count - 2) / 3)); // 8-10: 2, 11-13: 3, 14-15: 4
   const deck = emptyDeck();
   deck.werewolf = wolves;
   let left = count - wolves;
-  village.forEach((id) => { const n = Math.min(ROLES_DATA[id].max, left); deck[id] = n; left -= n; });
+  village.forEach((id) => { if (id === 'villager') return; const n = Math.min(1, left); deck[id] = n; left -= n; }); // one of each special role first
+  const v = Math.min(ROLES_DATA.villager.max, left); deck.villager = v; left -= v;
+  village.forEach((id) => { if (id === 'villager') return; const n = Math.min(ROLES_DATA[id].max - deck[id], left); deck[id] += n; left -= n; }); // then second copies
   return deck;
 }
 
@@ -2252,7 +2254,7 @@ function GameCard({ game, confirming, onOpen, onAskDelete, onCancelDelete, onDel
   );
 }
 
-const POPULAR_COUNTS = [4, 5, 6, 7, 8];
+const POPULAR_COUNTS = [4, 5, 6, 7, 8, 10, 12, 15];
 function PresetCard({ count, deck, onPick }) {
   return (
     <button onClick={() => { Sfx.enter(); onPick(); }} aria-label={`Popular ${count} player setup`}
@@ -2822,7 +2824,7 @@ function StatusChip({ active, onClick, color, children }) {
 /* ------------------------------------------------------------------ */
 /* Automated night: shared pieces, Pass & Play loop, day trial        */
 /* ------------------------------------------------------------------ */
-const NIGHT_ORDER = ['cupid', 'werewolf', 'medusa', 'seer', 'bodyguard', 'witch', 'spellcaster', 'shadow'];
+const NIGHT_ORDER = ['werewolf', 'seer', 'cupid', 'medusa', 'bodyguard', 'witch', 'spellcaster', 'shadow'];
 const NIGHT_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 const nightWord = (n) => NIGHT_WORDS[n] || String(n);
 const roleLabel = (id) => (id === 'werewolf' ? 'Werewolves' : id === 'seerResult' ? 'Seer' : id === 'lovers' ? 'Lovers' : ROLES_DATA[id].name);
@@ -2875,9 +2877,11 @@ function applyShadow(c, sh, shadowId) {
   return out;
 }
 // What the Seer finally learns once the Shadow Figure has redirected: { target, stoned }.
-function seerVision(c, sh, shadowId, seerId) {
+function seerVision(c, sh, shadowId, seerId, players) {
   const c2 = applyShadow(c, sh, shadowId);
-  return { target: hasV(c2.seer) ? c2.seer : null, stoned: hasV(c2.medusa) && c2.medusa === seerId };
+  let stoned = hasV(c2.medusa) && c2.medusa === seerId;
+  if (players && hasV(c2.medusa)) { const t = players.find((x) => x.id === c2.medusa); stoned = !!t && t.role === 'seer' && !players.some((x) => x.alive && x.role === 'seer' && x.id !== t.id); } // with two Seers, the other one still sees
+  return { target: hasV(c2.seer) ? c2.seer : null, stoned };
 }
 
 /* Cupid helpers. Items look like { id, role, alive, lover } (Pass & Play) */
@@ -3137,11 +3141,14 @@ function ShadowAct({ actions, victimName, alive, nm, stoned, onDone, header }) {
 }
 
 // One role's secret choice screen on a single shared device. Names only, never anyone's role.
-function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOverride, hideSelf }) {
+function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOverride, hideSelf, ext }) {
   const alive = players.filter((p) => p.alive);
   const opts = (list) => list.map((p) => ({ id: p.id, n: p.name }));
   const nm = (id) => (players.find((p) => p.id === id) || {}).name || '?';
-  const [pick, setPick] = useState(null);
+  const [pickL, setPickL] = useState(null);
+  // ext (Multi-Device teammates): the pick is shared, so any teammate's tap updates everyone's selection
+  const pick = ext ? (ext.pick === '' || ext.pick === undefined ? null : ext.pick) : pickL;
+  const setPick = ext ? ext.set : setPickL;
   const [pair, setPair] = useState([]);
   const [save, setSave] = useState(false);
   const [seen, setSeen] = useState(null);
@@ -3166,28 +3173,13 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
       </div>
     );
   }
-  if (role === 'lovers') {
-    const pr = choices.cupid || [];
-    const la = players.find((x) => x.id === pr[0]), lb = players.find((x) => x.id === pr[1]);
-    return (
-      <div className="flex flex-1 flex-col">
-        <ActHeader role={role} />
-        <Panel className="text-center" style={{ border: '1px solid rgba(244,114,182,0.55)', background: 'rgba(131,24,67,0.25)' }}>
-          <HeartIcon width="44" height="44" className="mx-auto text-pink-300" />
-          <div className="font-display mt-2 text-2xl font-bold text-slate-50">{la ? la.name : '?'} &hearts; {lb ? lb.name : '?'}</div>
-          <p className="mt-2 text-sm text-slate-300">If either of you dies, the other dies of heartbreak.</p>
-        </Panel>
-        <Btn className="mt-5" onClick={() => onDone({})}>Done</Btn>
-      </div>
-    );
-  }
   if (role === 'shadow') {
     const stoned = hasV(choices.medusa) && choices.medusa === actor.id;
     return <ShadowAct header={<ActHeader role="shadow" />} actions={nightActions(choices)} victimName={hasV(choices.werewolf) ? nm(choices.werewolf) : 'No one'}
       alive={opts(alive)} nm={nm} stoned={stoned} onDone={(r) => onDone({ shadow: r })} />;
   }
   if (role === 'seerResult') {
-    const sv = seerOverride || seerVision(choices, choices.shadow, (players.find((p) => p.alive && p.role === 'shadow') || {}).id, actor.id);
+    const sv = seerOverride || seerVision(choices, choices.shadow, (players.find((p) => p.alive && p.role === 'shadow') || {}).id, actor.id, players);
     const tp = sv.target === null ? null : players.find((p) => p.id === sv.target);
     return (
       <div className="flex flex-1 flex-col">
@@ -3211,12 +3203,13 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
     );
   }
   if (role === 'seer') {
-    const stoned = choices.medusa !== undefined && choices.medusa !== null && choices.medusa !== '' && choices.medusa === actor.id;
+    const stoneT = hasV(choices.medusa) ? players.find((p) => p.id === choices.medusa) : null;
+    const stoned = !!stoneT && stoneT.role === 'seer' && !players.some((p) => p.alive && p.role === 'seer' && p.id !== stoneT.id); // a free second Seer still sees
     const target = seen === null ? null : players.find((p) => p.id === seen);
     return (
       <div className="flex flex-1 flex-col">
         <ActHeader role={role} sub={target ? '' : 'Tap a name to select. Nothing is revealed until you confirm.'} />
-        <PickList players={opts(alive.filter((p) => p.id !== actor.id))} value={val} onChange={choose} locked={seen !== null} />
+        <PickList players={opts(alive.filter((p) => p.id !== actor.id && !(ext && ext.group.includes(p.id))))} value={val} onChange={choose} locked={seen !== null} />
         {target && deferSeer && <StoneVision text="Your vision will come at the end of the night." />}
         {target && !deferSeer && stoned && <StoneVision />}
         {target && !deferSeer && !stoned && <GhostFlip key={target.id} name={target.name} wolf={target.role === 'werewolf'} />}
@@ -3240,7 +3233,7 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
     return (
       <div className="flex flex-1 flex-col">
         <ActHeader role={role} sub="They may not speak during tomorrow’s discussion." />
-        <PickList players={opts(alive.filter((p) => p.id !== actor.id))} value={val} onChange={choose} />
+        <PickList players={opts(alive.filter((p) => p.id !== actor.id && !(ext && ext.group.includes(p.id))))} value={val} onChange={choose} />
         <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ spellcaster: pick })}>{pick === null ? 'Select a player' : 'Confirm Silence'}</Btn>
       </div>
     );
@@ -3266,7 +3259,7 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
         ? <p className="mt-4 text-center text-xs text-slate-500">Your poison is already used.</p>
         : <>
             <div className="mb-2 mt-4 text-center text-xs font-semibold uppercase tracking-widest text-slate-400">Poison a player (optional)</div>
-            <PickList players={opts(alive.filter((p) => p.id !== actor.id))} value={val} onChange={choose} />
+            <PickList players={opts(alive.filter((p) => p.id !== actor.id && !(ext && ext.group.includes(p.id))))} value={val} onChange={choose} />
           </>}
       <Btn className="mt-5" onClick={() => onDone({ witchSave: save && canSave, witchPoison: pick })}>{pick !== null ? 'Confirm Poison' : save && canSave ? 'Confirm Save' : 'Do Nothing Tonight'}</Btn>
     </div>
@@ -3281,7 +3274,7 @@ function resolveNightPP(players, c0, night) {
   // Medusa's gaze lands first: whoever she stones loses their action for the night.
   const stoneId = has(c.medusa) && byId.get(c.medusa) && byId.get(c.medusa).alive ? c.medusa : null;
   const stoned = stoneId !== null ? byId.get(stoneId) : null;
-  const blocked = (role) => !!stoned && stoned.role === role;
+  const blocked = (role) => !!stoned && stoned.role === role && !players.some((p) => p.alive && p.role === role && p.id !== stoneId); // a role with a free teammate still acts
   const victim = has(c.werewolf) && !blocked('werewolf') ? c.werewolf : null;
   const guarded = has(c.bodyguard) && !blocked('bodyguard') ? c.bodyguard : null;
   const poison = has(c.witchPoison) && !blocked('witch') ? c.witchPoison : null;
@@ -3316,11 +3309,10 @@ function resolveNightPP(players, c0, night) {
 function NightLoopPP({ players, night, onFinish, onExit }) {
   const roles = useMemo(() => {
     const list = NIGHT_ORDER.filter((r) => (r !== 'cupid' || night === 1) && players.some((p) => p.alive && p.role === r));
-    if (list.includes('cupid')) list.splice(list.indexOf('cupid') + 1, 0, 'lovers'); // after Cupid binds them, the Lovers wake to see each other
-    if (list.includes('shadow') && list.includes('seer')) list.push('seerResult'); // the Seer's vision waits until the Shadow Figure has acted
+    if (list.includes('seer') && (list.includes('shadow') || list.includes('medusa'))) list.push('seerResult'); // the Seer's vision waits until Medusa and the Shadow Figure have acted
     return list;
   }, []);
-  const deferSeer = useMemo(() => players.some((p) => p.alive && p.role === 'shadow'), []);
+  const deferSeer = useMemo(() => players.some((p) => p.alive && (p.role === 'shadow' || p.role === 'medusa')), []);
   useState(() => rollBg('night'));
   const [st, setSt] = useState({ k: 'title' });
   const [count, setCount] = useState(5);
@@ -3366,7 +3358,7 @@ function NightLoopPP({ players, night, onFinish, onExit }) {
     return () => { off = true; };
   }, [st]);
 
-  const actorOf = (role) => players.find((p) => p.alive && p.role === (role === 'seerResult' ? 'seer' : role === 'lovers' ? 'cupid' : role));
+  const actorOf = (role) => players.find((p) => p.alive && p.role === (role === 'seerResult' ? 'seer' : role));
   let body = null, dawn = false, shake = false, flash = false;
   if (st.k === 'title') body = <LockView key="t" title={`Night ${nightWord(night)} Begins...`} sub="The village falls silent." />;
   else if (st.k === 'close') body = <LockView key="c" eye title="Close Your Eyes" sub="Keep them closed until the narrator says otherwise." count={count} />;
@@ -3891,10 +3883,10 @@ const STORE_KEY = 'nightfall.games.v1';
 //  pl[pid]: { n name, o join order, r roleId, a alive 1/0, d ready 1/0, t night target pid, nd night action done,
 //             ws witch save this night, wsu / wpu potion used, lp bodyguard (or Medusa) last target, hs hunter shot used, s silenced, x stoned until dusk, sa Shadow Figure's chosen action, lv Lovers partner pid, t2 Cupid's second pick, la Lover has seen their partner, rd Seer saw the final vision, lf left }
 const SESSION_KEY = 'nightfall.mp.v1';
-const MP_ACTIVE = ['cupid', 'werewolf', 'medusa', 'seer', 'bodyguard', 'witch', 'spellcaster', 'shadow'];
+const MP_ACTIVE = ['werewolf', 'seer', 'cupid', 'medusa', 'bodyguard', 'witch', 'spellcaster', 'shadow'];
 const mpActive = (role, k) => MP_ACTIVE.includes(role) && (role !== 'cupid' || k === 1); // Cupid only acts on the first night
 const MP_MIN = 4;
-const MP_MAX = 8;
+const MP_MAX = 15;
 const CODE_WORDS = ['WOLF', 'MOON', 'FANG', 'HOWL', 'PACK', 'CLAW', 'DARK', 'BONE', 'MIST', 'GRIM', 'CROW', 'BATS', 'DUSK', 'DAWN', 'HUNT', 'PREY', 'FEAR', 'GORE', 'MAUL', 'OMEN'];
 
 function normalizeDbUrl(u) {
@@ -4065,7 +4057,7 @@ function mpDealPatch(room, deck) {
   return patch;
 }
 function mpLobbyPatch(room) {
-  const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null, vd: null };
+  const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null, vd: null, cm: null, sp: null };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
     ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'x', 'sa', 'rd', 'lf', 'v', 'lv', 't2', 'la'].forEach((f) => { patch[b + f] = null; });
@@ -4074,7 +4066,7 @@ function mpLobbyPatch(room) {
   return patch;
 }
 function mpNightPatch(room) {
-  const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1, vd: null, bn: nextBgIdx('night', room.bn) };
+  const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1, cm: null, sp: null, vd: null, bn: nextBgIdx('night', room.bn) };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
     patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0; patch[b + 'v'] = ''; patch[b + 's'] = 0; patch[b + 'x'] = 0; patch[b + 'sa'] = ''; patch[b + 'rd'] = 0; patch[b + 'la'] = 0; patch[b + 't2'] = ''; // dusk: the stone wears off
@@ -4110,7 +4102,7 @@ function mpShadowRedirect(ps) {
 // What this Seer finally learns: { target, stoned } once any Shadow Figure redirect is applied.
 function mpSeerView(ps, seerId) {
   const sh = ps.find((p) => p.a === 1 && p.r === 'shadow');
-  return seerVision(mpChoices(ps), mpShadowRedirect(ps), sh ? sh.id : null, seerId);
+  return seerVision(mpChoices(ps), mpShadowRedirect(ps), sh ? sh.id : null, seerId, ps.map((p) => ({ id: p.id, role: p.r, alive: p.a === 1 })));
 }
 
 // Works out the night from everyone's secret choices and returns the patch that opens the day.
@@ -4124,11 +4116,11 @@ function mpResolveNight(room) {
   // Medusa's gaze lands next: whoever she stones loses their action for the night.
   const stoneId = c.medusa && byId[c.medusa] && byId[c.medusa].a === 1 ? c.medusa : '';
   const stoneRole = stoneId ? byId[stoneId].r : '';
-  const blocked = (role) => stoneRole === role;
+  const blocked = (role) => stoneRole === role && !ps.some((p) => p.a === 1 && p.r === role && p.id !== stoneId);
   const victim = blocked('werewolf') ? '' : (c.werewolf || '');
-  const bg = alive.find((p) => p.r === 'bodyguard' && p.t && byId[p.t]);
+  const bgs = alive.filter((p) => p.r === 'bodyguard' && p.t && byId[p.t]);
   const guarded = c.bodyguard && !blocked('bodyguard') ? c.bodyguard : '';
-  const witch = alive.find((p) => p.r === 'witch');
+  const witches = alive.filter((p) => p.r === 'witch');
   const witchSaves = !!(c.witchSave && !blocked('witch') && victim);
   const saveTarget = witchSaves ? (c.witchSaveTo || victim) : '';
   const poison = c.witchPoison && !blocked('witch') ? c.witchPoison : '';
@@ -4150,12 +4142,10 @@ function mpResolveNight(room) {
   const patch = { ph: 'day', an, ns: null, nk: null, bd: nextBgIdx('day', room.bd) };
   ps.forEach((p) => { patch[`pl/${p.id}/s`] = silencedAlive && p.id === silencedAlive ? 1 : 0; patch[`pl/${p.id}/x`] = stonedAlive && p.id === stonedAlive ? 1 : 0; });
   dead.forEach((id) => { patch[`pl/${id}/a`] = 0; });
-  if (witch && witchSaves) patch[`pl/${witch.id}/wsu`] = 1;
-  if (witch && poison) patch[`pl/${witch.id}/wpu`] = 1;
+  witches.forEach((w) => { if (witchSaves) patch[`pl/${w.id}/wsu`] = 1; if (poison) patch[`pl/${w.id}/wpu`] = 1; }); // teammates share the potions
   // Bodyguard and Medusa remember what they picked themselves, even when the Shadow Figure moved it.
-  if (bg && !blocked('bodyguard')) patch[`pl/${bg.id}/lp`] = bg.t;
-  const medusa = alive.find((p) => p.r === 'medusa');
-  if (medusa) patch[`pl/${medusa.id}/lp`] = c0.medusa || '';
+  bgs.forEach((b) => { if (!blocked('bodyguard')) patch[`pl/${b.id}/lp`] = b.t; });
+  alive.filter((p) => p.r === 'medusa').forEach((m) => { patch[`pl/${m.id}/lp`] = c0.medusa || ''; });
   return { patch, dead, saved, victim, guarded, silenced: silencedAlive, stoned: stonedAlive, lines, silencedLine: silencedAlive ? `${byId[silencedAlive].n} has been silenced for the day. They cannot speak or vote.` : '', stonedLine: stonedAlive ? stoneLine(byId[stonedAlive].n) : '' };
 }
 
@@ -4657,11 +4647,41 @@ function MpNight(props) {
   return <>{pt && <LoverBadge name={pt.n} className="mb-3" />}<MpNightManual me={props.me} players={props.players} room={props.room} write={props.write} /></>;
 }
 
+// Private chat for the players who are awake together on the same night turn. Only the group sees it, and it clears when the turn ends.
+const CHAT_QUICK = ['Agree', 'Not that one', 'Skip', 'Your call'];
+function TeamChat({ me, group, room, write, tag }) {
+  const [text, setText] = useState('');
+  const ids = group.map((g) => g.id);
+  const msgs = Object.entries(room.cm || {}).filter(([k, m]) => m && m.g === tag && ids.includes(m.i)).sort((a, b) => (a[0] < b[0] ? -1 : 1)).slice(-4);
+  const send = (x) => {
+    const t = String(x).trim().slice(0, 80);
+    if (!t) return;
+    setText('');
+    write({ [`cm/${Date.now()}_${me.id}`]: { g: tag, i: me.id, f: me.n, x: t } });
+  };
+  return (
+    <div data-testid="team-chat" className="mt-4 rounded-2xl p-3" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+      <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Team chat {'\u00b7'} {group.map((g) => g.n).join(', ')}</div>
+      <div className="mb-2 max-h-24 min-h-[20px] space-y-1 overflow-y-auto text-[13px]">
+        {msgs.length === 0 && <div className="text-slate-500">Whisper to your team. Only you can see this.</div>}
+        {msgs.map(([k, m]) => <div key={k}><span className="font-bold" style={{ color: m.i === me.id ? '#A5B4FC' : '#FCA5A5' }}>{m.i === me.id ? 'You' : m.f}</span> <span className="text-slate-200">{m.x}</span></div>)}
+      </div>
+      <div className="mb-2 flex flex-wrap gap-1.5">
+        {CHAT_QUICK.map((q) => <button key={q} onClick={() => send(q)} className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-slate-200" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>{q}</button>)}
+      </div>
+      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(text); }}>
+        <input value={text} onChange={(e) => setText(e.target.value)} maxLength={80} placeholder="Message your team" aria-label="Team chat message"
+          className="min-w-0 flex-1 rounded-xl px-3 py-2 text-sm text-slate-100 outline-none" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }} />
+        <button type="submit" className="rounded-xl px-4 py-2 text-sm font-bold text-white" style={{ background: 'var(--accent, #6366F1)' }}>Send</button>
+      </form>
+    </div>
+  );
+}
+
 function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
   const ns = room.ns || '';
   const role = ns.indexOf('r:') === 0 ? ns.slice(2) : '';
   const viewing = ns === 'v:seer'; // the Seer's final vision, after the Shadow Figure has acted
-  const lovers = ns === 'l'; // the Lovers wake together to see who they are bound to
   const tag = `${ns}:${room.nk}`;
   const [n, setN] = useState(5);
   const [opened, setOpened] = useState('');
@@ -4674,29 +4694,19 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
   }, [ns, room.nk]);
 
   const partner = me.lv && me.a === 1 ? players.find((x) => x.id === me.lv) : null;
-  const wrap = (body, pitch) => <NightStage fixed={!!immersive} pitch={pitch} onExit={immersive ? onLeave : undefined}>{!pitch && partner && (me.la === 1 || room.k > 1) && <LoverBadge name={partner.n} className="mb-3" />}{body}</NightStage>;
-  const mine = me.a === 1 && ((!!role && me.r === role && me.nd !== 1) || (viewing && me.r === 'seer' && me.rd !== 1) || (lovers && !!partner && me.la !== 1)) && sent !== tag;
+  const group = role && role !== 'cupid' ? players.filter((x) => x.a === 1 && x.r === role) : []; // everyone awake on this turn shares one action
+  const chatGroup = group.length > 1 && me.a === 1 && me.r === role && me.nd !== 1;
+  const [spL, setSpL] = useState(null);
+  const wrap = (body, pitch) => <NightStage fixed={!!immersive} pitch={pitch} onExit={immersive ? onLeave : undefined}>{!pitch && partner && <LoverBadge name={partner.n} className="mb-3" />}{body}{!pitch && chatGroup && <TeamChat me={me} group={group} room={room} write={write} tag={tag} />}</NightStage>;
+  const mine = me.a === 1 && ((!!role && me.r === role && me.nd !== 1) || (viewing && me.r === 'seer' && me.rd !== 1)) && sent !== tag;
 
   if (ns === 'i') return wrap(<LockView key="i" title={`Night ${nightWord(room.k)} Begins...`} sub="The village falls silent." />);
   if (ns === 'c') return wrap(<LockView key="c" eye title="Close Your Eyes" sub="Keep them closed until the narrator says otherwise." count={n} />);
   if (mine && opened !== tag) {
     return wrap(
       <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
-        <LockView key={'u' + tag} title={roleLabel(viewing ? 'seer' : lovers ? 'lovers' : role)} sub="Only your role may look now. Everyone else has their eyes closed." />
+        <LockView key={'u' + tag} title={roleLabel(viewing ? 'seer' : role)} sub="Only your role may look now. Everyone else has their eyes closed." />
         <Btn className="max-w-xs" onClick={() => setOpened(tag)}>Tap to Unlock Secretly</Btn>
-      </div>
-    );
-  }
-  if (mine && lovers) {
-    return wrap(
-      <div className="flex flex-1 flex-col">
-        <ActHeader role="lovers" />
-        <Panel className="text-center" style={{ border: '1px solid rgba(244,114,182,0.55)', background: 'rgba(131,24,67,0.25)' }}>
-          <HeartIcon width="44" height="44" className="mx-auto text-pink-300" />
-          <div className="font-display mt-2 text-2xl font-bold text-slate-50">You are bound to {partner.n}</div>
-          <p className="mt-2 text-sm text-slate-300">If either of you dies, the other dies of heartbreak.</p>
-        </Panel>
-        <Btn className="mt-5" onClick={() => { setSent(tag); write({ [`pl/${me.id}/la`]: 1 }); }}>Done</Btn>
       </div>
     );
   }
@@ -4704,20 +4714,23 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
     const adapted = players.map((p) => ({ id: p.id, name: p.n, role: p.r, alive: p.a === 1, saveUsed: p.wsu === 1, poisonUsed: p.wpu === 1, lastGuard: p.lp || null, lastStone: p.lp || null }));
     const actor = adapted.find((p) => p.id === me.id);
     const victim = mpWolfVictim(players);
-    const shadowAlive = players.some((p) => p.a === 1 && p.r === 'shadow');
+    const shadowAlive = players.some((p) => p.a === 1 && (p.r === 'shadow' || p.r === 'medusa' || (p.r === 'seer' && group.length > 1 && role === 'seer')));
+    const srv = room.sp && room.sp.g === tag ? room.sp.v : null;
+    const ext = group.length > 1 ? { group: group.map((g) => g.id), pick: spL && spL.g === tag && Date.now() - spL.at < 2500 ? spL.v : srv, set: (v) => { setSpL({ g: tag, v, at: Date.now() }); write({ sp: { g: tag, v } }); } } : undefined;
     const submit = (c) => {
       setSent(tag);
+      const gp = (fn) => { const o = {}; (group.length ? group : [me]).forEach((g) => Object.assign(o, fn(g))); return o; }; // one confirmed action covers the whole wake-up group
       if (viewing) write({ [`pl/${me.id}/rd`]: 1 });
       else if (role === 'cupid') write({ [`pl/${me.id}/t`]: c.cupid[0], [`pl/${me.id}/t2`]: c.cupid[1], [`pl/${me.id}/nd`]: 1, [`pl/${c.cupid[0]}/lv`]: c.cupid[1], [`pl/${c.cupid[1]}/lv`]: c.cupid[0] });
       else if (role === 'shadow') write({ [`pl/${me.id}/t`]: c.shadow ? c.shadow.to : '', [`pl/${me.id}/sa`]: c.shadow ? c.shadow.key : '', [`pl/${me.id}/nd`]: 1 });
-      else if (role === 'witch') write({ [`pl/${me.id}/t`]: c.witchPoison === null || c.witchPoison === undefined ? '' : c.witchPoison, [`pl/${me.id}/ws`]: c.witchSave ? 1 : 0, [`pl/${me.id}/nd`]: 1 });
-      else write({ [`pl/${me.id}/t`]: c[role] || '', [`pl/${me.id}/nd`]: 1 });
+      else if (role === 'witch') write(gp((g) => ({ [`pl/${g.id}/t`]: c.witchPoison === null || c.witchPoison === undefined ? '' : c.witchPoison, [`pl/${g.id}/ws`]: c.witchSave ? 1 : 0, [`pl/${g.id}/nd`]: 1 })));
+      else write(gp((g) => ({ [`pl/${g.id}/t`]: c[role] || '', [`pl/${g.id}/nd`]: 1 })));
     };
     if (viewing) {
       const sv = mpSeerView(players, me.id);
       return wrap(<NightActPP key={tag} role="seerResult" players={adapted} actor={actor} choices={mpChoices(players)} onDone={submit} seerOverride={sv} />);
     }
-    return wrap(<NightActPP key={tag} role={role} players={adapted} actor={actor} choices={mpChoices(players)} deferSeer={shadowAlive} hideSelf onDone={submit} />);
+    return wrap(<NightActPP key={tag} role={role} players={adapted} actor={actor} choices={mpChoices(players)} deferSeer={shadowAlive} ext={ext} hideSelf onDone={submit} />);
   }
   const text = me.a !== 1 ? 'You have been eliminated. Stay silent and keep your eyes closed.' : 'The night is not over.';
   return wrap(<LockView key={'z' + tag} title="Keep your eyes closed..." sub={text} />, true);
@@ -4741,7 +4754,7 @@ function useNightDirector({ room, players, write }) {
     const nightNo = opts && opts.again ? (room0.k || 1) : (room0.k || 0) + 1;
     const roles = NIGHT_ORDER.filter((r) => mpActive(r, nightNo) && latest.current.players.some((p) => p.a === 1 && p.r === r));
     let nk = 1;
-    const step = async (ns, label) => { nk += 1; setDir({ on: true, label }); await write({ ns, nk }); };
+    const step = async (ns, label) => { nk += 1; setDir({ on: true, label }); await write({ ns, nk, cm: null, sp: null }); }; // each turn starts with a clean team chat
     try {
       const base = mpNightPatch(room0);
       if (opts && opts.again) base.k = room0.k || 1;
@@ -4764,24 +4777,8 @@ function useNightDirector({ room, players, write }) {
         await step('z', `${roleLabel(r)} sleeping`);
         await Narrator.say(`${roleLabel(r)}, close your eyes.`); if (!live()) return;
         await wait(2200); if (!live()) return;
-        if (r === 'cupid') {
-          await step('z', 'Lovers waking');
-          await Narrator.say('Lovers, open your eyes.'); if (!live()) return;
-          await step('l', 'Lovers looking');
-          skip.current = false;
-          const t2 = Date.now();
-          while (live()) {
-            const lov = latest.current.players.filter((p) => p.a === 1 && p.lv);
-            if (lov.every((p) => p.la === 1) || skip.current || Date.now() - t2 > 60000) break;
-            await wait(500);
-          }
-          if (!live()) return;
-          await step('z', 'Lovers sleeping');
-          await Narrator.say('Lovers, close your eyes.'); if (!live()) return;
-          await wait(2200); if (!live()) return;
-        }
       }
-      if (roles.includes('shadow') && roles.includes('seer')) {
+      if (roles.includes('seer') && (roles.includes('shadow') || roles.includes('medusa') || latest.current.players.filter((p) => p.a === 1 && p.r === 'seer').length > 1)) {
         await step('z', 'Seer waking for the final vision');
         await Narrator.say('Seer, open your eyes.'); if (!live()) return;
         await step('v:seer', 'Seer viewing');

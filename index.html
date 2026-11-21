@@ -259,6 +259,14 @@ const DoctorIcon = (p) => (
     <path d="M32 19 V45 M19 32 H45" />
   </svg>
 );
+const PlagueIcon = (p) => (
+  <svg {...iconProps} {...p}>
+    <path d="M18 34 C18 14 46 14 46 34 V40 C46 46 40 50 32 50 C24 50 18 46 18 40 Z" />
+    <path d="M32 33 L52 46 L32 43 Z" />
+    <circle cx="26" cy="31" r="3" />
+    <circle cx="38" cy="31" r="3" />
+  </svg>
+);
 const ShadowIcon = (p) => (
   <svg {...iconProps} {...p}>
     <path d="M32 6 C18 8 12 22 14 36 L8 58 L22 50 L32 58 L42 50 L56 58 L50 36 C52 22 46 8 32 6Z" />
@@ -463,6 +471,13 @@ const DoctorArt = () => (
     <rect width="200" height="267" fill="#062431" />
     <circle cx="150" cy="48" r="18" fill="#E2E8F0" opacity="0.8" />
     <DoctorIcon x="30" y="62" width="140" height="140" className="text-cyan-300" />
+  </svg>
+);
+const PlagueArt = () => (
+  <svg {...artSvg}>
+    <rect width="200" height="267" fill="#1B0F2E" />
+    <circle cx="150" cy="48" r="18" fill="#E2E8F0" opacity="0.8" />
+    <PlagueIcon x="30" y="62" width="140" height="140" className="text-violet-300" />
   </svg>
 );
 const CupidArt = () => (
@@ -838,6 +853,12 @@ const ROLES_DATA = {
     short: 'Cures a Zombie or Infected player. Anyone else sleeps through the next night.',
     ability: 'Cure a Zombie or Infected player each night. If used on someone uninfected, they sleep through the next night.'
   },
+  plaguedoctor: {
+    id: 'plaguedoctor', balance: -2, Art: PlagueArt, imageUrl: 'images/plague-doctor-card.jpg', blurb: 'Inspect one player each night, then cure, infect or leave them.', name: 'Plague Doctor', team: 'neutral', max: 1, color: '#A78BFA', Icon: PlagueIcon, outbreak: true,
+    nightOrder: 7.6, nightPrompt: 'Plague Doctor wakes, locks onto one player and inspects them. They may then cure an infected player, infect an uninfected one, or leave them alone.',
+    short: 'Lock onto one player each night to reveal if they are infected, then choose to Cure, Infect, or leave them.',
+    ability: 'Lock onto one player each night to reveal if they are infected, then choose to Cure, Infect, or leave them.'
+  },
   villager: {
     id: 'villager', balance: 1, Art: VillagerArt, imageUrl: 'images/villager-card.jpg', blurb: 'No night power. Use deduction to find the wolves.', name: 'Villager', team: 'village', max: 10, color: '#CBD5E1', Icon: HouseIcon,
     nightOrder: null, nightPrompt: null,
@@ -849,8 +870,8 @@ const ROLE_IDS = Object.keys(ROLES_DATA);
 const MIN_PLAYERS = 4;
 const MAX_PLAYERS = 15;
 
-const TEAM_LABEL = { village: 'Village', werewolf: 'Werewolf', zombie: 'Zombie' };
-const teamColor = (team) => (team === 'werewolf' ? '#DC2626' : team === 'zombie' ? '#2DD4BF' : '#34D399');
+const TEAM_LABEL = { village: 'Village', werewolf: 'Werewolf', zombie: 'Zombie', neutral: 'Neutral' };
+const teamColor = (team) => (team === 'werewolf' ? '#DC2626' : team === 'zombie' ? '#2DD4BF' : team === 'neutral' ? '#A78BFA' : '#34D399');
 
 // Game mode: Classic hides the Outbreak roles (Zombie, Sniper) everywhere a deck is built.
 let gameMode = 'classic';
@@ -866,12 +887,23 @@ function threeWay(items) {
   if (!items.some((i) => i.role)) return '';
   const wolves = live.filter((i) => i.role === 'werewolf').length; // the Shadow Figure loses with the last Werewolf
   const evil = live.filter((i) => ROLES_DATA[i.role] && ROLES_DATA[i.role].team === 'werewolf').length;
-  const zombies = live.filter((i) => i.role === 'zombie').length;
+  const realZ = live.filter((i) => i.role === 'zombie').length;
+  const zombies = realZ + live.filter((i) => i.role === 'plaguedoctor' && i.side === 'zombie').length; // a Horde-aligned Plague Doctor counts toward the majority
   const rest = live.length - evil - zombies;
-  if (zombies > 0) return zombies > live.length - zombies ? 'zombie' : ''; // strict majority of the living
+  if (zombies > 0 && zombies > live.length - zombies) return 'zombie'; // strict majority of the living
+  if (realZ > 0) return '';
   if (wolves === 0) return 'village';
   if (evil >= rest) return 'werewolf';
   return '';
+}
+// Plague Doctor allegiance from the serums used: more cures = Village, more infections = Zombie Horde, ties follow the last serum, none = Unaligned.
+const pdSide = (cures, infects, last) => { const c = cures || 0, i = infects || 0; return !c && !i ? '' : c > i ? 'village' : i > c ? 'zombie' : last === 'infect' ? 'zombie' : 'village'; };
+function plagueLine(items, w) {
+  const pd = items.find((i) => i.role === 'plaguedoctor');
+  if (!pd || !w || w === 'lovers') return '';
+  if (!pd.side) return ' The Plague Doctor stayed Unaligned and does not win.';
+  if (pd.side === w) return ` The Plague Doctor, aligned with the ${w === 'zombie' ? 'Zombie Horde' : 'Village'}, wins too.`;
+  return ' The Plague Doctor does not win.';
 }
 const winText = (w, hadZ) => (w === 'village' && hadZ ? 'No Werewolves or Zombies are left. The Village wins!' : WIN_UI[w].text);
 const WIN_UI = {
@@ -935,9 +967,9 @@ function autoFill(count, mode = getGameMode()) {
   const v = Math.min(ROLES_DATA.villager.max, left); deck.villager = v; left -= v;
   village.forEach((id) => { if (id === 'villager') return; const n = Math.min(ROLES_DATA[id].max - deck[id], left); deck[id] += n; left -= n; }); // then second copies
   if (mode === 'outbreak' && count >= 6) { // Outbreak: one Zombie and one Sniper (plus a Doctor from 8 players) take the slots (plain Villagers first)
-    let need = count >= 8 ? 3 : 2;
+    let need = count >= 10 ? 4 : count >= 8 ? 3 : 2;
     ['villager', 'spellcaster', 'hunter'].forEach((id) => { const t = Math.min(need, deck[id]); deck[id] -= t; need -= t; });
-    deck.zombie = 1; deck.sniper = 1; if (count >= 8) deck.doctor = 1;
+    deck.zombie = 1; deck.sniper = 1; if (count >= 8) deck.doctor = 1; if (count >= 10) deck.plaguedoctor = 1;
   }
   return deck;
 }
@@ -3080,7 +3112,7 @@ function StatusChip({ active, onClick, color, children }) {
 /* ------------------------------------------------------------------ */
 /* Automated night: shared pieces, Pass & Play loop, day trial        */
 /* ------------------------------------------------------------------ */
-const NIGHT_ORDER = ['werewolf', 'seer', 'cupid', 'medusa', 'bodyguard', 'witch', 'sniper', 'doctor', 'spellcaster', 'zombie', 'shadow'];
+const NIGHT_ORDER = ['werewolf', 'seer', 'cupid', 'medusa', 'bodyguard', 'witch', 'sniper', 'doctor', 'plaguedoctor', 'spellcaster', 'zombie', 'shadow'];
 const NIGHT_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 const nightWord = (n) => NIGHT_WORDS[n] || String(n);
 const roleLabel = (id) => (id === 'werewolf' ? 'Werewolves' : id === 'zombie' ? 'Zombie Horde' : id === 'infected' ? 'Infected Player' : id === 'cured' ? 'Cured Player' : id === 'seerResult' ? 'Seer' : id === 'lovers' ? 'Lovers' : ROLES_DATA[id].name);
@@ -3098,6 +3130,7 @@ const NIGHT_PROMPT = {
   sniper: 'Sniper, choose who to scope.',
   zombie: 'Zombies, choose who to infect.',
   doctor: 'Doctor, choose who to treat.',
+  plaguedoctor: 'Plague Doctor, choose who to inspect.',
   infected: 'YOU HAVE BEEN INFECTED!',
   cured: 'YOU HAVE BEEN CURED!'
 };
@@ -3130,6 +3163,7 @@ function nightActions(c) {
   if (hasV(c.spellcaster)) out.push({ key: 'spellcaster', target: c.spellcaster });
   if (hasV(c.sniper)) out.push({ key: 'sniper', target: c.sniper });
   if (hasV(c.doctor)) out.push({ key: 'doctor', target: c.doctor });
+  if (hasV(c.plaguedoctor)) out.push({ key: 'plaguedoctor', target: c.plaguedoctor });
   if (hasV(c.zombie)) out.push({ key: 'zombie', target: c.zombie });
   return out;
 }
@@ -3388,8 +3422,36 @@ function SniperScope({ header, alive, isInfected, value, setValue, onDone }) {
   );
 }
 
+// Plague Doctor: step 1 locks one target (no switching), step 2 reveals their status and offers the matching serum.
+function PlagueScan({ header, alive, isInfected, value, setValue, onDone }) {
+  const locked = typeof value === 'string' && value.indexOf('L:') === 0;
+  const tgt = locked ? value.slice(2) : (value || '');
+  if (!locked) {
+    return (
+      <div className="flex flex-1 flex-col">
+        {header}
+        <PickList players={alive} value={tgt} onChange={(v) => setValue(v === '' ? null : v)} />
+        <Btn className="mt-5" disabled={!tgt} onClick={() => setValue('L:' + tgt)}>{tgt ? 'Lock Target & Inspect' : 'Select a player'}</Btn>
+      </div>
+    );
+  }
+  const t = alive.find((x) => x.id === tgt);
+  const inf = isInfected(tgt);
+  return (
+    <div className="flex flex-1 flex-col">
+      {header}
+      <Panel className="text-center" style={{ border: `1px solid ${inf ? 'rgba(52,211,153,0.8)' : 'rgba(167,139,250,0.7)'}`, background: inf ? 'rgba(16,185,129,0.2)' : 'rgba(109,40,217,0.2)' }}>
+        <div className="font-display text-xl font-bold text-slate-50">{t ? t.n : '?'}</div>
+        <div className="mt-2 text-sm font-black uppercase tracking-[0.18em]" style={{ color: inf ? '#6EE7B7' : '#C4B5FD' }}>{inf ? 'STATUS: INFECTED' : 'STATUS: UNINFECTED'}</div>
+      </Panel>
+      {inf ? <Btn className="mt-5" onClick={() => onDone(tgt, 'cure')}>Administer Cure</Btn> : <Btn className="mt-5" onClick={() => onDone(tgt, 'infect')}>Inject Plague</Btn>}
+      <Btn className="mt-3" variant="secondary" onClick={() => onDone(tgt, null)}>Leave Alone</Btn>
+    </div>
+  );
+}
+
 // The Shadow Figure's screen: anonymous action list, then a new target. Used by Pass & Play, Multi-Device auto and manual.
-const SHADOW_VERB = { medusa: 'Medusa turns {} to stone', bodyguard: 'Bodyguard protects {}', seer: 'Seer inspects {}', witchSave: 'Witch heals {}', witchPoison: 'Witch poisons {}', spellcaster: 'Spellcaster silences {}', sniper: 'Sniper Action \u2192 {}', doctor: 'Doctor Action \u2192 {}', wolf1: 'Werewolf Target 1 \u2192 {}', wolf2: 'Werewolf Target 2 \u2192 {}', zombie: 'Zombie Infect \u2192 {}' };
+const SHADOW_VERB = { medusa: 'Medusa turns {} to stone', bodyguard: 'Bodyguard protects {}', seer: 'Seer inspects {}', witchSave: 'Witch heals {}', witchPoison: 'Witch poisons {}', spellcaster: 'Spellcaster silences {}', sniper: 'Sniper Action \u2192 {}', doctor: 'Doctor Action \u2192 {}', plaguedoctor: 'Plague Doctor Action \u2192 {}', wolf1: 'Werewolf Target 1 \u2192 {}', wolf2: 'Werewolf Target 2 \u2192 {}', zombie: 'Zombie Infect \u2192 {}' };
 const shadowActionLabel = (key, name) => (SHADOW_VERB[key] || '{}').replace('{}', name);
 function ShadowAct({ actions, victimName, alive, wolves = [], selfId = null, nm, stoned, onDone, header }) {
   const order = useMemo(() => shuffle(actions.map((_, i) => i)), []);
@@ -3536,6 +3598,11 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
     return <SniperScope header={<ActHeader role={role} sub="Lock onto one player to scope them. If they are infected, you may take the shot." />}
       alive={opts(alive.filter((p) => p.id !== actor.id))} isInfected={(id) => { const q = players.find((x) => x.id === id); return !!q && (q.role === 'zombie' || !!q.bitten); }}
       value={pick} setValue={setPick} onDone={(t, shot) => onDone({ sniper: t, sniperShot: shot })} />;
+  }
+  if (role === 'plaguedoctor') {
+    return <PlagueScan header={<ActHeader role={role} sub="Lock onto one player to inspect them, then choose a serum." />}
+      alive={opts(alive.filter((p) => p.id !== actor.id))} isInfected={(id) => { const q = players.find((x) => x.id === id); return !!q && (q.role === 'zombie' || !!q.bitten); }}
+      value={pick} setValue={setPick} onDone={(t, a) => onDone({ plaguedoctor: t, plagueAct: a })} />;
   }
   if (role === 'infected') {
     return (
@@ -3695,9 +3762,19 @@ function resolveNightPP(players, c0, night) {
   const docT = has(c.doctor) && !blocked('doctor') ? c.doctor : null;
   const docP = docT !== null ? byId.get(docT) : null;
   const docLive = !!docP && docP.alive && !dead.includes(docT);
-  const cureId = docLive && (docP.role === 'zombie' || !!docP.bitten) ? docT : null;
-  const sedateId = docLive && cureId === null ? docT : null;
-  const hordeCured = cureId !== null && docP.role === 'zombie' && !players.some((p) => p.alive && p.role === 'zombie' && p.id !== cureId); // the last Zombie, cured, cannot bite tonight
+  const docCure = docLive && (docP.role === 'zombie' || !!docP.bitten) ? docT : null;
+  const sedateId = docLive && docCure === null ? docT : null;
+  // Plague Doctor: the serum matches the target's real status (a Shadow redirect can waste it). Cure beats the bite; an infection is stopped by the Bodyguard or a Witch heal.
+  const pdT = has(c.plaguedoctor) && !blocked('plaguedoctor') ? c.plaguedoctor : null;
+  const pdAct = pdT !== null && (c.plagueAct === 'cure' || c.plagueAct === 'infect') ? c.plagueAct : null;
+  const pdP = pdT !== null ? byId.get(pdT) : null;
+  const pdLive = !!pdP && pdP.alive && !dead.includes(pdT);
+  const pdIsInf = !!pdP && (pdP.role === 'zombie' || !!pdP.bitten);
+  const pdCure = pdLive && pdAct === 'cure' && pdIsInf ? pdT : null;
+  const pdInfect = pdLive && pdAct === 'infect' && !pdIsInf && pdT !== guarded && !(saveTarget !== null && pdT === saveTarget) ? pdT : null;
+  const cureId = docCure !== null ? docCure : pdCure;
+  const cureP = cureId !== null ? byId.get(cureId) : null;
+  const hordeCured = !!cureP && cureP.role === 'zombie' && !players.some((p) => p.alive && p.role === 'zombie' && p.id !== cureId); // the last Zombie, cured, cannot bite tonight
   // Outbreak: the horde's single bite lands unless the target died, was guarded, or was healed; the Sniper hits an active Zombie.
   const biteT = has(c.zombie) && !blocked('zombie') && !hordeCured ? c.zombie : null;
   const biteP = biteT !== null ? byId.get(biteT) : null;
@@ -3706,7 +3783,8 @@ function resolveNightPP(players, c0, night) {
   const next = players.map((p) => {
     const q = { ...p, nn: night, protectedTag: p.id === guarded, silencedTag: p.alive && p.id === silenced, stoneTag: p.alive && p.id === stoneId, shotTag: p.id === shotHit, justTurned: false, justCured: p.id === cureId, sedatedTag: p.id === sedateId };
     if (p.id === cureId) { q.role = p.former && p.former !== 'zombie' && ROLES_DATA[p.former] ? p.former : 'villager'; q.former = ''; q.bitten = 0; }
-    if (p.id === bitten) q.bitten = night;
+    if (p.id === bitten || p.id === pdInfect) q.bitten = night;
+    if (p.role === 'plaguedoctor' && pdAct) { if (pdAct === 'cure') q.pdCures = (p.pdCures || 0) + 1; else q.pdInfects = (p.pdInfects || 0) + 1; q.pdLast = pdAct; }
     if (dead.includes(p.id)) { q.alive = false; q.protectedTag = false; q.silencedTag = false; q.stoneTag = false; q.shotTag = false; q.bitten = 0; q.justCured = false; q.sedatedTag = false; }
     if (pair && (p.id === pair[0] || p.id === pair[1])) q.lover = partnerOf(p.id);
     if (p.role === 'bodyguard' && p.alive && myGuard !== null) q.lastGuard = myGuard;
@@ -3716,7 +3794,7 @@ function resolveNightPP(players, c0, night) {
   });
   const silencedName = silenced !== null && byId.get(silenced) && !dead.includes(silenced) ? byId.get(silenced).name : '';
   const stonedName = stoneId !== null && !dead.includes(stoneId) ? stoned.name : '';
-  return { next, dead, broken: brokenIds, saved, victim, silenced, silencedName, stoned: stonedName ? stoneId : null, stonedName, lines: dawnLines(saved, dead.filter((id) => !brokenIds.includes(id)).map((id) => byId.get(id).name), silencedName, stonedName, brokenIds.map((id) => byId.get(id).name), shotHit !== null), bitten, shotHit };
+  return { next, dead, broken: brokenIds, saved, victim, silenced, silencedName, stoned: stonedName ? stoneId : null, stonedName, lines: dawnLines(saved, dead.filter((id) => !brokenIds.includes(id)).map((id) => byId.get(id).name), silencedName, stonedName, brokenIds.map((id) => byId.get(id).name), shotHit !== null), bitten: bitten !== null ? bitten : pdInfect, shotHit };
 }
 
 // Pass & Play: the narrator runs the whole night by voice. One device, passed to each role in turn.
@@ -3883,9 +3961,10 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
   const wolves = alive.filter((p) => p.role === 'werewolf').length; // the Shadow Figure loses with the last Werewolf
   const evil = alive.filter((p) => ROLES_DATA[p.role].team === 'werewolf').length;
   const village = alive.length - evil;
-  const tw = threeWay(players.map((p) => ({ role: p.role, alive: p.alive })));
+  const sideItems = players.map((p) => ({ role: p.role, alive: p.alive, side: pdSide(p.pdCures, p.pdInfects, p.pdLast) }));
+  const tw = threeWay(sideItems);
   const hadZ = players.some((p) => p.role === 'zombie');
-  const over = loversFaction(players) ? { ...LOVERS_WIN, kind: 'lovers' } : tw ? { text: winText(tw, hadZ), color: WIN_UI[tw].color, kind: tw } : null;
+  const over = loversFaction(players) ? { ...LOVERS_WIN, kind: 'lovers' } : tw ? { text: winText(tw, hadZ) + plagueLine(sideItems, tw), color: WIN_UI[tw].color, kind: tw } : null;
   const sung = useRef('');
   useEffect(() => { if (over && sung.current !== over.kind) { sung.current = over.kind; Sfx.win(over.kind); } if (!over) sung.current = ''; }, [over && over.kind]);
   // Eliminates players; a Lover's partner dies of heartbreak with them. Returns the heartbroken players.
@@ -4123,7 +4202,7 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
   let status = null;
   if (loversFaction(players)) status = { text: 'The Lovers win! Only the bound pair is left.', color: '#F472B6' };
   else {
-    const tw3 = threeWay(players.map((p) => ({ role: p.role, alive: p.alive })));
+    const tw3 = threeWay(players.map((p) => ({ role: p.role, alive: p.alive, side: pdSide(p.pdCures, p.pdInfects, p.pdLast) })));
     if (tw3 === 'village') status = { text: 'No Werewolves left. The Village wins.', color: '#34D399' };
     else if (tw3 === 'werewolf') status = { text: 'Werewolves match or outnumber the Village.', color: '#F87171' };
     else if (tw3 === 'zombie') status = { text: 'The Zombie horde holds the majority. The Zombies win.', color: '#2DD4BF' };
@@ -4325,7 +4404,7 @@ const STORE_KEY = 'nightfall.games.v1';
 //  pl[pid]: { n name, o join order, r roleId, a alive 1/0, d ready 1/0, t night target pid, nd night action done,
 //             ws witch save this night, wsu / wpu potion used, lp bodyguard (or Medusa) last target, hs hunter shot used, s silenced, x stoned until dusk, sa Shadow Figure's chosen action, lv Lovers partner pid, t2 Cupid's second pick, la Lover has seen their partner, rd Seer saw the final vision, lf left }
 const SESSION_KEY = 'nightfall.mp.v1';
-const MP_ACTIVE = ['werewolf', 'seer', 'cupid', 'medusa', 'bodyguard', 'witch', 'sniper', 'doctor', 'spellcaster', 'zombie', 'shadow'];
+const MP_ACTIVE = ['werewolf', 'seer', 'cupid', 'medusa', 'bodyguard', 'witch', 'sniper', 'doctor', 'plaguedoctor', 'spellcaster', 'zombie', 'shadow'];
 const mpActive = (role, k) => MP_ACTIVE.includes(role) && (role !== 'cupid' || k === 1); // Cupid only acts on the first night
 const MP_MIN = 4;
 const MP_MAX = 15;
@@ -4469,7 +4548,7 @@ const mpNightRoles = (players) => Array.from(new Set(players.map((p) => p.r).fil
 function mpWinner(players) {
   if (!players.some((p) => p.r)) return '';
   if (loversFaction(players.map((p) => ({ id: p.id, role: p.r, alive: p.a === 1 && !!p.r, lover: p.lv })).filter((i) => i.role))) return 'lovers';
-  return threeWay(players.map((p) => ({ role: p.r, alive: p.a === 1 })));
+  return threeWay(players.map((p) => ({ role: p.r, alive: p.a === 1, side: pdSide(p.pdc, p.pdi, p.pdl) })));
 }
 // What the wolf pack has chosen so far (most votes wins; ties go to the earliest joined target).
 function mpWolfVictims(players) { // Blood Moon: wolves also fill t2, and the top two picks are hunted
@@ -4490,7 +4569,7 @@ function mpDealPatch(room, deck) {
   const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0, bm: 0 };
   players.forEach((p, i) => {
     const b = `pl/${p.id}/`;
-    Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0, [b + 'v']: '', [b + 'lv']: '', [b + 't2']: '', [b + 'la']: 0, [b + 'bt']: 0, [b + 'jt']: 0, [b + 'cu']: 0, [b + 'cj']: 0, [b + 'sd']: 0, [b + 'sn']: 0, [b + 'fr']: '' });
+    Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0, [b + 'v']: '', [b + 'lv']: '', [b + 't2']: '', [b + 'la']: 0, [b + 'bt']: 0, [b + 'jt']: 0, [b + 'cu']: 0, [b + 'cj']: 0, [b + 'sd']: 0, [b + 'sn']: 0, [b + 'fr']: '', [b + 'pdc']: 0, [b + 'pdi']: 0, [b + 'pdl']: '' });
   });
   return patch;
 }
@@ -4498,7 +4577,7 @@ function mpLobbyPatch(room) {
   const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null, vd: null, cm: null, sp: null, bm: null };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
-    ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'x', 'sa', 'rd', 'lf', 'v', 'lv', 't2', 'la', 'bt', 'jt', 'sn', 'fr', 'cu', 'cj', 'sd'].forEach((f) => { patch[b + f] = null; });
+    ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'x', 'sa', 'rd', 'lf', 'v', 'lv', 't2', 'la', 'bt', 'jt', 'sn', 'fr', 'cu', 'cj', 'sd', 'pdc', 'pdi', 'pdl'].forEach((f) => { patch[b + f] = null; });
     patch[b + 'a'] = 1; patch[b + 'd'] = 0;
   });
   return patch;
@@ -4536,6 +4615,8 @@ function mpChoices(ps) {
     witchSaveTo: witch && witch.ws >= 1 && victim2 ? (witch.ws === 2 ? victim2 : victim) : null,
     witchPoison: witch && witch.t && !witch.wpu && byId[witch.t] ? witch.t : null,
     spellcaster: pick('spellcaster'), sniper: pick('sniper'), doctor: pick('doctor'), zombie: pick('zombie'),
+    plaguedoctor: pick('plaguedoctor'),
+    plagueAct: (() => { const q = alive.find((x) => x.r === 'plaguedoctor' && x.t && byId[x.t]); return q ? (q.ws === 1 ? 'cure' : q.ws === 2 ? 'infect' : null) : null; })(), // ws: 1 cure, 2 infect, 0 leave alone
     sniperShot: alive.some((x) => x.r === 'sniper' && x.t && byId[x.t] && x.ws === 1)
   };
 }
@@ -4587,9 +4668,18 @@ function mpResolveNight(room) {
   const docT = c.doctor && !blocked('doctor') ? c.doctor : '';
   const docP = docT ? byId[docT] : null;
   const docLive = !!docP && docP.a === 1 && !dead.includes(docT);
-  const cureId = docLive && (docP.r === 'zombie' || !!docP.bt) ? docT : '';
-  const sedateId = docLive && !cureId ? docT : '';
-  const hordeCured = !!cureId && docP.r === 'zombie' && !alive.some((p) => p.r === 'zombie' && p.id !== cureId);
+  const docCure = docLive && (docP.r === 'zombie' || !!docP.bt) ? docT : '';
+  const sedateId = docLive && !docCure ? docT : '';
+  // Plague Doctor: the serum matches the target's real status (a Shadow redirect can waste it). An infection is stopped by the Bodyguard or a Witch heal.
+  const pdT = c.plaguedoctor && !blocked('plaguedoctor') ? c.plaguedoctor : '';
+  const pdAct = pdT && (c.plagueAct === 'cure' || c.plagueAct === 'infect') ? c.plagueAct : '';
+  const pdP = pdT ? byId[pdT] : null;
+  const pdLive = !!pdP && pdP.a === 1 && !dead.includes(pdT);
+  const pdIsInf = !!pdP && (pdP.r === 'zombie' || !!pdP.bt);
+  const pdCure = pdLive && pdAct === 'cure' && pdIsInf ? pdT : '';
+  const pdInfect = pdLive && pdAct === 'infect' && !pdIsInf && pdT !== guarded && !(saveTarget && pdT === saveTarget) ? pdT : '';
+  const cureId = docCure || pdCure;
+  const hordeCured = !!cureId && byId[cureId].r === 'zombie' && !alive.some((p) => p.r === 'zombie' && p.id !== cureId);
 
   // Outbreak: the horde's single bite lands unless the target died, was guarded or was healed; the Sniper hits an active Zombie.
   const biteT = c.zombie && !blocked('zombie') && !hordeCured ? c.zombie : '';
@@ -4603,6 +4693,8 @@ function mpResolveNight(room) {
   const patch = { ph: 'day', an, ns: null, nk: null, bd: nextBgIdx('day', room.bd) };
   ps.forEach((p) => { patch[`pl/${p.id}/s`] = silencedAlive && p.id === silencedAlive ? 1 : 0; patch[`pl/${p.id}/x`] = stonedAlive && p.id === stonedAlive ? 1 : 0; patch[`pl/${p.id}/sn`] = shotHit && p.id === shotHit ? 1 : 0; });
   if (bitten) patch[`pl/${bitten}/bt`] = room.k || 1;
+  if (pdInfect) patch[`pl/${pdInfect}/bt`] = room.k || 1;
+  if (pdAct) alive.filter((p) => p.r === 'plaguedoctor').forEach((d) => { if (pdAct === 'cure') patch[`pl/${d.id}/pdc`] = (d.pdc || 0) + 1; else patch[`pl/${d.id}/pdi`] = (d.pdi || 0) + 1; patch[`pl/${d.id}/pdl`] = pdAct; });
   if (cureId) { const fr = byId[cureId].fr; patch[`pl/${cureId}/r`] = fr && fr !== 'zombie' && ROLES_DATA[fr] ? fr : 'villager'; patch[`pl/${cureId}/fr`] = ''; patch[`pl/${cureId}/bt`] = 0; patch[`pl/${cureId}/cu`] = room.k || 1; }
   if (sedateId) patch[`pl/${sedateId}/sd`] = (room.k || 1) + 1;
   dead.forEach((id) => { patch[`pl/${id}/a`] = 0; });
@@ -5137,6 +5229,12 @@ function MpNightManual({ me, players, room, write }) {
       </div>
     );
   }
+  if (role === 'plaguedoctor') {
+    if (done) return <div className="flex flex-1 flex-col">{header('Inspect a player', me.ws === 1 ? 'You administered the cure.' : me.ws === 2 ? 'You injected the plague.' : 'You left them alone.')}{lockedNote}</div>;
+    return <PlagueScan header={header('Inspect a player', 'Lock onto one player to inspect them, then choose a serum.')}
+      alive={alive.filter((p) => p.id !== me.id).map((p) => ({ id: p.id, n: p.n }))} isInfected={(id) => { const q = players.find((x) => x.id === id); return !!q && (q.r === 'zombie' || !!q.bt); }}
+      value={pick} setValue={setPick} onDone={(t, a) => write({ [`pl/${me.id}/t`]: t, [`pl/${me.id}/ws`]: a === 'cure' ? 1 : a === 'infect' ? 2 : 0, [`pl/${me.id}/nd`]: 1 })} />;
+  }
   if (role === 'spellcaster') {
     return (
       <div className="flex flex-1 flex-col">
@@ -5270,6 +5368,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
       else if (role === 'shadow') write({ [`pl/${me.id}/t`]: c.shadow ? c.shadow.to : '', [`pl/${me.id}/sa`]: c.shadow ? c.shadow.key : '', [`pl/${me.id}/nd`]: 1 });
       else if (role === 'werewolf') write(gp((g) => ({ [`pl/${g.id}/t`]: c.werewolf || '', [`pl/${g.id}/t2`]: c.werewolf2 || '', [`pl/${g.id}/nd`]: 1 })));
       else if (role === 'witch') { const vs = mpWolfVictims(players); write(gp((g) => ({ [`pl/${g.id}/t`]: c.witchPoison === null || c.witchPoison === undefined ? '' : c.witchPoison, [`pl/${g.id}/ws`]: c.witchSave ? (vs[1] && c.witchSaveTo === vs[1] ? 2 : 1) : 0, [`pl/${g.id}/nd`]: 1 }))); } // ws 2 = healing the second Blood Moon victim
+      else if (role === 'plaguedoctor') write(gp((g) => ({ [`pl/${g.id}/t`]: c.plaguedoctor || '', [`pl/${g.id}/ws`]: c.plagueAct === 'cure' ? 1 : c.plagueAct === 'infect' ? 2 : 0, [`pl/${g.id}/nd`]: 1 })));
       else if (role === 'sniper') write(gp((g) => ({ [`pl/${g.id}/t`]: c.sniper || '', [`pl/${g.id}/ws`]: c.sniperShot ? 1 : 0, [`pl/${g.id}/nd`]: 1 }))); // ws doubles as the Sniper's "shot taken" flag
       else write(gp((g) => ({ [`pl/${g.id}/t`]: c[role] || '', [`pl/${g.id}/nd`]: 1 })));
     };
@@ -5516,6 +5615,7 @@ function MpOver({ room, players, meId }) {
       <Panel className="text-center" style={{ border: `1px solid ${W.color}`, background: W.bg }}>
         <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-300">Game over</div>
         <h2 className="font-display mt-1 text-3xl font-black" style={{ color: W.title }}>{W.name}</h2>
+        {players.some((p) => p.r === 'plaguedoctor') && <p className="mt-2 text-sm text-slate-300">{plagueLine(players.map((p) => ({ role: p.r, alive: p.a === 1, side: pdSide(p.pdc, p.pdi, p.pdl) })), room.w).trim()}</p>}
       </Panel>
       <ul className="flex flex-col gap-2">
         {players.map((p) => (

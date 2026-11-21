@@ -3859,7 +3859,7 @@ function resolveNightPP(players, c0, night) {
   });
   const silencedName = silenced !== null && byId.get(silenced) && !dead.includes(silenced) ? byId.get(silenced).name : '';
   const stonedName = stoneId !== null && !dead.includes(stoneId) ? stoned.name : '';
-  return { next, dead, shot: shotHit, broken: brokenIds, saved, victim, silenced, silencedName, stoned: stonedName ? stoneId : null, stonedName, lines: dawnLines(saved, dead.filter((id) => !brokenIds.includes(id)).map((id) => byId.get(id).name), silencedName, stonedName, brokenIds.map((id) => byId.get(id).name), shotHit !== null), bitten: bitten !== null ? bitten : pdInfect !== null ? pdInfect : infBite, shotHit };
+  return { next, dead, shot: shotHit, broken: brokenIds, saved, victim, poisoned: poison, hunted: [victim, victim2].filter((v) => v !== null && !protectedV(v)), silenced, silencedName, stoned: stonedName ? stoneId : null, stonedName, lines: dawnLines(saved, dead.filter((id) => !brokenIds.includes(id)).map((id) => byId.get(id).name), silencedName, stonedName, brokenIds.map((id) => byId.get(id).name), shotHit !== null), bitten: bitten !== null ? bitten : pdInfect !== null ? pdInfect : infBite, shotHit };
 }
 
 // Pass & Play: the narrator runs the whole night by voice. One device, passed to each role in turn.
@@ -4716,6 +4716,9 @@ function mpResolveNight(room) {
   const shotHit = res.shot !== null && res.shot !== undefined ? res.shot : '';
   const lines = dawnLines(res.saved, res.dead.filter((id) => !res.broken.includes(id)).map(nameOf), '', '', res.broken.map(nameOf), !!shotHit);
   const an = { k: room.k || 0, t: Date.now(), l: Object.fromEntries(lines.map((t, i) => [i, t])), sv: res.saved ? 1 : 0, si: silencedAlive, st: stonedAlive };
+  const cz = {}; // why each player died, so the eliminated screen can say so
+  res.dead.forEach((id) => { cz[id] = res.broken.includes(id) ? 'h' : id === shotHit ? 's' : res.hunted.includes(id) ? 'w' : id === res.poisoned ? 'p' : 'w'; });
+  if (Object.keys(cz).length) an.cz = cz;
   if (res.dead.length && getSettings().revealDead) an.rv = Object.fromEntries(res.dead.map((id) => [id, byId[id].r]));
   const patch = { ph: 'day', an, ns: null, nk: null, bd: nextBgIdx('day', room.bd) };
   res.next.forEach((q) => {
@@ -5836,7 +5839,11 @@ function ElimGate({ me, room, code }) {
   const lines = Object.values((room.an && room.an.l) || {});
   const xs = Object.values((room.an && room.an.x) || {});
   const has = (t) => lines.concat(xs).some((l) => String(l).indexOf(t) >= 0);
-  const why = has(`${me.n} was found dead`) ? 'The werewolves found you in the night.'
+  const cz = room.an && room.an.cz ? room.an.cz[me.id] : '';
+  const why = cz === 'p' ? 'The Witch poisoned you in the night.'
+    : cz === 's' ? 'The Sniper shot you in the night.'
+    : cz === 'h' ? 'Your Lover died, and you died of heartbreak.'
+    : cz === 'w' || has(`${me.n} was found dead`) ? 'The werewolves found you in the night.'
     : has(`${me.n} was voted out`) ? 'The village voted you out.'
     : has(`took ${me.n} down`) ? 'The Hunter took you down with a last shot.'
     : has(`${me.n} died of heartbreak`) ? 'You died of heartbreak.'

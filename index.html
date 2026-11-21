@@ -214,6 +214,13 @@ const CrosshairIcon = (p) => (
     <circle cx="32" cy="32" r="2.5" fill="currentColor" />
   </svg>
 );
+const MayorIcon = (p) => (
+  <svg {...iconProps} {...p}>
+    <path d="M10 46 L8 22 L22 33 L32 14 L42 33 L56 22 L54 46Z" />
+    <path d="M10 54 H54" />
+    <circle cx="32" cy="38" r="2.5" fill="currentColor" />
+  </svg>
+);
 const HouseIcon = (p) => (
   <svg {...iconProps} {...p}>
     <path d="M8 32 L32 11 L56 32" />
@@ -372,6 +379,19 @@ const SpellcasterArt = () => (
   </svg>
 );
 
+const MayorArt = () => (
+  <svg {...artSvg}>
+    <defs>
+      <linearGradient id="my-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#10204A" /><stop offset="1" stopColor="#060A18" /></linearGradient>
+    </defs>
+    <rect width="200" height="267" fill="url(#my-bg)" />
+    <Stars pts={[[24, 28, 1.2], [160, 22, 1], [30, 196, 1]]} fill="#BFDBFE" />
+    <circle cx="70" cy="56" r="20" fill="#DBEAFE" opacity="0.8" />
+    <path d="M50 150 L44 98 L76 124 L100 76 L124 124 L156 98 L150 150Z" fill="#3B2E10" stroke="#FBBF24" strokeWidth="2" strokeLinejoin="round" />
+    <path d="M50 164 H150" stroke="#FBBF24" strokeWidth="3" strokeLinecap="round" />
+    <circle cx="100" cy="132" r="5" fill="#FBBF24" />
+  </svg>
+);
 const HunterArt = () => (
   <svg {...artSvg}>
     <defs>
@@ -461,6 +481,8 @@ function makeBgStore(key, fallback) {
     use: function () { return React.useSyncExternalStore((fn) => { listeners.add(fn); return () => listeners.delete(fn); }, this.get); }
   };
 }
+const MAYOR_ART_DEFAULT = 'images/mayor-card.jpg';
+const mayorArtStore = makeBgStore('nightfall.mayorart.v1', MAYOR_ART_DEFAULT);
 const NIGHT_BG_DEFAULT = 'images/night-bg.jpg';
 const nightBgStore = makeBgStore('nightfall.nightbg.v1', NIGHT_BG_DEFAULT);
 const DAY_BG_DEFAULT = 'images/day-bg.jpg';
@@ -492,7 +514,8 @@ function fileToBg(file) {
 try { localStorage.removeItem('nightfall.cardart.v1'); } catch (e) { /* custom art no longer exists */ }
 const DEFAULT_BACK = 'images/card-back.jpg';
 function useCardImage(role) {
-  return ROLES_DATA[role].imageUrl || '';
+  const mayor = mayorArtStore.use();
+  return role === 'mayor' ? mayor : (ROLES_DATA[role].imageUrl || '');
 }
 function DefaultBackDesign() {
   const Diamond = ({ className }) => (
@@ -604,6 +627,12 @@ const ROLES_DATA = {
     nightOrder: null, nightPrompt: null,
     short: 'If eliminated, takes one player down immediately.',
     ability: 'If eliminated at any time, immediately chooses one player to take down with them.'
+  },
+  mayor: {
+    id: 'mayor', balance: 2, Art: MayorArt, get imageUrl() { return mayorArtStore.get(); }, blurb: 'Your vote counts twice.', name: 'Mayor', team: 'village', max: 1, color: '#60A5FA', Icon: MayorIcon,
+    nightOrder: null, nightPrompt: null,
+    short: 'Your vote counts twice.',
+    ability: 'Your vote counts twice.'
   },
   villager: {
     id: 'villager', balance: 1, Art: VillagerArt, imageUrl: 'images/villager-card.jpg', blurb: 'No night power. Use deduction to find the wolves.', name: 'Villager', team: 'village', max: 1, color: '#CBD5E1', Icon: HouseIcon,
@@ -1330,7 +1359,7 @@ function ServerUrlRow({ rowStyle }) {
   );
 }
 
-function BgRow({ rowStyle, store, title, desc, savedMsg, resetMsg }) {
+function BgRow({ rowStyle, store, title, desc, savedMsg, resetMsg, thumb = 'aspect-[9/16] w-[54px]' }) {
   const src = store.use();
   const [msg, setMsg] = useState('');
   const custom = store.isCustom();
@@ -1346,7 +1375,7 @@ function BgRow({ rowStyle, store, title, desc, savedMsg, resetMsg }) {
   return (
     <div className="rounded-2xl p-4" style={rowStyle}>
       <div className="flex items-start gap-3">
-        <div className="aspect-[9/16] w-[54px] shrink-0 overflow-hidden rounded-lg" style={{ background: src ? '#05070B' : DAY_GRADIENT, border: '1px solid var(--line)' }}>
+        <div className={`${thumb} shrink-0 overflow-hidden rounded-lg`} style={{ background: src ? '#05070B' : DAY_GRADIENT, border: '1px solid var(--line)' }}>
           {src && <img src={src} alt="" className="h-full w-full object-cover" />}
         </div>
         <div className="min-w-0 flex-1">
@@ -1440,6 +1469,7 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
 
             <BgRow rowStyle={rowStyle} store={nightBgStore} title="Night Phase Background" desc="Artwork behind the narrator’s night screens. Portrait photos fit best." savedMsg="Night background updated." resetMsg="Back to the default night background." />
             <BgRow rowStyle={rowStyle} store={dayBgStore} title="Day Phase Background" desc="Artwork behind the dawn announcement, discussion and voting screens." savedMsg="Day background updated." resetMsg="Back to the default day background." />
+            <BgRow rowStyle={rowStyle} store={mayorArtStore} thumb="aspect-[3/4] w-[60px]" title="Mayor Card Art" desc="Your own picture for the Mayor card. A portrait 3:4 image fits best." savedMsg="Mayor card art updated." resetMsg="Back to the default Mayor card." />
             <ServerUrlRow rowStyle={rowStyle} />
 
             <div className="rounded-2xl p-4" style={rowStyle}>
@@ -2599,8 +2629,12 @@ const SilencedBadge = () => <span className="rounded-full px-2 py-0.5 text-[10px
 // Pass & Play day: recap the dawn, talk, then each voter takes the phone and casts a secret ballot. Silenced players cannot vote.
 function DayTrial({ players, setPlayers, night, info, onNight, onAgain }) {
   const reveal = useSettings().revealDead;
-  const [phase, setPhase] = useState('talk'); // talk | vote | result
+  const [phase, setPhase] = useState('talk'); // talk | vote (group) | ballots (secret, with a Mayor) | result
   const [pick, setPick] = useState(null);
+  const [bi, setBi] = useState(0);
+  const [hold, setHold] = useState(true);
+  const [ballots, setBallots] = useState({});
+  const [cands, setCands] = useState(null);
   const [roles, setRoles] = useState(false);
   const [res, setRes] = useState(null);
   const [out, setOut] = useState(null);
@@ -2615,7 +2649,30 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain }) {
   const kill = (ids) => setPlayers(players.map((p) => (ids.includes(p.id) ? { ...p, alive: false, protectedTag: false, silencedTag: false } : p)));
   const opts = (list) => list.map((p) => ({ id: p.id, n: p.name }));
   const nm = (id) => (players.find((p) => p.id === id) || {}).name || '?';
-  const startVote = () => { setPick(null); setOut(null); setRes(null); setPhase('vote'); };
+  const mayorAlive = alive.some((p) => p.role === 'mayor');
+  const voter = phase === 'ballots' ? voters[bi] : null;
+  const tallyUp = (all) => {
+    const tally = {};
+    voters.forEach((v) => { const t = all[v.id]; if (t !== null && t !== undefined) tally[t] = (tally[t] || 0) + (v.role === 'mayor' ? 2 : 1); });
+    const ranked = Object.keys(tally).map(Number).sort((x, y) => tally[y] - tally[x]);
+    const top = ranked.length ? ranked[0] : null;
+    const tie = ranked.length > 1 && tally[ranked[1]] === tally[top];
+    setRes({ tally, ranked, top, tie, skipped: ranked.length === 0, tied: tie ? ranked.filter((id) => tally[id] === tally[top]) : [] });
+    if (top !== null && !tie) { const p = players.find((x) => x.id === top); kill([top]); setOut(p); if (p.role === 'hunter') setHunter(p); }
+    setPhase('result');
+  };
+  const cast = () => {
+    const all = { ...ballots, [voter.id]: pick === 'skip' ? null : pick };
+    setBallots(all); setPick(null);
+    if (bi + 1 < voters.length) { setBi(bi + 1); setHold(true); } else tallyUp(all);
+  };
+  const startVote = (tiedIds) => {
+    setPick(null); setOut(null); setRes(null);
+    if (mayorAlive) {
+      setCands(Array.isArray(tiedIds) ? tiedIds : null); setBallots({}); setBi(0); setHold(true);
+      if (voters.length === 0) { setRes({ tally: {}, ranked: [], top: null, tie: false, skipped: true }); setPhase('result'); } else setPhase('ballots');
+    } else setPhase('vote');
+  };
   const eliminate = () => {
     const p = players.find((x) => x.id === pick); if (!p) return;
     kill([p.id]); setOut(p); setRes({ tally: {}, ranked: [], top: p.id, tie: false, skipped: false });
@@ -2629,7 +2686,7 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain }) {
     <DayStage>
       <header className="pb-3">
         <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-amber-300">Day {night}</p>
-        <h1 className="font-display text-3xl font-bold tracking-wide text-slate-50">{phase === 'vote' ? 'The Vote' : 'The Village Wakes'}</h1>
+        <h1 className="font-display text-3xl font-bold tracking-wide text-slate-50">{phase === 'vote' || phase === 'ballots' ? 'The Vote' : 'The Village Wakes'}</h1>
       </header>
       {phase === 'talk' && (
         <>
@@ -2653,6 +2710,26 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain }) {
             </ul>
           </Panel>
         </>
+      )}
+      {phase === 'ballots' && voter && (
+        <div className="flex flex-1 flex-col">
+          <p className="text-center text-xs tabular-nums text-slate-300">Ballot {bi + 1} of {voters.length}{silenced.length > 0 ? ` · ${silenced.map((p) => p.name).join(', ')} silenced, skipped` : ''}</p>
+          {hold ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
+              <ShieldIcon width="64" height="64" className="text-slate-200" />
+              <p className="font-display text-2xl font-bold text-slate-50">Pass the phone to {voter.name} &mdash; Eyes only!</p>
+              <p className="max-w-xs text-sm text-slate-300">Everyone else look away while {voter.name} votes.</p>
+              <Btn className="max-w-xs" onClick={() => setHold(false)}>I&rsquo;m {voter.name}. Show my ballot</Btn>
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-1 flex-col">
+              <h2 className="font-display mb-3 text-center text-xl font-bold text-slate-50">{voter.name}, who do you vote to eliminate?</h2>
+              <PickList players={opts((cands ? alive.filter((p) => cands.includes(p.id)) : alive).filter((p) => p.id !== voter.id))} value={pick === null ? '' : pick} onChange={(v) => setPick(v === '' ? null : v)} />
+              <Btn className="mt-3" variant="secondary" onClick={() => setPick('skip')}>{pick === 'skip' ? 'Skip selected ✓' : 'Skip (no vote)'}</Btn>
+              <Btn className="mt-3" disabled={pick === null} onClick={cast}>{pick === null ? 'Select a player or Skip' : pick === 'skip' ? 'Confirm Vote: Skip' : `Confirm Vote: ${nm(pick)}`}</Btn>
+            </div>
+          )}
+        </div>
       )}
       {phase === 'vote' && (
         <div className="flex flex-1 flex-col">
@@ -2681,7 +2758,7 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain }) {
       {phase === 'result' && res && (
         <>
           <Panel className="text-center" style={{ border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(21,26,36,0.85)' }}>
-            <p className="font-display text-xl font-bold text-slate-50">{out ? `${out.name} was voted out by the village.` : 'The vote was skipped. No one is eliminated.'}</p>
+            <p className="font-display text-xl font-bold text-slate-50">{out ? `${out.name} was voted out by the village.` : res.tie ? 'The vote is tied. No one is eliminated yet.' : 'The vote was skipped. No one is eliminated.'}</p>
             {false && <ul className="mt-3 flex flex-col gap-1 text-sm text-slate-200">{res.ranked.map((id) => <li key={id} className="flex justify-between"><span>{nm(id)}</span><span className="tabular-nums text-slate-400">{res.tally[id]}</span></li>)}</ul>}
             {out && reveal && <div className="mt-3"><NightCard player={out} line={`${out.name} was the ${ROLES_DATA[out.role].name}`} /></div>}
           </Panel>
@@ -2716,7 +2793,9 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain }) {
           <Btn variant="secondary" disabled={!!hunter} onClick={() => setRoles(!roles)}>{roles ? 'Hide All Roles' : 'Reveal All Roles'}</Btn>
           <Btn disabled={!!hunter} onClick={onAgain}>Play Again</Btn>
         </>}
-        {!over && phase === 'result' && <Btn disabled={!!hunter} onClick={onNight}>Start Night {night + 1}</Btn>}
+        {!over && phase === 'result' && res && res.tie && <Btn variant="secondary" onClick={() => startVote(res.tied)}>Revote (tied players)</Btn>}
+        {!over && phase === 'result' && res && res.tie && <Btn variant="ghost" onClick={() => setRes({ ...res, tie: false, skipped: true })}>Skip (no elimination)</Btn>}
+        {!over && phase === 'result' && !(res && res.tie) && <Btn disabled={!!hunter} onClick={onNight}>Start Night {night + 1}</Btn>}
       </div>
     </DayStage>
   );
@@ -3720,7 +3799,7 @@ function mpTally(players) {
   const alive = players.filter((p) => p.a === 1);
   const voters = alive.filter((p) => p.s !== 1);
   const tally = {};
-  voters.forEach((p) => { if (p.v && byId[p.v] && byId[p.v].a === 1) tally[p.v] = (tally[p.v] || 0) + 1; });
+  voters.forEach((p) => { if (p.v && byId[p.v] && byId[p.v].a === 1) tally[p.v] = (tally[p.v] || 0) + (p.r === 'mayor' ? 2 : 1); });
   const ranked = Object.keys(tally).sort((x, y) => tally[y] - tally[x]);
   const top = ranked[0] || '';
   const tie = ranked.length > 1 && tally[ranked[1]] === tally[top];
@@ -4368,6 +4447,7 @@ function AppInner() {
 function activeImageSources() {
   const list = [DEFAULT_BG, LOADING_BG, DEFAULT_BACK, getNightBg()];
   list.push(dayBgStore.get());
+  list.push(mayorArtStore.get());
   ROLE_IDS.forEach((id) => {
     const src = ROLES_DATA[id].imageUrl;
     if (src) list.push(src);

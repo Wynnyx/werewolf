@@ -5047,7 +5047,7 @@ function MpCountStep({ n, setN, onBack, onNext }) {
   );
 }
 
-function MpJoinForm({ onBack, onJoined }) {
+function MpJoinForm({ onBack, onJoined, onHost }) {
   const [code, setCode] = useState('');
   const [target, setTarget] = useState(''); // the room the player chose; the name step opens for it
   const [name, setName] = useState(loadName);
@@ -5064,14 +5064,16 @@ function MpJoinForm({ onBack, onJoined }) {
   };
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="font-display text-2xl font-bold uppercase">Join a Private Room</h2>
+      <MpPublicRooms onPick={openName} />
+      <h2 className="font-display mt-2 text-sm font-bold uppercase tracking-[0.2em] text-slate-300">Join a Private Room</h2>
       <MpField label="Room code">
         <input value={code} maxLength={4} onChange={(e) => setCode(cleanCode(e.target.value))} placeholder="WOLF" autoComplete="off" autoCapitalize="characters" spellCheck={false}
           className="font-display h-16 w-full rounded-xl text-center text-3xl font-black uppercase tracking-[0.4em] text-white placeholder-slate-600" style={{ ...mpInputStyle, paddingLeft: '0.4em' }} />
       </MpField>
       {err && !target && <p role="alert" className="text-sm text-amber-300">{err}</p>}
       <Btn onClick={tryCode}>Join Room</Btn>
-      <MpPublicRooms onPick={openName} />
+      <button onClick={onHost} className="mt-2 flex min-h-[56px] w-full items-center justify-center rounded-2xl text-base font-bold uppercase tracking-wide text-violet-100 transition hover:brightness-125 active:scale-[0.99]"
+        style={{ background: 'linear-gradient(135deg, rgba(109,40,217,0.4), rgba(21,26,36,0.95))', border: '1px solid rgba(167,139,250,0.65)' }}>+ Create Your Own Room</button>
       <Btn variant="ghost" onClick={onBack}>Back</Btn>
       {target && (
         <div role="dialog" aria-modal="true" aria-label="Write your name" className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: 'rgba(5,7,12,0.86)' }}>
@@ -6117,7 +6119,7 @@ function MpRoom({ session, onExit, onPhase }) {
 function MultiScreen({ onBack, onPhase, gameCount, onClearGames }) {
   const st = useSettings();
   const hasUrl = !!(normalizeDbUrl(st.fbUrl) || normalizeDbUrl(DEFAULT_FIREBASE_URL));
-  const [view, setView] = useState('entry'); // entry | mode | count | deck | host | join | room
+  const [view, setView] = useState('join'); // join (the hub) | mode | count | deck | host | join | room
   const [cfg, setCfg] = useState({ n: 8, deck: null });
   useEffect(() => { if (view !== 'room') onPhase(view === 'deck' ? 'cards' : ''); }, [view]);
   const [session, setSession] = useState(loadSession);
@@ -6140,7 +6142,7 @@ function MultiScreen({ onBack, onPhase, gameCount, onClearGames }) {
   }, []);
 
   const enter = (s) => { saveSession(s); setSession(s); setView('room'); };
-  const exitRoom = () => { Mp.local = false; setSession(null); setView('entry'); };
+  const exitRoom = () => { Mp.local = false; setSession(null); setView('join'); };
 
   if (view === 'room' && session) return <MpRoom session={session} onExit={exitRoom} onPhase={onPhase} />;
   if (view === 'deck' && cfg.deck) return <ChooseCards count={cfg.n} deck={cfg.deck} setDeck={(d) => setCfg((c) => ({ ...c, deck: d }))} onBack={() => setView('count')} onStart={() => setView('host')} startLabel="Lock Deck" showBalance />;
@@ -6159,14 +6161,12 @@ function MultiScreen({ onBack, onPhase, gameCount, onClearGames }) {
         : !hasUrl
           ? <MpConfigCard onBack={onBack} onOpenSettings={() => setSettingsOpen(true)} />
           : view === 'mode'
-            ? <MpModeStep onBack={() => setView('entry')} onPick={(m) => { setGameMode(m); setView('count'); }} />
+            ? <MpModeStep onBack={() => setView('join')} onPick={(m) => { setGameMode(m); setView('count'); }} />
           : view === 'count'
             ? <MpCountStep n={cfg.n} setN={(n) => setCfg((c) => ({ ...c, n }))} onBack={() => setView('mode')} onNext={() => { setCfg((c) => ({ ...c, deck: autoFill(c.n) })); setView('deck'); }} />
           : view === 'host' && cfg.deck
             ? <MpHostForm cfg={cfg} onBack={() => setView('deck')} onCreated={enter} />
-            : view === 'join'
-              ? <MpJoinForm onBack={() => setView('entry')} onJoined={enter} />
-              : <MpEntry onHost={() => setView('mode')} onJoin={() => setView('join')} onBack={onBack} />}
+            : <MpJoinForm onBack={onBack} onJoined={enter} onHost={() => setView('mode')} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} gameCount={gameCount} onClearGames={onClearGames} />}
     </Screen>
   );

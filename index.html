@@ -5154,7 +5154,7 @@ function MpReveal({ me, ready, readyCount, total, onReady, onLeave }) {
         <p className="font-display text-2xl font-bold">You&rsquo;re ready</p>
         <p className="text-sm text-slate-300">Waiting for the others to look at their cards.</p>
         <p className="text-sm font-semibold tabular-nums text-violet-200">{readyCount} of {total} ready</p>
-        <button onClick={() => setShowAbility(true)} className="min-h-[44px] rounded-xl px-5 text-sm font-semibold text-slate-200 hover:bg-white/5" style={{ border: '1px solid var(--line)' }}>View my role</button>
+        <button onClick={() => setShowAbility(true)} className="min-h-[44px] rounded-xl px-5 text-sm font-semibold text-slate-200 hover:bg-white/5" style={{ border: '1px solid var(--line)' }}>Reveal Role</button>
         {showAbility && <RoleViewModal role={me.r} onClose={() => setShowAbility(false)} />}
       </div>
       </NightStage>

@@ -1540,6 +1540,10 @@ document.documentElement.lang = langNow;
 
 const TH_ROLE = { Werewolf: 'มนุษย์หมาป่า', Seer: 'ผู้หยั่งรู้', Witch: 'แม่มด', Bodyguard: 'บอดี้การ์ด', Hunter: 'นายพราน', Spellcaster: 'จอมเวทใบ้', Medusa: 'เมดูซ่า', 'Shadow Figure': 'ร่างเงา', Mayor: 'นายกเทศมนตรี', Villager: 'ชาวบ้าน' };
 const TH_PAIRS = [
+  // mode titles and subtitles (Step 1 Home Screen and Step 2 mode lobby)
+  ['Classic', 'โหมดคลาสสิก'], ['CLASSIC MODE', 'โหมดคลาสสิก'], ['Outbreak', 'โหมดซอมบี้ระบาด'], ['OUTBREAK MODE', 'โหมดซอมบี้ระบาด'],
+  ['Villagers vs. Werewolves', 'ชาวบ้าน ปะทะ มนุษย์หมาป่า'], ['Villagers vs. Werewolves vs. Zombies', 'ชาวบ้าน ปะทะ มนุษย์หมาป่า ปะทะ ซอมบี้'],
+  ['Share one phone around the circle', 'ส่งโทรศัพท์วนเล่นรอบวง'], ['Everyone joins on their own phone', 'ทุกคนเข้าร่วมผ่านมือถือของตัวเอง'],
   // role names
   ...Object.entries(TH_ROLE),
   ['Werewolves', 'มนุษย์หมาป่า'], ['Villagers', 'ชาวบ้าน'],
@@ -1548,8 +1552,8 @@ const TH_PAIRS = [
   ['{#} Wolf', '{1} มนุษย์หมาป่า'], ['{#} Wolves', '{1} มนุษย์หมาป่า'],
   ['Zero', 'ศูนย์'], ['One', 'หนึ่ง'], ['Two', 'สอง'], ['Three', 'สาม'], ['Four', 'สี่'], ['Five', 'ห้า'], ['Six', 'หก'], ['Seven', 'เจ็ด'], ['Eight', 'แปด'], ['Nine', 'เก้า'], ['Ten', 'สิบ'],
   // home / setup
-  ['At Nightfall', 'เมื่อรัตติกาลมาเยือน'], ['WEREWOLF', 'มนุษย์หมาป่า'], ['MULTI-DEVICE', 'หลายเครื่อง'], ['Multi-Device', 'หลายเครื่อง'], ['Pass', 'ส่งต่อเครื่อง'],
-  ['Pass & Play', 'เล่นส่งต่อเครื่อง'], ['Home', 'หน้าหลัก'], ['Create a new game', 'สร้างเกมใหม่'], ['Choose players and cards from scratch', 'เลือกผู้เล่นและไพ่เองตั้งแต่ต้น'],
+  ['At Nightfall', 'เมื่อรัตติกาลมาเยือน'], ['WEREWOLF', 'มนุษย์หมาป่า'], ['MULTI-DEVICE', 'หลายเครื่อง'], ['Multi-Device', 'เล่นหลายเครื่อง'], ['Pass', 'ส่งต่อเครื่อง'],
+  ['Pass & Play', 'เล่นเครื่องเดียว'], ['Home', 'หน้าหลัก'], ['Create a new game', 'สร้างเกมใหม่'], ['Choose players and cards from scratch', 'เลือกผู้เล่นและไพ่เองตั้งแต่ต้น'],
   ['Recently Played', 'เล่นล่าสุด'], ['Popular Setups', 'ชุดเกมยอดนิยม'], ['Popular', 'ยอดนิยม'], ['Popular {#} player setup', 'ชุดเกมยอดนิยม {1} ผู้เล่น'],
   ['Cards are picked for you. Tap one, then change any card you like.', 'เลือกไพ่ให้แล้ว แตะชุดใดชุดหนึ่ง แล้วปรับไพ่ตามที่ชอบได้เลย'],
   ['Your games will show up here.', 'เกมของคุณจะแสดงที่นี่'], ['No saved games on this device.', 'ไม่มีเกมที่บันทึกไว้ในอุปกรณ์นี้'], ['My Games', 'เกมของฉัน'], ['Saved Games', 'เกมที่บันทึกไว้'], ['Active', 'กำลังเล่น'], ['Saved Setup', 'ชุดที่บันทึกไว้'],

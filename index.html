@@ -2305,7 +2305,7 @@ function LobbyBackdrop({ mode }) {
   );
 }
 
-function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
+function StartScreen({ onPlay, onMulti, onAi, gameCount, onClearGames }) {
   const [step, setStep] = useState('mode'); // mode -> play
   const [pv, setPv] = useState('classic'); // which mode art the selector backdrop previews
   const src = DEFAULT_BG;
@@ -2439,11 +2439,17 @@ function StartScreen({ onPlay, onMulti, gameCount, onClearGames }) {
                 <span className="text-xl font-bold tracking-wide md:text-2xl"><span aria-hidden="true">&#9654; </span>Pass &amp; Play</span>
                 <span className="mt-0.5 text-xs font-semibold opacity-85">Share one phone around the circle</span>
               </button>
-              <button data-ui-sound="primary" onClick={onMulti} aria-label="Multi-Device"
+              <button data-ui-sound="primary" onClick={onMulti} aria-label="Online Multiplayer"
                 className="mx-auto flex w-full max-w-[300px] flex-col items-center justify-center rounded-2xl py-3.5 text-white transition active:scale-[0.98] md:max-w-[380px] md:py-4"
                 style={{ background: 'linear-gradient(180deg,#6D28D9,#4C1D95)', border: '1px solid rgba(167,139,250,0.55)', boxShadow: '0 8px 26px -8px rgba(109,40,217,0.7)' }}>
-                <span className="text-xl font-bold tracking-wide md:text-2xl">Multi-Device</span>
-                <span className="mt-0.5 px-2 text-center text-xs font-semibold opacity-85">Everyone joins on their own phone</span>
+                <span className="text-xl font-bold tracking-wide md:text-2xl">Online Multiplayer</span>
+                <span className="mt-0.5 px-2 text-center text-xs font-semibold opacity-85">Join public rooms or host with a code</span>
+              </button>
+              <button data-ui-sound="primary" onClick={onAi} aria-label="Play with AI"
+                className="mx-auto flex w-full max-w-[300px] flex-col items-center justify-center rounded-2xl py-3.5 text-white transition active:scale-[0.98] md:max-w-[380px] md:py-4"
+                style={{ background: 'linear-gradient(180deg,#0F766E,#134E4A)', border: '1px solid rgba(94,234,212,0.5)', boxShadow: '0 8px 26px -8px rgba(13,148,136,0.6)' }}>
+                <span className="text-xl font-bold tracking-wide md:text-2xl">Play with AI</span>
+                <span className="mt-0.5 px-2 text-center text-xs font-semibold opacity-85">Solo match against smart AI players</span>
               </button>
             </div>
           </>
@@ -4619,7 +4625,7 @@ function mpLobbyPatch(room) {
   return patch;
 }
 function mpNightPatch(room) {
-  const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1, cm: null, sp: null, vd: null, bn: nextBgIdx('night', room.bn) };
+  const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1, cm: null, sp: null, vd: null, dc: null, bn: nextBgIdx('night', room.bn) };
   patch.bm = patch.k >= 2 && Math.random() < 0.2 ? 1 : 0; // Blood Moon: 20% from Night 2 on, shared with every phone through the room
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
@@ -4935,7 +4941,7 @@ function MpEntry({ onHost, onJoin, onBack }) {
   );
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm leading-relaxed text-slate-300">Everyone plays on their own phone. The host shares a 4-letter code and each player sees only their own card.</p>
+      <p className="text-sm leading-relaxed text-slate-300">Join an open public room, enter a private code, or host your own server.</p>
       {card('Host a Room', 'Create a code and run the game', onHost, <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#C4B5FD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4 V20 M4 12 H20" /></svg>, '#8B5CF6')}
       {card('Join a Room', 'Join a private room or browse public rooms', onJoin, <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FCA5A5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12 H19 M13 6 L19 12 L13 18" /></svg>, '#EF4444')}
       <Btn variant="ghost" className="mt-2" onClick={onBack}>Back</Btn>
@@ -5809,6 +5815,7 @@ function MpDay({ me, players, room, write }) {
           <Btn className="mt-3" disabled={!target} onClick={shoot}>Fire</Btn>
         </Panel>
       )}
+      {room.ai === 1 && <AiChat me={me} players={players} room={room} write={write} />}
       {!hunterShot && <MpVote me={me} players={players} room={room} write={write} />}
       <div>
         <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Players</div>
@@ -6097,6 +6104,7 @@ function MpRoom({ session, onExit, onPhase }) {
     refresh();
   };
   writeRef.current = write;
+  useAiDriver({ enabled: !!room && room.ai === 1 && isHost, room, players, write });
   // A host who is also playing is a regular player: no Grimoire, no roles, only spoiler-free room controls.
   const hostPlays = isHost && !!room && !!room.hp && !!me;
   // Playing + Hosting runs itself: no manual Next buttons. Moderator Only keeps the host controls.
@@ -6217,7 +6225,7 @@ function MpRoom({ session, onExit, onPhase }) {
     )}
     <Screen className={ph === 'day' ? 'relative z-10' : ''}>
       {fullHost ? (ph !== 'night' && <div className="h-6" />) : <MpHeader code={code} roomName={room.rn} onLeave={() => setConfirmLeave(true)} leaveLabel="Leave room" />}
-      {session.local && <p className="mb-3 text-center text-[11px] font-semibold tracking-wide text-slate-500">Preview Mode &mdash; deploy to Vercel for live multi-phone sync</p>}
+      {session.local && !session.ai && <p className="mb-3 text-center text-[11px] font-semibold tracking-wide text-slate-500">Preview Mode &mdash; deploy to Vercel for live multi-phone sync</p>}
       {(err || wErr) && <p role="alert" className="mb-3 rounded-xl px-3 py-2 text-center text-xs font-semibold text-amber-200" style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)' }}>{wErr || `${err} Retrying...`}</p>}
       {body}
       {confirmPublic && (
@@ -6238,6 +6246,354 @@ function MpRoom({ session, onExit, onPhase }) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Play with AI: a solo match against local bots (no network, no keys).  */
+/* It reuses the Multi-Device room engine in its on-device store: the    */
+/* bots are ordinary players whose choices are written by the host       */
+/* device, so every night still goes through the one resolution engine.  */
+/* ------------------------------------------------------------------ */
+const AI_NAMES = ['Mira', 'Bram', 'Ivy', 'Corvin', 'Sable', 'Thorn', 'Wren', 'Dax', 'Lysa', 'Odin', 'Pia', 'Rook', 'Nyx', 'Hale', 'Juno', 'Kade', 'Vera', 'Finn'];
+
+async function aiCreateRoom(name, cfg) {
+  Mp.local = true;
+  const pid = randId();
+  const words = shuffle(CODE_WORDS);
+  let code = '';
+  for (let i = 0; i < words.length; i++) { if (!(await Mp.get(`rooms/${words[i]}`))) { code = words[i]; break; } }
+  if (!code) code = randLetters();
+  const pl = { [pid]: { n: name, o: 1, a: 1, d: 0 } };
+  shuffle(AI_NAMES.filter((x) => x.toLowerCase() !== name.toLowerCase())).slice(0, cfg.n - 1).forEach((nm, i) => { pl[randId()] = { n: nm, o: i + 2, a: 1, d: 0, bot: 1 }; });
+  const room = { v: 1, host: pid, hp: 1, rn: 'AI Village', hn: name, md: getGameMode(), ph: 'lobby', k: 0, lk: 0, w: '', ts: Date.now(), pub: 0, st: 'waiting', mx: cfg.n, dk: cfg.deck, nightStyle: 'eyes_open', ai: 1, pl };
+  await Mp.put(`rooms/${code}`, room);
+  await Mp.patch(`rooms/${code}`, mpDealPatch(room, { ...emptyDeck(), ...cfg.deck })); // the human's secret card is dealt with everyone else's
+  return { code, pid, host: true, local: true, ai: true };
+}
+
+const aiPick = (a) => a[Math.floor(Math.random() * a.length)];
+const aiSus = (M, id) => M.sus[id] || 0;
+function aiTop(M, cands, bonus) { // the most suspected candidate, with a little noise so bots are not identical
+  let best = null; let bs = -1;
+  cands.forEach((c) => { const s = aiSus(M, c.id) + (bonus ? bonus(c) : 0) + Math.random() * 0.9; if (s > bs) { bs = s; best = c; } });
+  return best;
+}
+
+// What one bot submits for its night turn, in the same short fields a phone writes.
+function aiNightWrites(b, role, ns, ctx, M) {
+  const { room, players } = ctx;
+  const k = room.k || 1;
+  const alive = players.filter((p) => p.a === 1);
+  const others = alive.filter((p) => p.id !== b.id);
+  const grp = alive.filter((p) => p.r === b.r && p.sd !== k);
+  const wr = (fn) => { const o = {}; (grp.length ? grp : [b]).forEach((g) => Object.assign(o, fn(g.id))); return o; };
+  const done = (id, t, extra) => ({ [`pl/${id}/t`]: t || '', [`pl/${id}/nd`]: 1, ...(extra || {}) });
+  const isInfectedLike = (p) => !!p.bt || !!p.ic || p.r === 'zombie' || p.r === 'infector';
+  if (ns === 'v:seer') return { [`pl/${b.id}/rd`]: 1 };
+  if (role === 'infected') return { [`pl/${b.id}/jt`]: 2 };
+  if (role === 'cured') return { [`pl/${b.id}/cj`]: 2 };
+  if (b.sd === k) return { [`pl/${b.id}/nd`]: 1 }; // sedated: sleeps through it
+  if (role === 'werewolf') { // prefers non-wolves, and anyone who claimed to be the Seer
+    const c = others.filter((p) => p.r !== 'werewolf');
+    const t1 = aiTop(M, c, (p) => (M.claims[p.id] === 'seer' ? 3 : 0));
+    const t2 = room.bm ? aiTop(M, c.filter((p) => !t1 || p.id !== t1.id)) : null;
+    return wr((id) => done(id, t1 ? t1.id : '', { [`pl/${id}/t2`]: t2 ? t2.id : '' }));
+  }
+  if (role === 'seer') { // scans someone not yet inspected and remembers the answer
+    const seen = M.seen[b.id] || (M.seen[b.id] = {});
+    const fresh = others.filter((p) => !(p.id in seen));
+    const t = aiTop(M, fresh.length ? fresh : others);
+    if (t) seen[t.id] = t.r === 'werewolf';
+    return wr((id) => done(id, t ? t.id : ''));
+  }
+  if (role === 'cupid') {
+    const two = shuffle(others).slice(0, 2);
+    if (two.length < 2) return done(b.id, '');
+    return { ...done(b.id, two[0].id, { [`pl/${b.id}/t2`]: two[1].id }), [`pl/${two[0].id}/lv`]: two[1].id, [`pl/${two[1].id}/lv`]: two[0].id };
+  }
+  if (role === 'medusa') { const t = Math.random() < 0.75 ? aiTop(M, others) : null; return wr((id) => done(id, t ? t.id : '')); }
+  if (role === 'bodyguard') { const c = others.filter((p) => p.id !== b.lp); const t = aiTop(M, c.length ? c : others, (p) => (M.claims[p.id] === 'seer' ? 2 : 0) - aiSus(M, p.id)); return wr((id) => done(id, t ? t.id : '')); }
+  if (role === 'witch') {
+    const victim = mpWolfVictims(players)[0];
+    const save = !b.wsu && victim && (k <= 2 || Math.random() < 0.35);
+    const poisonT = !b.wpu && k >= 2 && Math.random() < 0.45 ? aiTop(M, others.filter((p) => aiSus(M, p.id) >= 1)) : null;
+    return wr((id) => done(id, poisonT ? poisonT.id : '', { [`pl/${id}/ws`]: save ? 1 : 0 }));
+  }
+  if (role === 'sniper') {
+    const t = room.md === 'outbreak' && k >= 2 ? aiTop(M, others.filter((p) => aiSus(M, p.id) >= 2)) : null;
+    const any = t || aiTop(M, others);
+    return wr((id) => done(id, any ? any.id : '', { [`pl/${id}/ws`]: t ? 1 : 0 }));
+  }
+  if (role === 'doctor') { const t = aiTop(M, others, (p) => (isInfectedLike(p) && aiSus(M, p.id) >= 1 ? 2 : 0)); return wr((id) => done(id, t ? t.id : '')); }
+  if (role === 'plaguedoctor') {
+    const fresh = others.filter((p) => !isInfectedLike(p) && p.r !== 'plaguedoctor');
+    const infect = Math.random() < 0.5 && fresh.length;
+    const t = infect ? aiTop(M, fresh) : aiTop(M, others, (p) => (aiSus(M, p.id) >= 1 ? 1 : 0));
+    return wr((id) => done(id, t ? t.id : '', { [`pl/${id}/ws`]: t ? (infect ? 2 : 1) : 0 }));
+  }
+  if (role === 'spellcaster') { const t = aiTop(M, others); return wr((id) => done(id, t ? t.id : '')); }
+  if (role === 'zombie' || role === 'infector') {
+    const fresh = others.filter((p) => !isInfectedLike(p) && p.r !== 'plaguedoctor');
+    const t = aiTop(M, fresh.length ? fresh : others);
+    return wr((id) => done(id, t ? t.id : ''));
+  }
+  if (role === 'shadow') { // frees itself from Medusa's stone, or moves a killing blow off itself; otherwise stays out of it
+    const c0 = mpChoices(players);
+    const acts = nightActions(c0);
+    const mine = acts.find((a) => a.target === b.id && ['medusa', 'werewolf', 'wolf1', 'wolf2', 'zombie', 'infector'].includes(a.key));
+    const to = mine ? aiPick(others) : null;
+    return { [`pl/${b.id}/t`]: to ? to.id : '', [`pl/${b.id}/sa`]: to ? mine.key : '', [`pl/${b.id}/nd`]: 1 };
+  }
+  return done(b.id, '');
+}
+
+const AI_L = {
+  seerClaim: (n) => aiPick([`I'm the Seer, and last night I looked at ${n}. They are a Werewolf! Vote them out.`, `Listen to me: I am the Seer. ${n} is a Werewolf, I saw it myself.`]),
+  seerHint: (n) => aiPick([`I can't prove it yet, but ${n} feels wrong to me.`, `Keep an eye on ${n}. Trust me on this one.`]),
+  seerClean: (n) => aiPick([`I have a good feeling about ${n}.`, `I would not waste a vote on ${n}.`]),
+  wolfAccuse: (n) => aiPick([`${n} has been awfully quiet. What are they hiding?`, `Something about ${n} doesn't add up.`, `I'd start with ${n}. Just a hunch.`]),
+  wolfDefend: (n) => aiPick([`Leave ${n} alone. There is no proof against them.`, `Why are we piling on ${n}? That is exactly what a wolf would want.`]),
+  wolfVsSeer: (n) => aiPick([`${n} claims to know things but shows no proof. Suspicious.`, `Anyone can say they are the Seer, ${n}.`]),
+  villAccuse: (n) => aiPick([`I think ${n} is acting strange today.`, `My gut says ${n}. Anyone else?`, `${n}, you haven't explained yourself. Care to?`]),
+  death: (n) => aiPick([`${n} is gone... the wolves are among us.`, `Rest easy, ${n}. We have to be careful now.`]),
+  quiet: () => aiPick(['A quiet night. Maybe someone was protected.', 'No one died. Interesting.']),
+  defend: () => aiPick(["It's not me! I'm only trying to help the village.", 'Why me? I have done nothing wrong.', 'That is a weak accusation. Look at who is pushing it.']),
+  counter: (n) => aiPick([`Funny that ${n} is the one pointing at me.`, `${n} is trying to steer the village. Be careful.`]),
+  calm: () => aiPick(['Let us stay calm and think this through.', 'Who has anything solid to share?'])
+};
+
+function aiSpeak(b, ctx, M) {
+  const { room, players } = ctx;
+  const alive = players.filter((p) => p.a === 1);
+  const others = alive.filter((p) => p.id !== b.id);
+  const seen = M.seen[b.id] || {};
+  const deaths = Object.values((room.an && room.an.l) || {}).map((l) => (/^(.+) was found dead/.exec(l) || [])[1]).filter(Boolean);
+  if (b.r === 'seer') {
+    const wolf = others.find((p) => seen[p.id] === true);
+    if (wolf) return Math.random() < 0.55 || (room.k || 1) >= 3 ? { m: AI_L.seerClaim(wolf.n), a: wolf.id, c: 'seer' } : { m: AI_L.seerHint(wolf.n), a: wolf.id };
+    const clean = others.find((p) => seen[p.id] === false);
+    if (clean && Math.random() < 0.3) return { m: AI_L.seerClean(clean.n) };
+  }
+  if (b.r === 'werewolf') {
+    const mate = alive.find((p) => p.r === 'werewolf' && p.id !== b.id && aiSus(M, p.id) >= 1.5);
+    if (mate && Math.random() < 0.6) return { m: AI_L.wolfDefend(mate.n) };
+    const claim = others.find((p) => M.claims[p.id] === 'seer' && p.r !== 'werewolf');
+    if (claim && Math.random() < 0.7) return { m: AI_L.wolfVsSeer(claim.n), a: claim.id };
+    const t = aiTop(M, others.filter((p) => p.r !== 'werewolf'));
+    if (t) return { m: AI_L.wolfAccuse(t.n), a: t.id };
+  }
+  if (!M.said.death && deaths.length && Math.random() < 0.4) { M.said.death = 1; return { m: AI_L.death(deaths[0]) }; }
+  if (!M.said.death && !deaths.length && Math.random() < 0.25) { M.said.death = 1; return { m: AI_L.quiet() }; }
+  const t = aiTop(M, others);
+  if (t && (aiSus(M, t.id) > 0 || Math.random() < 0.6)) return { m: AI_L.villAccuse(t.n), a: t.id };
+  return { m: AI_L.calm() };
+}
+
+function aiVoteChoice(b, ctx, M) {
+  const { players } = ctx;
+  const others = players.filter((p) => p.a === 1 && p.id !== b.id);
+  const human = players.find((p) => p.bot !== 1 && p.a === 1);
+  const humanBonus = (p) => (human && human.v === p.id ? 0.7 : 0);
+  if (b.r === 'seer') { const seen = M.seen[b.id] || {}; const w = others.find((p) => seen[p.id] === true); if (w) return w.id; }
+  if (b.r === 'werewolf') { const t = aiTop(M, others.filter((p) => p.r !== 'werewolf'), (p) => (M.claims[p.id] === 'seer' ? 2 : 0) + humanBonus(p)); return t ? t.id : ''; }
+  const t = aiTop(M, others, humanBonus);
+  return t ? t.id : '';
+}
+
+function aiTick(ctx, M) {
+  const { room, players, write } = ctx;
+  if (!room || !room.pl) return;
+  const now = Date.now();
+  const go = (key, lo, hi) => { // true once, after a random delay, so bots do not all act in the same instant
+    if (M.done[key]) return false;
+    if (!(key in M.due)) M.due[key] = now + lo + Math.random() * (hi - lo);
+    if (now < M.due[key]) return false;
+    M.done[key] = 1; return true;
+  };
+  const bots = players.filter((p) => p.bot === 1);
+  const humans = players.filter((p) => p.bot !== 1);
+  const k = room.k || 0;
+  if (room.ph === 'reveal') {
+    if (M.gameTs !== room.ts + ':' + (room.lk || 0)) { Object.assign(M, { gameTs: room.ts + ':' + (room.lk || 0), sus: {}, claims: {}, seen: {}, due: {}, done: {}, proc: {}, defend: [], said: {}, dayK: -1 }); }
+    bots.filter((p) => p.d !== 1).forEach((p) => { if (go('rev' + p.id, 500, 3500)) write({ [`pl/${p.id}/d`]: 1 }); });
+    return;
+  }
+  if (room.ph === 'night') {
+    const ns = room.ns || '';
+    if (!(ns.indexOf('w:') === 0 || ns === 'v:seer')) return;
+    const tag = `${k}:${room.nk}`;
+    const roleOf = (p) => {
+      if (ns === 'v:seer') return p.r === 'seer' ? 'seer' : '';
+      if (ns === 'w:1') return p.jt === 1 ? 'infected' : p.cj === 1 ? 'cured' : (mpActive(p.r, k) && p.r !== 'witch' && p.r !== 'shadow' ? p.r : '');
+      if (ns === 'w:2') return p.r === 'witch' ? 'witch' : '';
+      return p.r === 'shadow' ? 'shadow' : '';
+    };
+    const out = {};
+    bots.filter((b) => b.a === 1).forEach((b) => {
+      const role = roleOf(b);
+      if (!role) return;
+      if (ns === 'v:seer' ? b.rd === 1 : role === 'infected' ? b.jt !== 1 : role === 'cured' ? b.cj !== 1 : b.nd === 1) return;
+      const solo = role === 'infected' || role === 'cured' || role === 'cupid' || role === 'shadow' || ns === 'v:seer' || b.sd === k; // a sedated bot only sleeps through its own turn
+      if (!solo && humans.some((h) => h.a === 1 && h.r === b.r)) return; // a human teammate's confirmation covers the whole group
+      if (!solo && M.done['g' + tag + role]) return;
+      if (!go('n' + tag + b.id + role, 800, 4000)) return; // a just-turned or just-cured bot acts twice: first the notice, then its role
+      if (!solo) M.done['g' + tag + role] = 1;
+      Object.assign(out, aiNightWrites(b, role, ns, ctx, M));
+    });
+    if (Object.keys(out).length) write(out);
+    return;
+  }
+  if (room.ph !== 'day') return;
+  const alive = players.filter((p) => p.a === 1);
+  if (M.dayK !== k) { M.dayK = k; M.chatN = 0; M.nextChat = now + 2500; M.defend = []; M.said = {}; M.defended = {}; M.dayStart = now; Object.keys(M.sus).forEach((id) => { M.sus[id] *= 0.7; }); }
+  bots.filter((b) => b.r === 'hunter' && b.a !== 1 && b.hs !== 1).forEach((b) => { // a fallen Hunter takes their last shot
+    const t = aiTop(M, alive.filter((p) => p.id !== b.id));
+    if (!t || !go('h' + k + b.id, 2000, 5000)) return;
+    const pt = t.lv ? players.find((x) => x.id === t.lv && x.a === 1) : null;
+    const ts = String(Date.now());
+    write({ [`pl/${t.id}/a`]: 0, [`pl/${b.id}/hs`]: 1, [`an/x/${ts}`]: `${b.n} fired a last shot and took ${t.n} down.`, ...(pt ? { [`pl/${pt.id}/a`]: 0, [`an/x/${ts}h`]: `${pt.n} died of heartbreak.` } : {}) });
+  });
+  if (room.vd === 1) return;
+  // Read the new discussion: accusations raise suspicion, claims are remembered, accused bots answer back.
+  Object.entries(room.dc || {}).sort((x, y) => (x[0] < y[0] ? -1 : 1)).forEach(([key, m]) => {
+    if (!m || M.proc[key]) return;
+    M.proc[key] = 1;
+    if (m.c) M.claims[m.i] = m.c;
+    if (m.a) {
+      M.sus[m.a] = (M.sus[m.a] || 0) + (bots.some((b) => b.id === m.i) ? 0.9 : 1.4);
+      if (bots.some((b) => b.id === m.a && b.a === 1) && !M.defended[m.a] && Math.random() < 0.85) { M.defended[m.a] = 1; M.defend.push({ id: m.a, by: m.i, at: now + 2000 + Math.random() * 2500 }); }
+    }
+  });
+  const speakers = bots.filter((b) => b.a === 1 && b.s !== 1 && b.x !== 1 && b.sn !== 1); // silenced and stoned bots stay mute
+  const post = (b, o) => write({ ['dc/' + Date.now() + String(10 + Math.floor(Math.random() * 90))]: { i: b.id, m: o.m, a: o.a || '', c: o.c || '' } });
+  const df = M.defend.find((d) => now >= d.at);
+  if (df) {
+    M.defend = M.defend.filter((d) => d !== df);
+    const b = speakers.find((x) => x.id === df.id);
+    const accuser = players.find((p) => p.id === df.by && p.a === 1);
+    if (b) post(b, b.r === 'werewolf' && accuser && accuser.r !== 'werewolf' && Math.random() < 0.4 ? { m: AI_L.counter(accuser.n), a: accuser.id } : { m: AI_L.defend() });
+  } else if (now >= M.nextChat && M.chatN < Math.min(14, 2 + Math.floor(alive.length * 1.5)) && speakers.length) {
+    const fresh = speakers.filter((b) => !M.said[b.id]);
+    const b = aiPick(fresh.length ? fresh : speakers);
+    M.said[b.id] = 1; M.chatN += 1; M.nextChat = now + 3500 + Math.random() * 4500;
+    post(b, aiSpeak(b, ctx, M));
+  }
+  // Votes: once the human has voted (or cannot), or after a long day.
+  const hum = humans.find((h) => h.a === 1);
+  const humanDone = !hum || !!hum.v || hum.s === 1 || hum.x === 1 || hum.sn === 1;
+  if (humanDone || now - (room.an && room.an.t ? room.an.t : M.dayStart) > 70000) {
+    speakers.filter((b) => !b.v).forEach((b) => { if (go('v' + k + b.id, 1200, 7000)) { const t = aiVoteChoice(b, ctx, M); if (t) write({ [`pl/${b.id}/v`]: t }); } });
+  }
+}
+
+function useAiDriver({ enabled, room, players, write }) {
+  const latest = useRef({});
+  latest.current = { room, players, write };
+  const mem = useRef({ gameTs: '', sus: {}, claims: {}, seen: {}, due: {}, done: {}, proc: {}, defend: [], said: {}, defended: {}, dayK: -1 });
+  useEffect(() => {
+    if (!enabled) return;
+    const t = setInterval(() => { try { aiTick(latest.current, mem.current); } catch (e) { /* a bad tick must never stop the game */ } }, 900);
+    return () => clearInterval(t);
+  }, [enabled]);
+}
+
+// The Village Discussion feed with quick chips for the human player.
+function AiChat({ me, players, room, write }) {
+  const [pickOpen, setPickOpen] = useState(false);
+  const [cool, setCool] = useState(false);
+  const msgs = Object.entries(room.dc || {}).sort((x, y) => (x[0] < y[0] ? -1 : 1)).map((e) => e[1]).filter(Boolean).slice(-14);
+  const nm = (id) => (players.find((p) => p.id === id) || {}).n || '?';
+  const can = me.a === 1 && me.s !== 1 && me.x !== 1 && me.sn !== 1;
+  const say = (o) => { if (cool) return; setCool(true); setTimeout(() => setCool(false), 2500); setPickOpen(false); write({ ['dc/' + Date.now() + String(10 + Math.floor(Math.random() * 90))]: { i: me.id, m: o.m, a: o.a || '', q: o.q ? 1 : 0 } }); };
+  const chip = 'min-h-[40px] rounded-full px-3.5 text-xs font-bold text-slate-100 transition active:scale-95 disabled:opacity-40';
+  return (
+    <Panel>
+      <h3 className="font-display text-lg font-bold">Village Discussion</h3>
+      <div className="mt-2 max-h-56 overflow-y-auto rounded-xl p-3 text-sm leading-snug" style={{ background: 'rgba(2,6,23,0.45)', border: '1px solid var(--line)' }} aria-live="polite">
+        {msgs.length === 0 && <p className="text-slate-500">The village is quiet...</p>}
+        {msgs.map((m, i) => (
+          <p key={i} className="mb-1.5 text-slate-200"><b className="text-violet-200">{nm(m.i)}{m.i === me.id ? ' (you)' : ''}</b>{m.q ? <i className="text-slate-400"> stays quiet.</i> : <>: {m.m}</>}</p>
+        ))}
+      </div>
+      {can ? (
+        <>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" disabled={cool} onClick={() => setPickOpen((v) => !v)} className={chip} style={{ background: 'rgba(185,28,28,0.35)', border: '1px solid rgba(248,113,113,0.5)' }}>Accuse...</button>
+            <button type="button" disabled={cool} onClick={() => say({ m: "I'm on your side. Don't waste the vote on me." })} className={chip} style={{ background: 'rgba(16,185,129,0.25)', border: '1px solid rgba(52,211,153,0.5)' }}>Defend Self</button>
+            <button type="button" disabled={cool} onClick={() => say({ m: '', q: true })} className={chip} style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>Stay Quiet</button>
+            <button type="button" onClick={() => { try { const el = document.getElementById('mp-vote'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ } }} className={chip} style={{ background: 'rgba(109,40,217,0.35)', border: '1px solid rgba(167,139,250,0.5)' }}>Go to Vote</button>
+          </div>
+          {pickOpen && (
+            <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Choose a player to accuse">
+              {players.filter((p) => p.a === 1 && p.id !== me.id).map((p) => (
+                <button key={p.id} type="button" disabled={cool} onClick={() => say({ m: `I accuse ${p.n}. Something feels off about them.`, a: p.id })} className={chip} style={{ background: 'var(--card-2)', border: '1px solid rgba(248,113,113,0.5)' }}>Accuse {p.n}</button>
+              ))}
+            </div>
+          )}
+        </>
+      ) : <p className="mt-3 text-center text-xs text-slate-400">{me.a !== 1 ? 'You are eliminated. Watch quietly.' : 'You cannot speak today.'}</p>}
+    </Panel>
+  );
+}
+
+function AiNameStep({ onBack, onStart, busy, err }) {
+  const [name, setName] = useState(loadName());
+  const n = name.trim();
+  return (
+    <div className="flex flex-col gap-4">
+      <h2 className="font-display text-2xl font-bold">Your name</h2>
+      <p className="text-sm text-slate-300">The other seats are filled with AI players, and you get your secret card when the match starts.</p>
+      <input value={name} maxLength={14} onChange={(e) => setName(e.target.value)} placeholder="Enter your name..." autoComplete="off"
+        className="h-14 w-full rounded-xl px-4 text-lg text-slate-100 placeholder-slate-500" style={mpInputStyle} />
+      {err && <p role="alert" className="text-sm text-amber-300">{err}</p>}
+      <Btn disabled={busy || !n} onClick={() => { saveName(n); onStart(n); }}>{busy ? 'Dealing cards...' : 'Start Match'}</Btn>
+      <Btn variant="ghost" onClick={onBack}>Back</Btn>
+    </div>
+  );
+}
+
+function AiScreen({ onBack, onPhase }) {
+  const [view, setView] = useState('mode'); // mode | count | deck | name | room
+  const [cfg, setCfg] = useState({ n: 8, deck: null });
+  const [session, setSession] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [checking, setChecking] = useState(() => { const s = loadSession(); return !!(s && s.ai); });
+  useEffect(() => { if (view !== 'room') onPhase(view === 'deck' ? 'cards' : ''); }, [view]);
+  useEffect(() => { // pick up a match that was running before a refresh
+    const s = loadSession();
+    if (!s || !s.ai) { setChecking(false); return; }
+    let live = true;
+    Mp.local = true;
+    Mp.get(`rooms/${s.code}`).then((r) => { if (!live) return; if (r && r.ai) { setSession(s); setView('room'); } else { Mp.local = false; saveSession(null); } setChecking(false); }, () => { if (live) { Mp.local = false; setChecking(false); } });
+    return () => { live = false; };
+  }, []);
+  const exitRoom = () => { Mp.local = false; saveSession(null); setSession(null); onBack(); };
+  const start = async (name) => {
+    setBusy(true); setErr('');
+    try { const s = await aiCreateRoom(name, cfg); saveSession(s); setSession(s); setView('room'); }
+    catch (e) { Mp.local = false; setErr('Could not start the match. Try again.'); }
+    setBusy(false);
+  };
+  if (view === 'room' && session) return <MpRoom session={session} onExit={exitRoom} onPhase={onPhase} />;
+  if (view === 'deck' && cfg.deck) return <ChooseCards count={cfg.n} deck={cfg.deck} setDeck={(d) => setCfg((c) => ({ ...c, deck: d }))} onBack={() => setView('count')} onStart={() => setView('name')} startLabel="Lock Deck" showBalance />;
+  return (
+    <Screen>
+      <header className="flex items-center gap-1 pb-5">
+        <button onClick={onBack} aria-label="Back to start" className="flex h-11 w-11 items-center justify-center rounded-full text-slate-300 hover:bg-white/10">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5 L8 12 L15 19" /></svg>
+        </button>
+        <h1 className="font-display text-lg font-bold tracking-wide">PLAY WITH AI</h1>
+      </header>
+      {checking
+        ? <p className="hint-pulse mt-16 text-center text-slate-300">Looking for your match...</p>
+        : view === 'name'
+          ? <AiNameStep onBack={() => setView('deck')} onStart={start} busy={busy} err={err} />
+          : view === 'count'
+            ? <MpCountStep n={cfg.n} setN={(n) => setCfg((c) => ({ ...c, n }))} onBack={() => setView('mode')} onNext={() => { setCfg((c) => ({ ...c, deck: autoFill(c.n) })); setView('deck'); }} />
+            : <MpModeStep onBack={onBack} onPick={(m) => { setGameMode(m); setView('count'); }} />}
+    </Screen>
+  );
+}
+
 /* ---------- entry point ---------- */
 function MultiScreen({ onBack, onPhase, gameCount, onClearGames }) {
   const st = useSettings();
@@ -6252,7 +6608,7 @@ function MultiScreen({ onBack, onPhase, gameCount, onClearGames }) {
   // Rejoin after a refresh, if the room is still there.
   useEffect(() => {
     const s = loadSession();
-    if (!s || !hasUrl) { setChecking(false); return; }
+    if (!s || s.ai || !hasUrl) { setChecking(false); return; }
     let live = true;
     Mp.local = !!s.local;
     Mp.get(`rooms/${s.code}`).then((r) => {
@@ -6276,9 +6632,10 @@ function MultiScreen({ onBack, onPhase, gameCount, onClearGames }) {
         <button onClick={onBack} aria-label="Back to start" className="flex h-11 w-11 items-center justify-center rounded-full text-slate-300 hover:bg-white/10">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5 L8 12 L15 19" /></svg>
         </button>
-        <h1 className="font-display text-lg font-bold tracking-wide">MULTI-DEVICE</h1>
+        <h1 className="font-display text-lg font-bold tracking-wide">ONLINE MULTIPLAYER</h1>
         <span className="ml-auto rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-violet-200" style={{ background: 'rgba(109,40,217,0.3)' }}>Room code</span>
       </header>
+      {!checking && hasUrl && (view === 'join' || view === 'host') && <p className="-mt-2 pb-4 text-sm leading-relaxed text-slate-300">Join an open public room, enter a private code, or host your own server.</p>}
       {checking
         ? <p className="hint-pulse mt-16 text-center text-slate-300">Looking for your room...</p>
         : !hasUrl
@@ -6409,7 +6766,7 @@ function AppInner() {
 
   const { sound: soundOn, music: musicOn } = useSettings();
   useEffect(() => {
-    const isTense = screen === 'setup' || screen === 'cards' || screen === 'reveal' || (screen === 'multi' && (mpPhase === 'lobby' || mpPhase === 'cards' || mpPhase === 'reveal'));
+    const isTense = screen === 'setup' || screen === 'cards' || screen === 'reveal' || ((screen === 'multi' || screen === 'ai') && (mpPhase === 'lobby' || mpPhase === 'cards' || mpPhase === 'reveal'));
     const tense = isTense && musicOn;
     tensionScreen = isTense;
     if (tense) { Ambience.stop(true); Tension.start(); return; }   // music does not depend on the Sound switch
@@ -6418,7 +6775,10 @@ function AppInner() {
     if (screen !== 'start' && Ambience.unlocked()) Ambience.start();
   }, [screen, soundOn, musicOn, mpPhase]);
   if (screen === 'start') {
-    return <StartScreen onPlay={() => setScreen('home')} onMulti={() => setScreen('multi')} gameCount={games.length} onClearGames={() => setGames([])} />;
+    return <StartScreen onPlay={() => setScreen('home')} onMulti={() => setScreen('multi')} onAi={() => setScreen('ai')} gameCount={games.length} onClearGames={() => setGames([])} />;
+  }
+  if (screen === 'ai') {
+    return <AiScreen onBack={() => setScreen('start')} onPhase={setMpPhase} />;
   }
   if (screen === 'multi') {
     return <MultiScreen onBack={() => setScreen('start')} onPhase={setMpPhase} gameCount={games.length} onClearGames={() => setGames([])} />;

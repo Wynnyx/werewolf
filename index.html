@@ -5827,6 +5827,13 @@ function MpDay({ me, players, room, write }) {
   const alive = players.filter((p) => p.a === 1);
   const hunterShot = me.r === 'hunter' && me.a !== 1 && me.hs !== 1;
   const [target, setTarget] = useState('');
+  const [voting, setVoting] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [seenN, setSeenN] = useState(0);
+  useEffect(() => { setVoting(false); }, [room.k]);
+  const incoming = Object.values(room.dc || {}).filter((m) => m && m.i !== me.id && !m.q).length;
+  useEffect(() => { if (chatOpen) setSeenN(incoming); }, [chatOpen, incoming]);
+  const unread = !chatOpen && incoming > seenN;
   const shoot = () => {
     const t = players.find((p) => p.id === target);
     if (!t) return;
@@ -5843,17 +5850,10 @@ function MpDay({ me, players, room, write }) {
           <MoonIcon width="120" height="120" className="moon-fade mt-24 text-slate-100" />
         </div>
       )}
-      <AnnounceCard room={room} players={players} />
-      <DayTimer startAt={fxKey ? Number(fxKey) : 0} onEnd={() => { try { const el = document.getElementById('mp-vote'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ } }} />
-      {me.a !== 1
-        ? <Panel className="text-center text-sm text-slate-300">You are eliminated. You can still watch, but keep quiet.</Panel>
-        : me.x === 1
-          ? <Panel className="text-center text-sm font-semibold text-teal-100" style={{ border: '1px solid rgba(45,212,191,0.7)', background: 'rgba(13,148,136,0.25)' }} role="alert">You have been turned to stone by Medusa until dusk &mdash; you cannot speak or vote today.</Panel>
-        : me.s === 1
-          ? <Panel className="text-center text-sm font-semibold text-violet-100" style={{ border: '1px solid rgba(167,139,250,0.7)', background: 'rgba(109,40,217,0.25)' }} role="alert">You have been silenced by the Spellcaster &mdash; you cannot speak or vote today.</Panel>
-          : me.sn === 1
-            ? <Panel className="text-center text-sm font-semibold text-sky-100" style={{ border: '1px solid rgba(96,165,250,0.7)', background: 'rgba(37,99,235,0.25)' }} role="alert">The Sniper shot you &mdash; your vote is disabled for today.</Panel>
-          : <Panel className="text-center text-sm text-slate-300">You are alive. Discuss and find the werewolves.</Panel>}
+      <div className="mt-8 flex items-center justify-between gap-3">
+        <div className="font-display text-lg font-bold tracking-wide text-slate-100">{voting ? 'Trial Voting' : 'Day Discussion'}</div>
+        {room.ai === 1 && <ChatButton unread={unread} onClick={() => setChatOpen(true)} />}
+      </div>
       {hunterShot && (
         <Panel style={{ border: '1px solid rgba(245,158,11,0.6)' }}>
           <h3 className="font-display text-lg font-bold text-amber-300">Take your last shot</h3>
@@ -5862,12 +5862,32 @@ function MpDay({ me, players, room, write }) {
           <Btn className="mt-3" disabled={!target} onClick={shoot}>Fire</Btn>
         </Panel>
       )}
-      {room.ai === 1 && <AiChat me={me} players={players} room={room} write={write} />}
-      {!hunterShot && <MpVote me={me} players={players} room={room} write={write} />}
-      <div>
-        <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Players</div>
-        <StatusBadges players={players} meId={me.id} />
-      </div>
+      {!voting ? (
+        <>
+          <AnnounceCard room={room} players={players} />
+          <DayTimer startAt={fxKey ? Number(fxKey) : 0} onEnd={() => setVoting(true)} />
+          {me.a !== 1
+            ? <Panel className="text-center text-sm text-slate-300">You are eliminated. You can still watch, but keep quiet.</Panel>
+            : me.x === 1
+              ? <Panel className="text-center text-sm font-semibold text-teal-100" style={{ border: '1px solid rgba(45,212,191,0.7)', background: 'rgba(13,148,136,0.25)' }} role="alert">You have been turned to stone by Medusa until dusk &mdash; you cannot speak or vote today.</Panel>
+            : me.s === 1
+              ? <Panel className="text-center text-sm font-semibold text-violet-100" style={{ border: '1px solid rgba(167,139,250,0.7)', background: 'rgba(109,40,217,0.25)' }} role="alert">You have been silenced by the Spellcaster &mdash; you cannot speak or vote today.</Panel>
+              : me.sn === 1
+                ? <Panel className="text-center text-sm font-semibold text-sky-100" style={{ border: '1px solid rgba(96,165,250,0.7)', background: 'rgba(37,99,235,0.25)' }} role="alert">The Sniper shot you &mdash; your vote is disabled for today.</Panel>
+              : <Panel className="text-center text-sm text-slate-300">You are alive. Discuss and find the werewolves.</Panel>}
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Players</div>
+            <StatusBadges players={players} meId={me.id} />
+          </div>
+          <div className="mt-auto pt-4"><Btn onClick={() => setVoting(true)}>Choose Your Vote</Btn></div>
+        </>
+      ) : (
+        <>
+          <MpVote me={me} players={players} room={room} write={write} />
+          <div className="mt-auto pt-4"><Btn variant="ghost" onClick={() => setVoting(false)}>Back to Discussion</Btn></div>
+        </>
+      )}
+      {room.ai === 1 && <VillageChat open={chatOpen} onClose={() => setChatOpen(false)} me={me} players={players} room={room} write={write} />}
     </div>
   );
 }
@@ -6443,19 +6463,31 @@ function aiNightWrites(b, role, ns, ctx, M) {
 }
 
 const AI_L = {
-  seerClaim: (n) => aiPick([`I'm the Seer, and last night I looked at ${n}. They are a Werewolf! Vote them out.`, `Listen to me: I am the Seer. ${n} is a Werewolf, I saw it myself.`]),
-  seerHint: (n) => aiPick([`I can't prove it yet, but ${n} feels wrong to me.`, `Keep an eye on ${n}. Trust me on this one.`]),
-  seerClean: (n) => aiPick([`I have a good feeling about ${n}.`, `I would not waste a vote on ${n}.`]),
+  seerClaim: (n) => aiPick([`I'm a Seer. I saw it. ${n} is a werewolf.`, `I'm the Seer. I looked at ${n} last night. Werewolf. Vote them out.`]),
+  seerFake: (n) => aiPick([`I'm a Seer. I saw it. ${n} is a werewolf.`, `I'm the Seer, and ${n} came up as a werewolf.`]),
+  unsure: () => aiPick(["I'm not really sure yet. But I'm definitely not a werewolf. Trust me.", "Too early to tell, let's hear from everyone first.", 'Nothing solid yet. Who has something to share?', "I'm going to watch who piles on whom before I decide."]),
   wolfAccuse: (n) => aiPick([`${n} has been awfully quiet. What are they hiding?`, `Something about ${n} doesn't add up.`, `I'd start with ${n}. Just a hunch.`]),
-  wolfDefend: (n) => aiPick([`Leave ${n} alone. There is no proof against them.`, `Why are we piling on ${n}? That is exactly what a wolf would want.`]),
   wolfVsSeer: (n) => aiPick([`${n} claims to know things but shows no proof. Suspicious.`, `Anyone can say they are the Seer, ${n}.`]),
   villAccuse: (n) => aiPick([`I think ${n} is acting strange today.`, `My gut says ${n}. Anyone else?`, `${n}, you haven't explained yourself. Care to?`]),
   death: (n) => aiPick([`${n} is gone... the wolves are among us.`, `Rest easy, ${n}. We have to be careful now.`]),
   quiet: () => aiPick(['A quiet night. Maybe someone was protected.', 'No one died. Interesting.']),
-  defend: () => aiPick(["It's not me! I'm only trying to help the village.", 'Why me? I have done nothing wrong.', 'That is a weak accusation. Look at who is pushing it.']),
-  counter: (n) => aiPick([`Funny that ${n} is the one pointing at me.`, `${n} is trying to steer the village. Be careful.`]),
-  calm: () => aiPick(['Let us stay calm and think this through.', 'Who has anything solid to share?'])
+  claim: (r) => aiPick([`I'm ${r}, I swear.`, `I'm ${r}, check someone else!`, `Why me? I'm literally ${r}.`])
 };
+
+// "a Villager" / "the Doctor": roles with several copies in a deck read better with "a".
+const aiRoleTxt = (id) => { const R = ROLES_DATA[id]; return id === 'villager' ? 'a Villager' : `${R && R.max > 1 ? 'a' : 'the'} ${R ? R.name : id}`; };
+
+// When accused, a bot answers with its real role (good team) or a bluff taken from the deck (wolves and the like).
+function aiDefense(b, ctx) {
+  const { room } = ctx;
+  const R = ROLES_DATA[b.r];
+  let claim = b.r;
+  if (!(R && R.team === 'village' && Math.random() < 0.85)) {
+    const pool = ROLE_IDS.filter((id) => ROLES_DATA[id] && ROLES_DATA[id].team === 'village' && (room.dk ? (room.dk[id] || 0) > 0 : ['villager', 'doctor', 'medusa', 'seer'].includes(id)));
+    claim = pool.length ? aiPick(pool) : 'villager';
+  }
+  return { m: AI_L.claim(aiRoleTxt(claim)), c: claim };
+}
 
 function aiSpeak(b, ctx, M) {
   const { room, players } = ctx;
@@ -6465,23 +6497,27 @@ function aiSpeak(b, ctx, M) {
   const deaths = Object.values((room.an && room.an.l) || {}).map((l) => (/^(.+) was found dead/.exec(l) || [])[1]).filter(Boolean);
   if (b.r === 'seer') {
     const wolf = others.find((p) => seen[p.id] === true);
-    if (wolf) return Math.random() < 0.55 || (room.k || 1) >= 3 ? { m: AI_L.seerClaim(wolf.n), a: wolf.id, c: 'seer' } : { m: AI_L.seerHint(wolf.n), a: wolf.id };
-    const clean = others.find((p) => seen[p.id] === false);
-    if (clean && Math.random() < 0.3) return { m: AI_L.seerClean(clean.n) };
+    if (wolf) return { m: AI_L.seerClaim(wolf.n), a: wolf.id, c: 'seer' };
   }
   if (b.r === 'werewolf') {
-    const mate = alive.find((p) => p.r === 'werewolf' && p.id !== b.id && aiSus(M, p.id) >= 1.5);
-    if (mate && Math.random() < 0.6) return { m: AI_L.wolfDefend(mate.n) };
+    const innocents = others.filter((p) => p.r !== 'werewolf');
+    const seerInDeck = !room.dk || (room.dk.seer || 0) > 0;
+    if (!M.fake && seerInDeck && innocents.length && !others.some((p) => M.claims[p.id] === 'seer') && Math.random() < 0.3) { // a wolf now and then fakes a Seer to frame someone
+      M.fake = 1;
+      const t = aiTop(M, innocents) || aiPick(innocents);
+      return { m: AI_L.seerFake(t.n), a: t.id, c: 'seer' };
+    }
     const claim = others.find((p) => M.claims[p.id] === 'seer' && p.r !== 'werewolf');
-    if (claim && Math.random() < 0.7) return { m: AI_L.wolfVsSeer(claim.n), a: claim.id };
-    const t = aiTop(M, others.filter((p) => p.r !== 'werewolf'));
-    if (t) return { m: AI_L.wolfAccuse(t.n), a: t.id };
+    if (claim && Math.random() < 0.6) return { m: AI_L.wolfVsSeer(claim.n), a: claim.id };
+    const t = aiTop(M, innocents);
+    if (t && Math.random() < 0.35) return { m: AI_L.wolfAccuse(t.n), a: t.id };
+    return { m: AI_L.unsure() };
   }
-  if (!M.said.death && deaths.length && Math.random() < 0.4) { M.said.death = 1; return { m: AI_L.death(deaths[0]) }; }
-  if (!M.said.death && !deaths.length && Math.random() < 0.25) { M.said.death = 1; return { m: AI_L.quiet() }; }
+  if (!M.said.death && deaths.length && Math.random() < 0.35) { M.said.death = 1; return { m: AI_L.death(deaths[0]) }; }
+  if (!M.said.death && !deaths.length && Math.random() < 0.2) { M.said.death = 1; return { m: AI_L.quiet() }; }
   const t = aiTop(M, others);
-  if (t && (aiSus(M, t.id) > 0 || Math.random() < 0.6)) return { m: AI_L.villAccuse(t.n), a: t.id };
-  return { m: AI_L.calm() };
+  if (t && aiSus(M, t.id) > 0 && Math.random() < 0.6) return { m: AI_L.villAccuse(t.n), a: t.id };
+  return { m: AI_L.unsure() };
 }
 
 function aiVoteChoice(b, ctx, M) {
@@ -6542,7 +6578,10 @@ function aiTick(ctx, M) {
   }
   if (room.ph !== 'day') return;
   const alive = players.filter((p) => p.a === 1);
-  if (M.dayK !== k) { M.dayK = k; M.chatN = 0; M.nextChat = now + 2500; M.defend = []; M.said = {}; M.defended = {}; M.dayStart = now; Object.keys(M.sus).forEach((id) => { M.sus[id] *= 0.7; }); }
+  if (M.dayK !== k) { M.dayK = k; M.defend = []; M.said = {}; M.defended = {}; M.dayStart = now; M.sent = {}; M.fake = 0; M.nextChat = 0; M.plan = {};
+    const cand = bots.filter((b) => b.a === 1 && b.s !== 1 && b.x !== 1 && b.sn !== 1); // each bot speaks on its own once (about 2 in 3 of them), spread over the first ~25s
+    cand.forEach((b) => { const sure = b.r === 'seer' && alive.some((p) => p.id !== b.id && (M.seen[b.id] || {})[p.id] === true); if (sure || Math.random() < 0.65) M.plan[b.id] = now + 3000 + Math.random() * 22000; });
+    if (!Object.keys(M.plan).length && cand.length) M.plan[aiPick(cand).id] = now + 6000 + Math.random() * 12000; Object.keys(M.sus).forEach((id) => { M.sus[id] *= 0.7; }); }
   bots.filter((b) => b.r === 'hunter' && b.a !== 1 && b.hs !== 1).forEach((b) => { // a fallen Hunter takes their last shot
     const t = aiTop(M, alive.filter((p) => p.id !== b.id));
     if (!t || !go('h' + k + b.id, 2000, 5000)) return;
@@ -6558,22 +6597,23 @@ function aiTick(ctx, M) {
     if (m.c) M.claims[m.i] = m.c;
     if (m.a) {
       M.sus[m.a] = (M.sus[m.a] || 0) + (bots.some((b) => b.id === m.i) ? 0.9 : 1.4);
-      if (bots.some((b) => b.id === m.a && b.a === 1) && !M.defended[m.a] && Math.random() < 0.85) { M.defended[m.a] = 1; M.defend.push({ id: m.a, by: m.i, at: now + 2000 + Math.random() * 2500 }); }
+      if (bots.some((b) => b.id === m.a && b.a === 1) && !M.defended[m.a]) { M.defended[m.a] = 1; M.defend.push({ id: m.a, by: m.i, at: now + 2000 + Math.random() * 2500 }); }
     }
   });
   const speakers = bots.filter((b) => b.a === 1 && b.s !== 1 && b.x !== 1 && b.sn !== 1); // silenced and stoned bots stay mute
   const post = (b, o) => write({ ['dc/' + Date.now() + String(10 + Math.floor(Math.random() * 90))]: { i: b.id, m: o.m, a: o.a || '', c: o.c || '' } });
   const df = M.defend.find((d) => now >= d.at);
-  if (df) {
+  if (df) { // an accused bot answers right away with a role claim (at most 2 messages per bot per day)
     M.defend = M.defend.filter((d) => d !== df);
     const b = speakers.find((x) => x.id === df.id);
-    const accuser = players.find((p) => p.id === df.by && p.a === 1);
-    if (b) post(b, b.r === 'werewolf' && accuser && accuser.r !== 'werewolf' && Math.random() < 0.4 ? { m: AI_L.counter(accuser.n), a: accuser.id } : { m: AI_L.defend() });
-  } else if (now >= M.nextChat && M.chatN < Math.min(14, 2 + Math.floor(alive.length * 1.5)) && speakers.length) {
-    const fresh = speakers.filter((b) => !M.said[b.id]);
-    const b = aiPick(fresh.length ? fresh : speakers);
-    M.said[b.id] = 1; M.chatN += 1; M.nextChat = now + 3500 + Math.random() * 4500;
-    post(b, aiSpeak(b, ctx, M));
+    if (b && (M.sent[b.id] || 0) < 2) { M.sent[b.id] = (M.sent[b.id] || 0) + 1; post(b, aiDefense(b, ctx)); }
+  } else if (now >= M.nextChat) {
+    const due = Object.keys(M.plan).find((id) => now >= M.plan[id]);
+    if (due) {
+      delete M.plan[due];
+      const b = speakers.find((x) => x.id === due);
+      if (b && !(M.sent[b.id] || 0)) { M.sent[b.id] = 1; M.nextChat = now + 2500 + Math.random() * 2000; post(b, aiSpeak(b, ctx, M)); }
+    }
   }
   // Votes: once the human has voted (or cannot), or after a long day.
   const hum = humans.find((h) => h.a === 1);
@@ -6594,42 +6634,80 @@ function useAiDriver({ enabled, room, players, write }) {
   }, [enabled]);
 }
 
-// The Village Discussion feed with quick chips for the human player.
-function AiChat({ me, players, room, write }) {
-  const [pickOpen, setPickOpen] = useState(false);
+// Round chat button for the day header, with a red dot while there are unread messages.
+function ChatButton({ onClick, unread }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={unread ? 'Open village chat, new messages' : 'Open village chat'} className="relative flex h-11 w-11 items-center justify-center rounded-full text-slate-100 transition active:scale-95" style={{ background: 'rgba(10,10,18,0.6)', border: '1px solid rgba(203,213,225,0.3)' }}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.2A8 8 0 1 1 21 12z" /></svg>
+      {unread && <span className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full" style={{ background: '#EF4444', border: '2px solid #0B0E14', boxShadow: '0 0 8px rgba(239,68,68,0.8)' }} />}
+    </button>
+  );
+}
+
+// Slide-up Village Chat drawer: message log, quick chips and a text box for the human player.
+function VillageChat({ open, onClose, me, players, room, write }) {
+  const [mode, setMode] = useState(''); // '' | accuse | claim
+  const [text, setText] = useState('');
   const [cool, setCool] = useState(false);
-  const msgs = Object.entries(room.dc || {}).sort((x, y) => (x[0] < y[0] ? -1 : 1)).map((e) => e[1]).filter(Boolean).slice(-14);
+  const logRef = useRef(null);
+  const msgs = Object.entries(room.dc || {}).sort((x, y) => (x[0] < y[0] ? -1 : 1)).map((e) => e[1]).filter(Boolean).slice(-60);
+  useEffect(() => { if (open && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [open, msgs.length]);
+  if (!open) return null;
   const nm = (id) => (players.find((p) => p.id === id) || {}).n || '?';
   const can = me.a === 1 && me.s !== 1 && me.x !== 1 && me.sn !== 1;
-  const say = (o) => { if (cool) return; setCool(true); setTimeout(() => setCool(false), 2500); setPickOpen(false); write({ ['dc/' + Date.now() + String(10 + Math.floor(Math.random() * 90))]: { i: me.id, m: o.m, a: o.a || '', q: o.q ? 1 : 0 } }); };
+  const say = (o) => { if (cool) return; setCool(true); setTimeout(() => setCool(false), 2000); setMode(''); write({ ['dc/' + Date.now() + String(10 + Math.floor(Math.random() * 90))]: { i: me.id, m: o.m, a: o.a || '', c: o.c || '', q: 0 } }); };
+  const send = () => {
+    const t = text.trim().slice(0, 140);
+    if (!t || cool) return;
+    const low = t.toLowerCase();
+    const hit = /wolf|accus|suspect|sus\b|liar|lying|fishy|guilty|vote/.test(low) ? players.find((p) => p.a === 1 && p.id !== me.id && low.includes(String(p.n).toLowerCase())) : null; // naming a player with an accusing word counts as an accusation
+    say({ m: t, a: hit ? hit.id : '' });
+    setText('');
+  };
+  const deckRoles = ROLE_IDS.filter((id) => ROLES_DATA[id] && (room.dk ? (room.dk[id] || 0) > 0 : true));
   const chip = 'min-h-[40px] rounded-full px-3.5 text-xs font-bold text-slate-100 transition active:scale-95 disabled:opacity-40';
   return (
-    <Panel>
-      <h3 className="font-display text-lg font-bold">Village Discussion</h3>
-      <div className="mt-2 max-h-56 overflow-y-auto rounded-xl p-3 text-sm leading-snug" style={{ background: 'rgba(2,6,23,0.45)', border: '1px solid var(--line)' }} aria-live="polite">
-        {msgs.length === 0 && <p className="text-slate-500">The village is quiet...</p>}
-        {msgs.map((m, i) => (
-          <p key={i} className="mb-1.5 text-slate-200"><b className="text-violet-200">{nm(m.i)}{m.i === me.id ? ' (you)' : ''}</b>{m.q ? <i className="text-slate-400"> stays quiet.</i> : <>: {m.m}</>}</p>
-        ))}
-      </div>
-      {can ? (
-        <>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" disabled={cool} onClick={() => setPickOpen((v) => !v)} className={chip} style={{ background: 'rgba(185,28,28,0.35)', border: '1px solid rgba(248,113,113,0.5)' }}>Accuse...</button>
-            <button type="button" disabled={cool} onClick={() => say({ m: "I'm on your side. Don't waste the vote on me." })} className={chip} style={{ background: 'rgba(16,185,129,0.25)', border: '1px solid rgba(52,211,153,0.5)' }}>Defend Self</button>
-            <button type="button" disabled={cool} onClick={() => say({ m: '', q: true })} className={chip} style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>Stay Quiet</button>
-            <button type="button" onClick={() => { try { const el = document.getElementById('mp-vote'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ } }} className={chip} style={{ background: 'rgba(109,40,217,0.35)', border: '1px solid rgba(167,139,250,0.5)' }}>Go to Vote</button>
-          </div>
-          {pickOpen && (
-            <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Choose a player to accuse">
-              {players.filter((p) => p.a === 1 && p.id !== me.id).map((p) => (
-                <button key={p.id} type="button" disabled={cool} onClick={() => say({ m: `I accuse ${p.n}. Something feels off about them.`, a: p.id })} className={chip} style={{ background: 'var(--card-2)', border: '1px solid rgba(248,113,113,0.5)' }}>Accuse {p.n}</button>
-              ))}
+    <div className="fixed inset-0 z-[60] flex items-end justify-center" style={{ background: 'rgba(3,5,10,0.6)' }} onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label="Village Chat" onClick={(e) => e.stopPropagation()} className="flex max-h-[82vh] w-full max-w-md flex-col rounded-t-3xl p-4 md:max-w-lg" style={{ background: 'var(--card)', border: '1px solid var(--line)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="font-display text-lg font-bold">Village Chat</h3>
+          <button type="button" onClick={onClose} aria-label="Close chat" className="flex h-9 w-9 items-center justify-center rounded-full text-slate-300 hover:bg-white/10">&#10005;</button>
+        </div>
+        <div ref={logRef} className="min-h-[160px] flex-1 overflow-y-auto rounded-xl p-3 text-sm leading-snug" style={{ background: 'rgba(2,6,23,0.45)', border: '1px solid var(--line)' }} aria-live="polite">
+          {msgs.length === 0 && <p className="text-slate-500">The village is quiet...</p>}
+          {msgs.map((m, i) => (
+            <p key={i} className="mb-1.5 text-slate-200"><b className="text-violet-200">{nm(m.i)}{m.i === me.id ? ' (you)' : ''}</b>{m.q ? <i className="text-slate-400"> stays quiet.</i> : <>: {m.m}</>}</p>
+          ))}
+        </div>
+        {can ? (
+          <>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" disabled={cool} onClick={() => setMode(mode === 'accuse' ? '' : 'accuse')} className={chip} style={{ background: 'rgba(185,28,28,0.35)', border: '1px solid rgba(248,113,113,0.5)' }}>Accuse...</button>
+              <button type="button" disabled={cool} onClick={() => say({ m: "I'm on your side. Don't waste the vote on me." })} className={chip} style={{ background: 'rgba(16,185,129,0.25)', border: '1px solid rgba(52,211,153,0.5)' }}>Defend Self</button>
+              <button type="button" disabled={cool} onClick={() => setMode(mode === 'claim' ? '' : 'claim')} className={chip} style={{ background: 'rgba(109,40,217,0.35)', border: '1px solid rgba(167,139,250,0.5)' }}>Claim Role</button>
             </div>
-          )}
-        </>
-      ) : <p className="mt-3 text-center text-xs text-slate-400">{me.a !== 1 ? 'You are eliminated. Watch quietly.' : 'You cannot speak today.'}</p>}
-    </Panel>
+            {mode === 'accuse' && (
+              <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Choose a player to accuse">
+                {players.filter((p) => p.a === 1 && p.id !== me.id).map((p) => (
+                  <button key={p.id} type="button" disabled={cool} onClick={() => say({ m: `I accuse ${p.n}. Something feels off about them.`, a: p.id })} className={chip} style={{ background: 'var(--card-2)', border: '1px solid rgba(248,113,113,0.5)' }}>{p.n}</button>
+                ))}
+              </div>
+            )}
+            {mode === 'claim' && (
+              <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Choose a role to claim">
+                {deckRoles.map((id) => (
+                  <button key={id} type="button" disabled={cool} onClick={() => say({ m: id === 'villager' ? "I'm a Villager." : `I'm the ${ROLES_DATA[id].name}.`, c: id })} className={chip} style={{ background: 'var(--card-2)', border: '1px solid rgba(167,139,250,0.5)' }}>{ROLES_DATA[id].name}</button>
+                ))}
+              </div>
+            )}
+            <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); send(); }}>
+              <input value={text} maxLength={140} onChange={(e) => setText(e.target.value)} placeholder="Type a message..." autoComplete="off" className="h-11 min-w-0 flex-1 rounded-xl px-3.5 text-sm text-slate-100 placeholder-slate-500" style={mpInputStyle} />
+              <button type="submit" disabled={cool || !text.trim()} className="min-h-[44px] rounded-xl px-4 text-sm font-bold text-white disabled:opacity-40" style={{ background: '#6D28D9' }}>Send</button>
+            </form>
+          </>
+        ) : <p className="mt-3 text-center text-xs text-slate-400">{me.a !== 1 ? 'You are eliminated. Watch quietly.' : 'You cannot speak today.'}</p>}
+      </div>
+    </div>
   );
 }
 

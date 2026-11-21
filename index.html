@@ -814,10 +814,10 @@ const ROLES_DATA = {
     ability: 'Infect one player each night. Victims turn the following night and join the horde.'
   },
   sniper: {
-    id: 'sniper', balance: 3, Art: SniperArt, imageUrl: 'images/sniper-card.jpg', blurb: 'Scope one player each night and silence a Zombie vote.', name: 'Sniper', team: 'village', max: 1, color: '#60A5FA', Icon: SniperIcon, outbreak: true,
-    nightOrder: 7, nightPrompt: 'Sniper wakes and scopes one player. If that player is a Zombie, their vote is disabled tomorrow.',
-    short: 'Scopes a player each night. Shooting a Zombie disables its vote.',
-    ability: 'Each night, scope one player. If they are a Zombie, shoot to disable their vote tomorrow.'
+    id: 'sniper', balance: 3, Art: SniperArt, imageUrl: 'images/sniper-card.jpg', blurb: 'Scope one player each night and shoot the infected.', name: 'Sniper', team: 'village', max: 1, color: '#60A5FA', Icon: SniperIcon, outbreak: true,
+    nightOrder: 7, nightPrompt: 'Sniper wakes, locks onto one player and scopes them. If they are infected, the Sniper may take the shot.',
+    short: 'Lock onto one player each night to scope them. If they are infected, you may take the shot to eliminate them.',
+    ability: 'Lock onto one player each night to scope them. If they are infected, you may take the shot to eliminate them.'
   },
   villager: {
     id: 'villager', balance: 1, Art: VillagerArt, imageUrl: 'images/villager-card.jpg', blurb: 'No night power. Use deduction to find the wolves.', name: 'Villager', team: 'village', max: 10, color: '#CBD5E1', Icon: HouseIcon,
@@ -3329,8 +3329,37 @@ function NightCard({ player, line }) {
   );
 }
 
+// The Sniper's two steps. `value` is null/'' while choosing, then 'L:<id>' once locked (shared by teammates in Multi-Device).
+function SniperScope({ header, alive, isInfected, value, setValue, onDone }) {
+  const locked = typeof value === 'string' && value.indexOf('L:') === 0;
+  const tgt = locked ? value.slice(2) : (value || '');
+  if (!locked) {
+    return (
+      <div className="flex flex-1 flex-col">
+        {header}
+        <PickList players={alive} value={tgt} onChange={(v) => setValue(v === '' ? null : v)} />
+        <Btn className="mt-5" disabled={!tgt} onClick={() => setValue('L:' + tgt)}>{tgt ? 'Lock & Scope Target' : 'Select a player'}</Btn>
+      </div>
+    );
+  }
+  const t = alive.find((x) => x.id === tgt);
+  const inf = isInfected(tgt);
+  return (
+    <div className="flex flex-1 flex-col">
+      {header}
+      <Panel className="text-center" style={{ border: `1px solid ${inf ? 'rgba(251,191,36,0.8)' : 'rgba(148,163,184,0.45)'}`, background: inf ? 'rgba(16,185,129,0.2)' : 'rgba(30,41,59,0.55)' }}>
+        <div className="font-display text-xl font-bold text-slate-50">{t ? t.n : '?'}</div>
+        <div className="mt-2 text-sm font-black uppercase tracking-[0.18em]" style={{ color: inf ? '#6EE7B7' : '#CBD5E1' }}>{inf ? 'SCOPE RESULT: INFECTED' : 'SCOPE RESULT: NOT INFECTED'}</div>
+        {inf && <div className="mt-1 text-xs font-semibold text-amber-300">Zombie or incubating</div>}
+      </Panel>
+      {inf && <Btn className="mt-5" onClick={() => onDone(tgt, true)}>Take the Shot (Eliminate)</Btn>}
+      <Btn className="mt-3" variant="secondary" onClick={() => onDone(tgt, false)}>{inf ? 'Hold Fire' : 'Hold Fire / Done'}</Btn>
+    </div>
+  );
+}
+
 // The Shadow Figure's screen: anonymous action list, then a new target. Used by Pass & Play, Multi-Device auto and manual.
-const SHADOW_VERB = { medusa: 'Medusa turns {} to stone', bodyguard: 'Bodyguard protects {}', seer: 'Seer inspects {}', witchSave: 'Witch heals {}', witchPoison: 'Witch poisons {}', spellcaster: 'Spellcaster silences {}', sniper: 'Sniper scopes {}', zombie: 'Zombie Infect \u2192 {}' };
+const SHADOW_VERB = { medusa: 'Medusa turns {} to stone', bodyguard: 'Bodyguard protects {}', seer: 'Seer inspects {}', witchSave: 'Witch heals {}', witchPoison: 'Witch poisons {}', spellcaster: 'Spellcaster silences {}', sniper: 'Sniper Action \u2192 {}', zombie: 'Zombie Infect \u2192 {}' };
 const shadowActionLabel = (key, name) => (SHADOW_VERB[key] || '{}').replace('{}', name);
 function ShadowAct({ actions, victimName, alive, wolves = [], selfId = null, nm, stoned, onDone, header }) {
   const order = useMemo(() => shuffle(actions.map((_, i) => i)), []);
@@ -3424,13 +3453,9 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
     );
   }
   if (role === 'sniper') {
-    return (
-      <div className="flex flex-1 flex-col">
-        <ActHeader role={role} sub="If they are a Zombie, you shoot and their vote is disabled tomorrow." />
-        <PickList players={opts(alive.filter((p) => p.id !== actor.id))} value={val} onChange={choose} />
-        <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ sniper: pick })}>{pick === null ? 'Select a player' : 'Confirm Scope'}</Btn>
-      </div>
-    );
+    return <SniperScope header={<ActHeader role={role} sub="Lock onto one player to scope them. If they are infected, you may take the shot." />}
+      alive={opts(alive.filter((p) => p.id !== actor.id))} isInfected={(id) => { const q = players.find((x) => x.id === id); return !!q && (q.role === 'zombie' || !!q.bitten); }}
+      value={pick} setValue={setPick} onDone={(t, shot) => onDone({ sniper: t, sniperShot: shot })} />;
   }
   if (role === 'infected') {
     return (
@@ -3566,6 +3591,10 @@ function resolveNightPP(players, c0, night) {
   const dead = [];
   if (victim !== null && !saved) dead.push(victim);
   if (poison !== null && !dead.includes(poison)) dead.push(poison); // the Bodyguard blocks hunts and bites, never the Witch's poison
+  // Sniper: a shot taken at an infected player (Zombie or incubating) eliminates them unless guarded or healed this night.
+  const shotP = has(c.sniper) && c.sniperShot && !blocked('sniper') ? byId.get(c.sniper) : null;
+  const shotHit = shotP && shotP.alive && (shotP.role === 'zombie' || !!shotP.bitten) && shotP.id !== guarded && !(saveTarget !== null && shotP.id === saveTarget) ? shotP.id : null;
+  if (shotHit !== null && !dead.includes(shotHit)) dead.push(shotHit);
   // Cupid's Lovers: when one dies from any cause the other dies of heartbreak (even if the Bodyguard guarded them).
   const pair = Array.isArray(c0.cupid) && c0.cupid.length === 2 ? c0.cupid : null;
   const partnerOf = (id) => { if (pair) { if (pair[0] === id) return pair[1]; if (pair[1] === id) return pair[0]; } const q = byId.get(id); return q && has(q.lover) ? q.lover : null; };
@@ -3575,9 +3604,6 @@ function resolveNightPP(players, c0, night) {
   const biteT = has(c.zombie) && !blocked('zombie') ? c.zombie : null;
   const biteP = biteT !== null ? byId.get(biteT) : null;
   const bitten = biteP && biteP.alive && !dead.includes(biteT) && biteT !== guarded && !(witchSave && biteT === saveTarget) && biteP.role !== 'zombie' ? biteT : null;
-  const shotT = has(c.sniper) && !blocked('sniper') ? c.sniper : null;
-  const shotP = shotT !== null ? byId.get(shotT) : null;
-  const shotHit = shotP && shotP.alive && shotP.role === 'zombie' && !dead.includes(shotT) ? shotT : null;
   const myGuard = has(c0.bodyguard) && !blocked('bodyguard') ? c0.bodyguard : null; // Bodyguard and Medusa remember what they picked themselves
   const next = players.map((p) => {
     const q = { ...p, nn: night, protectedTag: p.id === guarded, silencedTag: p.alive && p.id === silenced, stoneTag: p.alive && p.id === stoneId, shotTag: p.id === shotHit, justTurned: false };
@@ -4394,7 +4420,8 @@ function mpChoices(ps) {
     medusa: mpStoneTarget(ps) || null, werewolf: victim, seer: pick('seer'), bodyguard: pick('bodyguard'),
     witchSave: !!(witch && witch.ws === 1 && !witch.wsu && victim),
     witchPoison: witch && witch.t && !witch.wpu && byId[witch.t] ? witch.t : null,
-    spellcaster: pick('spellcaster'), sniper: pick('sniper'), zombie: pick('zombie')
+    spellcaster: pick('spellcaster'), sniper: pick('sniper'), zombie: pick('zombie'),
+    sniperShot: alive.some((x) => x.r === 'sniper' && x.t && byId[x.t] && x.ws === 1)
   };
 }
 function mpShadowRedirect(ps) {
@@ -4433,6 +4460,10 @@ function mpResolveNight(room) {
   let saved = false;
   if (victim) { if (victim === guarded || (saveTarget && victim === saveTarget)) saved = true; else dead.push(victim); }
   if (poison && !dead.includes(poison)) dead.push(poison); // the Bodyguard blocks hunts and bites, never the Witch's poison
+  // Sniper: a shot taken at an infected player (Zombie or incubating) eliminates them unless guarded or healed this night.
+  const shotP = c.sniper && c.sniperShot && !blocked('sniper') ? byId[c.sniper] : null;
+  const shotHit = shotP && shotP.a === 1 && (shotP.r === 'zombie' || !!shotP.bt) && shotP.id !== guarded && !(saveTarget && shotP.id === saveTarget) ? shotP.id : '';
+  if (shotHit && !dead.includes(shotHit)) dead.push(shotHit);
   // Lovers: a partner dies of heartbreak with them, even if the Bodyguard guarded that partner.
   const brokenIds = [];
   dead.slice().forEach((id) => { const pid = byId[id] && byId[id].lv; if (pid && byId[pid] && byId[pid].a === 1 && !dead.includes(pid)) { dead.push(pid); brokenIds.push(pid); } });
@@ -4441,8 +4472,6 @@ function mpResolveNight(room) {
   const biteT = c.zombie && !blocked('zombie') ? c.zombie : '';
   const biteP = biteT ? byId[biteT] : null;
   const bitten = biteP && biteP.a === 1 && !dead.includes(biteT) && biteT !== guarded && !(saveTarget && biteT === saveTarget) && biteP.r !== 'zombie' ? biteT : '';
-  const shotT = c.sniper && !blocked('sniper') ? c.sniper : '';
-  const shotHit = shotT && byId[shotT] && byId[shotT].a === 1 && byId[shotT].r === 'zombie' && !dead.includes(shotT) ? shotT : '';
   const lines = dawnLines(saved, dead.filter((id) => !brokenIds.includes(id)).map((id) => byId[id].n), '', '', brokenIds.map((id) => byId[id].n), !!shotHit);
   const silencedAlive = silenced && !dead.includes(silenced) ? silenced : '';
   const stonedAlive = stoneId && !dead.includes(stoneId) ? stoneId : '';
@@ -4913,6 +4942,12 @@ function MpNightManual({ me, players, room, write }) {
       </div>
     );
   }
+  if (role === 'sniper') {
+    if (done) return <div className="flex flex-1 flex-col">{header('Scope a player', me.ws === 1 ? 'You took the shot.' : 'You held fire.')}{lockedNote}</div>;
+    return <SniperScope header={header('Scope a player', 'Lock onto one player to scope them. If they are infected, you may take the shot.')}
+      alive={alive.filter((p) => p.id !== me.id).map((p) => ({ id: p.id, n: p.n }))} isInfected={(id) => { const q = players.find((x) => x.id === id); return !!q && (q.r === 'zombie' || !!q.bt); }}
+      value={pick} setValue={setPick} onDone={(t, shot) => write({ [`pl/${me.id}/t`]: t, [`pl/${me.id}/ws`]: shot ? 1 : 0, [`pl/${me.id}/nd`]: 1 })} />;
+  }
   if (role === 'spellcaster') {
     return (
       <div className="flex flex-1 flex-col">
@@ -5021,7 +5056,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
     );
   }
   if (mine) {
-    const adapted = players.map((p) => ({ id: p.id, name: p.n, role: p.r, alive: p.a === 1, saveUsed: p.wsu === 1, poisonUsed: p.wpu === 1, lastGuard: p.lp || null, lastStone: p.lp || null }));
+    const adapted = players.map((p) => ({ id: p.id, name: p.n, role: p.r, alive: p.a === 1, saveUsed: p.wsu === 1, poisonUsed: p.wpu === 1, lastGuard: p.lp || null, lastStone: p.lp || null, bitten: p.bt || 0 }));
     const actor = adapted.find((p) => p.id === me.id);
     const victim = mpWolfVictim(players);
     const shadowAlive = players.some((p) => p.a === 1 && (p.r === 'shadow' || p.r === 'medusa' || (p.r === 'seer' && group.length > 1 && role === 'seer')));
@@ -5035,6 +5070,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
       else if (role === 'cupid') write({ [`pl/${me.id}/t`]: c.cupid[0], [`pl/${me.id}/t2`]: c.cupid[1], [`pl/${me.id}/nd`]: 1, [`pl/${c.cupid[0]}/lv`]: c.cupid[1], [`pl/${c.cupid[1]}/lv`]: c.cupid[0] });
       else if (role === 'shadow') write({ [`pl/${me.id}/t`]: c.shadow ? c.shadow.to : '', [`pl/${me.id}/sa`]: c.shadow ? c.shadow.key : '', [`pl/${me.id}/nd`]: 1 });
       else if (role === 'witch') write(gp((g) => ({ [`pl/${g.id}/t`]: c.witchPoison === null || c.witchPoison === undefined ? '' : c.witchPoison, [`pl/${g.id}/ws`]: c.witchSave ? 1 : 0, [`pl/${g.id}/nd`]: 1 })));
+      else if (role === 'sniper') write(gp((g) => ({ [`pl/${g.id}/t`]: c.sniper || '', [`pl/${g.id}/ws`]: c.sniperShot ? 1 : 0, [`pl/${g.id}/nd`]: 1 }))); // ws doubles as the Sniper's "shot taken" flag
       else write(gp((g) => ({ [`pl/${g.id}/t`]: c[role] || '', [`pl/${g.id}/nd`]: 1 })));
     };
     if (viewing) {

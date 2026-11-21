@@ -632,6 +632,8 @@ const MEDUSA_ART_DEFAULT = 'images/medusa-card.jpg';
 const medusaArtStore = makeBgStore('nightfall.medusaart.v1', MEDUSA_ART_DEFAULT);
 const MAYOR_ART_DEFAULT = 'images/mayor-card.jpg';
 const mayorArtStore = makeBgStore('nightfall.mayorart.v1', MAYOR_ART_DEFAULT);
+// Role card art is fixed: drop any custom card photo saved on this device.
+[shadowArtStore, medusaArtStore, mayorArtStore].forEach((st) => st.set(''));
 const NIGHT_BG_DEFAULTS = ['images/night-bg.jpg', 'images/night-1.jpg', 'images/night-2.jpg', 'images/night-3.jpg', 'images/night-4.jpg'];
 const DAY_BG_DEFAULTS = ['images/day-bg.jpg', 'images/day-1.jpg', 'images/day-2.jpg', 'images/day-3.jpg', 'images/day-4.jpg'];
 const POOL_MAX = 12;
@@ -2250,9 +2252,6 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
 
             <PoolRow rowStyle={rowStyle} pool={nightPool} title="Night Background Pool" desc="Add several images. Each night picks one at random, never the same one twice in a row." />
             <PoolRow rowStyle={rowStyle} pool={dayPool} title="Day Background Pool" desc="Add several images. Each morning picks one at random, separately from the night." />
-            <BgRow rowStyle={rowStyle} store={shadowArtStore} thumb="aspect-[3/4] w-[60px]" title="Shadow Figure Card Art" desc="Your own picture for the Shadow Figure card. A portrait 3:4 image fits best." savedMsg="Shadow Figure card art updated." resetMsg="Back to the default Shadow Figure card." />
-            <BgRow rowStyle={rowStyle} store={medusaArtStore} thumb="aspect-[3/4] w-[60px]" title="Medusa Card Art" desc="Your own picture for the Medusa card. A portrait 3:4 image fits best." savedMsg="Medusa card art updated." resetMsg="Back to the default Medusa card." />
-            <BgRow rowStyle={rowStyle} store={mayorArtStore} thumb="aspect-[3/4] w-[60px]" title="Mayor Card Art" desc="Your own picture for the Mayor card. A portrait 3:4 image fits best." savedMsg="Mayor card art updated." resetMsg="Back to the default Mayor card." />
             <ServerUrlRow rowStyle={rowStyle} />
 
             <div className="rounded-2xl p-4" style={rowStyle}>
@@ -4634,7 +4633,7 @@ function mpDealPatch(room, deck) {
   const cards = [];
   ROLE_IDS.forEach((id) => { for (let i = 0; i < (deck[id] || 0); i++) cards.push(id); });
   const mix = shuffle(cards);
-  const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0, bm: 0, st: 'in_game', dc: null, dl: (room.dl || 0) + 1 }; // dl: a new deal, so bots forget the last match
+  const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0, bm: 0, st: 'in_game', dc: null, dl: (room.dl || 0) + 1, bn: nextBgIdx('night', room.bn) }; // dl: a new deal, so bots forget the last match
   players.forEach((p, i) => {
     const b = `pl/${p.id}/`;
     Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0, [b + 'v']: '', [b + 'lv']: '', [b + 't2']: '', [b + 'la']: 0, [b + 'bt']: 0, [b + 'jt']: 0, [b + 'cu']: 0, [b + 'cj']: 0, [b + 'sd']: 0, [b + 'sn']: 0, [b + 'fr']: '', [b + 'pdc']: 0, [b + 'pdi']: 0, [b + 'pdl']: '', [b + 'ic']: 0 });

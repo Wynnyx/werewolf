@@ -1967,6 +1967,30 @@ function AbilityModal({ role, onClose }) {
   );
 }
 
+// Full role card artwork plus the whole explanation, hidden again with one tap.
+function RoleViewModal({ role, onClose }) {
+  const r = ROLES_DATA[role];
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const pts = typeof r.balance === 'number' ? `${r.balance > 0 ? '+' : ''}${r.balance}` : '';
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label={`${r.name} role card`}>
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="screen-in relative flex max-h-[94dvh] w-full max-w-md flex-col overflow-y-auto rounded-t-3xl p-5 text-center sm:rounded-3xl md:max-w-lg"
+        style={{ background: 'var(--card)', border: '1px solid var(--line)', paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
+        <div className="mx-auto"><RoleCard role={role} phase="open" /></div>
+        <h2 className="font-display mt-4 text-2xl font-bold" style={{ color: r.color }}>{r.name}</h2>
+        <div className="mt-2 flex items-center justify-center gap-2"><TeamBadge team={r.team} />{pts && <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wider text-slate-200" style={{ border: '1px solid var(--line)' }}>{pts} points</span>}</div>
+        <p className="mt-3 text-[15px] leading-relaxed text-slate-200">{r.ability}</p>
+        <div className="mt-5"><Btn variant="secondary" onClick={onClose}>Close / Hide Card</Btn></div>
+      </div>
+    </div>
+  );
+}
+
 function ConfirmExit({ body, title = 'Exit game?', confirmLabel = 'Exit game', cancelLabel = 'Keep playing', onCancel, onConfirm }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onCancel(); };
@@ -4610,7 +4634,7 @@ function mpDealPatch(room, deck) {
   const cards = [];
   ROLE_IDS.forEach((id) => { for (let i = 0; i < (deck[id] || 0); i++) cards.push(id); });
   const mix = shuffle(cards);
-  const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0, bm: 0, st: 'in_game' };
+  const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0, bm: 0, st: 'in_game', dc: null, dl: (room.dl || 0) + 1 }; // dl: a new deal, so bots forget the last match
   players.forEach((p, i) => {
     const b = `pl/${p.id}/`;
     Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0, [b + 'v']: '', [b + 'lv']: '', [b + 't2']: '', [b + 'la']: 0, [b + 'bt']: 0, [b + 'jt']: 0, [b + 'cu']: 0, [b + 'cj']: 0, [b + 'sd']: 0, [b + 'sn']: 0, [b + 'fr']: '', [b + 'pdc']: 0, [b + 'pdi']: 0, [b + 'pdl']: '', [b + 'ic']: 0 });
@@ -4618,7 +4642,7 @@ function mpDealPatch(room, deck) {
   return patch;
 }
 function mpLobbyPatch(room) {
-  const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null, vd: null, cm: null, sp: null, bm: null, st: 'waiting' };
+  const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null, vd: null, cm: null, sp: null, bm: null, dc: null, st: 'waiting' };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
     ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'x', 'sa', 'rd', 'lf', 'v', 'lv', 't2', 'la', 'bt', 'jt', 'sn', 'fr', 'cu', 'cj', 'sd', 'pdc', 'pdi', 'pdl', 'ic'].forEach((f) => { patch[b + f] = null; });
@@ -5127,12 +5151,11 @@ function MpReveal({ me, ready, readyCount, total, onReady }) {
   if (done) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-        <RoleChip role={me.r} />
         <p className="font-display text-2xl font-bold">You&rsquo;re ready</p>
         <p className="text-sm text-slate-300">Waiting for the others to look at their cards.</p>
         <p className="text-sm font-semibold tabular-nums text-violet-200">{readyCount} of {total} ready</p>
         <button onClick={() => setShowAbility(true)} className="min-h-[44px] rounded-xl px-5 text-sm font-semibold text-slate-200 hover:bg-white/5" style={{ border: '1px solid var(--line)' }}>View my role</button>
-        {showAbility && <AbilityModal role={me.r} onClose={() => setShowAbility(false)} />}
+        {showAbility && <RoleViewModal role={me.r} onClose={() => setShowAbility(false)} />}
       </div>
     );
   }
@@ -5599,21 +5622,22 @@ function useNightDirector({ room, players, write }) {
       roles.splice(at, 0, 'cured');
     }
     if (room0.nightStyle === 'eyes_open') { // Eyes Open: no narration, three waves of silent phone actions, then straight to dawn
-      let nk0 = 1;
-      const stepO = async (ns, label) => { nk0 += 1; setDir({ on: true, label }); await write({ ns, nk: nk0, cm: null, sp: null }); };
+      let nk0 = 1; let curNs = 'w:1';
+      const stepO = async (ns, label) => { curNs = ns; nk0 += 1; setDir({ on: true, label }); await write({ ns, nk: nk0, cm: null, sp: null }); };
       const waitFor = async (idle, ms, seer) => {
         const isDone = () => idle().length === 0; // after the time limit anyone who has not chosen is recorded as a Skip
-        skip.current = false; const t0 = Date.now(); await wait(1200);
+        skip.current = false; const t0 = Date.now();
+        while (live() && latest.current.room.ns !== curNs && Date.now() - t0 < 4000) await wait(100); // wait until this step has reached us, so last night's answers are not mistaken for tonight's
         while (live() && !isDone() && !skip.current && Date.now() - t0 < ms) await wait(500);
         if (live() && !isDone()) { const o = {}; idle().forEach((p) => { if (seer) o[`pl/${p.id}/rd`] = 1; else if (p.jt === 1) o[`pl/${p.id}/jt`] = 2; else if (p.cj === 1) o[`pl/${p.id}/cj`] = 2; else o[`pl/${p.id}/nd`] = 1; }); if (Object.keys(o).length) await write(o); }
       };
       try {
         const base = mpNightPatch(room0);
         if (opts && opts.again) { base.k = room0.k || 1; base.bm = base.k >= 2 && Math.random() < 0.2 ? 1 : 0; }
-        setDir({ on: true, label: 'Night begins' });
-        await write(base); await wait(2500); if (!live()) return;
+        base.ns = 'w:1'; base.nk = 1; // no intro splash: everyone's night screen opens at once
+        setDir({ on: true, label: 'Night: everyone acts' });
+        await write(base); if (!live()) return;
         const w1 = roles.filter((r) => r !== 'witch' && r !== 'shadow' && r !== 'infected' && r !== 'cured');
-        await stepO('w:1', 'Wave 1: everyone acts');
         await waitFor(() => latest.current.players.filter((p) => p.a === 1 && ((w1.includes(p.r) && p.nd !== 1) || p.jt === 1 || p.cj === 1)), MP_WAVE_SECS * 1000); if (!live()) return;
         if (roles.includes('witch')) {
           await stepO('w:2', 'Wave 2: Witch');
@@ -6441,7 +6465,7 @@ function aiTick(ctx, M) {
   const humans = players.filter((p) => p.bot !== 1);
   const k = room.k || 0;
   if (room.ph === 'reveal') {
-    if (M.gameTs !== room.ts + ':' + (room.lk || 0)) { Object.assign(M, { gameTs: room.ts + ':' + (room.lk || 0), sus: {}, claims: {}, seen: {}, due: {}, done: {}, proc: {}, defend: [], said: {}, dayK: -1 }); }
+    if (M.gameTs !== room.ts + ':' + (room.dl || 0)) { Object.assign(M, { gameTs: room.ts + ':' + (room.dl || 0), sus: {}, claims: {}, seen: {}, due: {}, done: {}, proc: {}, defend: [], said: {}, dayK: -1 }); }
     bots.filter((p) => p.d !== 1).forEach((p) => { if (go('rev' + p.id, 500, 3500)) write({ [`pl/${p.id}/d`]: 1 }); });
     return;
   }
@@ -6465,7 +6489,7 @@ function aiTick(ctx, M) {
       const solo = role === 'infected' || role === 'cured' || role === 'cupid' || role === 'shadow' || ns === 'v:seer' || b.sd === k; // a sedated bot only sleeps through its own turn
       if (!solo && humans.some((h) => h.a === 1 && h.r === b.r)) return; // a human teammate's confirmation covers the whole group
       if (!solo && M.done['g' + tag + role]) return;
-      if (!go('n' + tag + b.id + role, 800, 4000)) return; // a just-turned or just-cured bot acts twice: first the notice, then its role
+      if (!go('n' + tag + b.id + role, sq ? 800 : 200, sq ? 4000 : 1200)) return; // Eyes Open bots answer almost at once // a just-turned or just-cured bot acts twice: first the notice, then its role
       if (!solo) M.done['g' + tag + role] = 1;
       Object.assign(out, aiNightWrites(b, role, ns, ctx, M));
     });

@@ -1809,8 +1809,8 @@ function Setup({ count, setCount, gameName, setGameName, narrator, setNarrator, 
 
       <section className="mt-4 flex items-center justify-between gap-4 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
         <div>
-          <div className="text-[15px] font-semibold" id="narrator-label">Narrator</div>
-          <p className="mt-0.5 text-xs leading-snug text-slate-400">A voice speaks the night phase out loud, so it takes the moderator’s place.</p>
+          <div className="text-[15px] font-semibold" id="narrator-label">Auto-Moderator</div>
+          <p className="mt-0.5 text-xs leading-snug text-slate-400">{narrator ? 'Everyone gets a card! The phone speaks out loud and runs the Night phase automatically—no human moderator needed.' : 'Human Moderator mode: 1 person sits out without a card and runs the game manually using the Grimoire.'}</p>
         </div>
         <button role="switch" aria-checked={narrator} aria-labelledby="narrator-label" onClick={() => setNarrator(!narrator)}
           className="relative h-8 w-14 shrink-0 rounded-full transition-colors"
@@ -2502,6 +2502,7 @@ function NightLoopPP({ players, night, onFinish, onExit }) {
   useEffect(() => () => Narrator.stop(), []);
   const after = (i) => (i + 1 < roles.length ? { k: 'call', i: i + 1 } : { k: 'dawnSay' });
 
+  const morningP = useRef(null);
   useEffect(() => {
     let off = false;
     (async () => {
@@ -2522,12 +2523,12 @@ function NightLoopPP({ players, night, onFinish, onExit }) {
         await wait(2600);
         if (!off) setSt(after(st.i));
       } else if (st.k === 'dawnSay') {
-        await Narrator.say('Everyone, open your eyes. Morning has broken.');
-        if (off) return;
+        morningP.current = Narrator.say('Everyone, open your eyes. Morning has broken.');
         const r = resolveNightPP(players, ch.current, night);
         setRes(r); setSpoken(false); setSt({ k: 'dawn' });
       } else if (st.k === 'dawn') {
-        await wait(900);
+        await morningP.current; if (off) return;
+        await wait(500);
         for (const line of res.lines) { if (off) return; await Narrator.say(line); }
         if (!off) setSpoken(true);
       }
@@ -2837,8 +2838,8 @@ function Moderator({ players, setPlayers, narrator, autoNight, onAgain, onNew, o
               <li key={p.id} className="rounded-xl p-3 transition-opacity"
                 style={{ background: 'var(--card)', border: `1px solid ${p.alive ? r.color + '55' : 'var(--line)'}`, opacity: p.alive ? 1 : 0.55 }}>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg" style={{ background: r.color + '1A' }}>
-                    <RoleEmblem role={p.role} size={26} />
+                  <div className="relative h-14 w-[42px] shrink-0 overflow-hidden rounded-md" style={{ border: `1px solid ${r.color}88` }}>
+                    <PlayingCard role={p.role} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className={`truncate text-[15px] font-semibold ${p.alive ? '' : 'line-through'}`}>{p.name}</div>
@@ -3701,10 +3702,11 @@ function useNightDirector({ room, players, write }) {
         await wait(2200); if (!live()) return;
       }
       setDir({ on: true, label: 'Dawn' });
-      await Narrator.say('Everyone, open your eyes. Morning has broken.'); if (!live()) return;
+      const morning = Narrator.say('Everyone, open your eyes. Morning has broken.');
       const result = mpResolveNight(latest.current.room);
       await write(result.patch);
       setDir({ on: false, label: '' });
+      await morning; if (!live()) return;
       const spoken = result.silencedLine ? result.lines.concat(result.silencedLine) : result.lines;
       for (const line of spoken) { await wait(800); if (!live()) return; await Narrator.say(line); if (!live()) return; }
     } catch (e) { setDir({ on: false, label: '' }); }

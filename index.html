@@ -1344,7 +1344,59 @@ const Sfx = (() => {
     if (bufs[f] === undefined) load(f);
     fallback(f);
   };
+  /* Built-in synthesizer effects (no audio files): the discussion bell and the faction victory sounds. */
+  const synth = (build) => {
+    if (!getSettings().sound) return;
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = 'playback';
+      const c = getCtx(); if (!c) return;
+      if (c.state !== 'running') { const r = c.resume(); if (r && r.catch) r.catch(() => {}); }
+      const master = c.createGain(); master.gain.value = 0.9; master.connect(c.destination);
+      build(c, master, c.currentTime + 0.03);
+    } catch (e) { /* ignore */ }
+  };
+  // One shaped voice: oscillator (optionally gliding) -> optional filter -> envelope.
+  const voice = (c, out, o) => {
+    const osc = c.createOscillator(); osc.type = o.type || 'sine';
+    osc.frequency.setValueAtTime(o.f0, o.t0);
+    if (o.f1 && o.f1 !== o.f0) osc.frequency.exponentialRampToValueAtTime(o.f1, o.t0 + (o.glide || o.dur));
+    if (o.detune) osc.detune.value = o.detune;
+    let node = osc;
+    if (o.filter) { const f = c.createBiquadFilter(); f.type = o.filter; f.frequency.setValueAtTime(o.ff || 800, o.t0); if (o.ff1) f.frequency.exponentialRampToValueAtTime(o.ff1, o.t0 + o.dur); f.Q.value = o.q || 1; node.connect(f); node = f; }
+    const g = c.createGain(); const a = o.attack || 0.01;
+    g.gain.setValueAtTime(0.0001, o.t0); g.gain.exponentialRampToValueAtTime(o.gain || 0.2, o.t0 + a); g.gain.exponentialRampToValueAtTime(0.0001, o.t0 + o.dur);
+    node.connect(g); g.connect(out);
+    if (o.vib) { const l = c.createOscillator(); l.frequency.value = o.vib; const lg = c.createGain(); lg.gain.value = o.vibDepth || 12; l.connect(lg); lg.connect(osc.detune); l.start(o.t0); l.stop(o.t0 + o.dur + 0.05); }
+    if (o.trem) { const l = c.createOscillator(); l.frequency.value = o.trem; const lg = c.createGain(); lg.gain.value = (o.gain || 0.2) * 0.6; l.connect(lg); lg.connect(g.gain); l.start(o.t0); l.stop(o.t0 + o.dur + 0.05); }
+    osc.start(o.t0); osc.stop(o.t0 + o.dur + 0.05);
+  };
+  const bellNote = (c, out, t, f, gain, dur) => [1, 2.76, 5.4].forEach((m, i) => voice(c, out, { type: 'sine', f0: f * m, t0: t, dur: dur / (1 + i * 0.7), gain: gain / (1 + i * 1.6) }));
+  const bell = () => synth((c, out, t) => { bellNote(c, out, t, 880, 0.3, 2.4); bellNote(c, out, t + 0.55, 1174.7, 0.22, 2.2); });
+  const win = (who) => synth((c, out, t) => {
+    if (who === 'werewolf') {
+      // dramatic wolf howl over a dark low minor chord
+      [55, 65.41, 82.41].forEach((f) => voice(c, out, { type: 'sawtooth', f0: f, t0: t, dur: 4.2, gain: 0.16, attack: 0.25, filter: 'lowpass', ff: 420, ff1: 120 }));
+      voice(c, out, { type: 'sine', f0: 36.7, t0: t, dur: 4.4, gain: 0.35, attack: 0.1 });
+      voice(c, out, { type: 'sawtooth', f0: 300, f1: 620, glide: 1.1, t0: t + 0.15, dur: 2.9, gain: 0.2, attack: 0.5, filter: 'lowpass', ff: 1400, vib: 5.5, vibDepth: 28 });
+      voice(c, out, { type: 'triangle', f0: 620, f1: 330, glide: 1.7, t0: t + 1.25, dur: 1.8, gain: 0.14, attack: 0.05, filter: 'lowpass', ff: 1200, vib: 6, vibDepth: 35 });
+    } else if (who === 'village') {
+      // bright triumphant fanfare
+      [[523.25, 0], [659.25, 0.16], [783.99, 0.32], [1046.5, 0.5]].forEach(([f, d]) => { voice(c, out, { type: 'square', f0: f, t0: t + d, dur: 0.5, gain: 0.09, filter: 'lowpass', ff: 3200 }); bellNote(c, out, t + d, f, 0.18, 1.6); });
+      [523.25, 659.25, 783.99, 1046.5].forEach((f) => voice(c, out, { type: 'triangle', f0: f, t0: t + 0.85, dur: 2.2, gain: 0.12, attack: 0.03 }));
+      bellNote(c, out, t + 0.85, 2093, 0.12, 2.4);
+    } else if (who === 'zombie') {
+      // eerie undead groan with an ominous low drone
+      voice(c, out, { type: 'sawtooth', f0: 52, t0: t, dur: 4.6, gain: 0.16, attack: 0.5, filter: 'lowpass', ff: 220 });
+      voice(c, out, { type: 'sawtooth', f0: 52, detune: 38, t0: t, dur: 4.6, gain: 0.14, attack: 0.5, filter: 'lowpass', ff: 200 });
+      voice(c, out, { type: 'sawtooth', f0: 150, f1: 62, glide: 2.4, t0: t + 0.2, dur: 2.9, gain: 0.2, attack: 0.4, filter: 'bandpass', ff: 700, ff1: 260, q: 4, trem: 7 });
+      voice(c, out, { type: 'sawtooth', f0: 118, f1: 70, glide: 2.0, t0: t + 1.6, dur: 2.4, gain: 0.14, attack: 0.3, filter: 'bandpass', ff: 520, ff1: 200, q: 5, trem: 5 });
+    } else {
+      // Lovers: a soft rising chime
+      [659.25, 830.61, 987.77].forEach((f, i) => bellNote(c, out, t + i * 0.28, f, 0.22, 2.2));
+    }
+  });
   return {
+    bell, win,
     preload: () => { try { FILES.forEach(load); } catch (e) { /* ignore */ } },
     unlock: () => { try { const c = getCtx(); if (c && c.state !== 'running') { const r = c.resume(); if (r && r.catch) r.catch(() => {}); } } catch (e) { /* ignore */ } },
     flip: () => play('audio/card-flip.mp3'),
@@ -1508,12 +1560,12 @@ const TH_PAIRS = [
   ['Skip selected ✓', 'เลือกข้ามแล้ว ✓'], ['Skip / Don’t Use Gaze Tonight', 'ข้าม / ไม่ใช้สายตาในคืนนี้'], ['Select a player or Skip', 'เลือกผู้เล่นหรือข้าม'], ['Confirm Skip', 'ยืนยันการข้าม'], ['Confirm Petrify', 'ยืนยันการสาปเป็นหิน'],
   ['Your vision was turned to stone tonight.', 'ญาณทิพย์ของคุณถูกสาปเป็นหินในคืนนี้'],
   ['{} has been turned to stone until dusk. They cannot speak or vote.', '{1} ถูกสาปเป็นหินจนถึงพลบค่ำ ห้ามพูดและห้ามโหวต'],
-  ['{} has been turned to stone by Medusa until dusk. They cannot speak, vote or be voted out today.', '{1} ถูกเมดูซ่าสาปเป็นหินจนถึงพลบค่ำ ห้ามพูด ห้ามโหวต และไม่สามารถถูกโหวตออกในวันนี้'],
-  ['{} have been turned to stone by Medusa until dusk. They cannot speak, vote or be voted out today.', '{1} ถูกเมดูซ่าสาปเป็นหินจนถึงพลบค่ำ ห้ามพูด ห้ามโหวต และไม่สามารถถูกโหวตออกในวันนี้'],
+  ['{} has been turned to stone by Medusa until dusk. They cannot speak or vote today.', '{1} ถูกเมดูซ่าสาปเป็นหินจนถึงพลบค่ำ ห้ามพูด ห้ามโหวต'],
+  ['{} have been turned to stone by Medusa until dusk. They cannot speak or vote today.', '{1} ถูกเมดูซ่าสาปเป็นหินจนถึงพลบค่ำ ห้ามพูด ห้ามโหวต'],
   ['STONED', 'ถูกสาปเป็นหิน'], ['Stoned', 'ถูกสาปเป็นหิน'], ['stoned', 'ถูกสาปเป็นหิน'], ['{} silenced, skipped', '{1} ถูกสาปให้เงียบ ข้ามไป'], ['{} stoned, skipped', '{1} ถูกสาปเป็นหิน ข้ามไป'],
   ['Turn a player to stone', 'เปลี่ยนผู้เล่นเป็นหิน'], ['You skipped your gaze tonight.', 'คุณไม่ใช้สายตาในคืนนี้'], ['Your vision is clouding. Waiting for Medusa…', 'ญาณทิพย์ของคุณพร่ามัว กำลังรอเมดูซ่า…'],
   ['You are turned to stone and cannot vote today.', 'คุณถูกสาปเป็นหินและไม่สามารถโหวตในวันนี้'],
-  ['You have been turned to stone by Medusa until dusk — you cannot speak or vote, and you cannot be voted out today.', 'คุณถูกเมดูซ่าสาปเป็นหินจนถึงพลบค่ำ — ห้ามพูดและห้ามโหวต และคุณไม่สามารถถูกโหวตออกในวันนี้'],
+  ['You have been turned to stone by Medusa until dusk — you cannot speak or vote today.', 'คุณถูกเมดูซ่าสาปเป็นหินจนถึงพลบค่ำ — ห้ามพูดและห้ามโหวต'],
   ['last stoned {}', 'สาปเป็นหินล่าสุด {1}'], ['{} 🗿 STONED', '{1} 🗿 ถูกสาปเป็นหิน'], ['{} (you) 🗿 STONED', '{1} (คุณ) 🗿 ถูกสาปเป็นหิน'], ['{} 🤐 🗿 STONED', '{1} 🤐 🗿 ถูกสาปเป็นหิน'], ['{} (you) 🤐 🗿 STONED', '{1} (คุณ) 🤐 🗿 ถูกสาปเป็นหิน'],
   ['Continue', 'ดำเนินการต่อ'],
   ['Redirect one night action to a new target.', 'เปลี่ยนเป้าหมายของการกระทำยามค่ำคืนหนึ่งอย่างไปยังคนใหม่'], ['Redirects one night action to a new target.', 'เปลี่ยนเป้าหมายของการกระทำยามค่ำคืนหนึ่งอย่างไปยังคนใหม่'],
@@ -2894,15 +2946,22 @@ function DayStage({ children }) {
   );
 }
 // Local discussion timer: tap to start or pause, add a minute, reset.
-function DayTimer({ minutes = 3 }) {
-  const [left, setLeft] = useState(minutes * 60);
-  const [on, setOn] = useState(false);
+// Starts by itself. At 0:00 it rings a bell and calls onEnd (which opens the vote). startAt (ms) syncs devices to one clock.
+function DayTimer({ minutes = 3, startAt = 0, onEnd, disabled = false }) {
+  const [left, setLeft] = useState(() => (startAt ? Math.max(0, minutes * 60 - Math.floor((Date.now() - startAt) / 1000)) : minutes * 60));
+  const [on, setOn] = useState(!disabled);
+  const prev = useRef(left);
+  const endRef = useRef(onEnd); endRef.current = onEnd;
   useEffect(() => {
     if (!on) return;
     const t = setInterval(() => setLeft((v) => Math.max(0, v - 1)), 1000);
     return () => clearInterval(t);
   }, [on]);
-  useEffect(() => { if (left === 0) setOn(false); }, [left]);
+  useEffect(() => {
+    if (prev.current > 0 && left === 0) { Sfx.bell(); if (endRef.current) endRef.current(); }
+    prev.current = left;
+    if (left === 0) setOn(false);
+  }, [left]);
   const mm = String(Math.floor(left / 60)).padStart(1, '0'), ss = String(left % 60).padStart(2, '0');
   return (
     <Panel className="text-center">
@@ -2910,7 +2969,7 @@ function DayTimer({ minutes = 3 }) {
       <div className={`font-display mt-1 text-5xl font-black tabular-nums ${left === 0 ? 'hint-pulse text-red-300' : 'text-slate-50'}`} role="timer" aria-live="off">{mm}:{ss}</div>
       {left === 0 && <p className="mt-1 text-sm font-semibold text-red-200">Time is up. Time to vote.</p>}
       <div className="mt-3 flex gap-2">
-        <button onClick={() => setOn(!on)} disabled={left === 0} className="min-h-[44px] flex-1 rounded-xl text-sm font-semibold text-slate-100 disabled:opacity-40" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>{on ? 'Pause' : left === minutes * 60 ? 'Start' : 'Resume'}</button>
+        <button onClick={() => setOn(!on)} disabled={left === 0} className="min-h-[44px] flex-1 rounded-xl text-sm font-semibold text-slate-100 disabled:opacity-40" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>{on ? 'Pause' : 'Resume'}</button>
         <button onClick={() => setLeft((v) => v + 60)} className="min-h-[44px] flex-1 rounded-xl text-sm font-semibold text-slate-100" style={{ background: 'var(--card-2)', border: '1px solid var(--line)' }}>+1 min</button>
         <button onClick={() => { setOn(false); setLeft(minutes * 60); }} className="min-h-[44px] flex-1 rounded-xl text-sm font-semibold text-slate-300" style={{ border: '1px solid var(--line)' }}>Reset</button>
       </div>
@@ -3295,15 +3354,13 @@ function NightLoopPP({ players, night, onFinish, onExit }) {
         await wait(2600);
         if (!off) setSt(after(st.i));
       } else if (st.k === 'dawnSay') {
-        morningP.current = Narrator.say('Everyone, open your eyes. Morning has broken.');
         const r = resolveNightPP(players, ch.current, night);
+        await Narrator.say('Everyone, open your eyes. Morning has broken.');
+        if (off) return;
         rollBg('day');
-        setRes(r); setSpoken(false); setSt({ k: 'dawn' });
+        setRes(r); setSpoken(true); setSt({ k: 'dawn' });
       } else if (st.k === 'dawn') {
-        await morningP.current; if (off) return;
-        await wait(500);
-        for (const line of res.lines) { if (off) return; await Narrator.say(line); }
-        if (!off) setSpoken(true);
+        // the casualty screen is silent: players can read it themselves
       }
     })();
     return () => { off = true; };
@@ -3398,11 +3455,13 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
   const voters = alive.filter((p) => !p.silencedTag && !p.stoneTag);
   const silenced = alive.filter((p) => p.silencedTag);
   const stoneds = alive.filter((p) => p.stoneTag);
-  const targets = alive.filter((p) => !p.stoneTag); // a stoned player cannot be voted out today
+  const targets = alive; // a stoned player cannot vote, but can still be voted out
   const wolves = alive.filter((p) => p.role === 'werewolf').length; // the Shadow Figure loses with the last Werewolf
   const evil = alive.filter((p) => ROLES_DATA[p.role].team === 'werewolf').length;
   const village = alive.length - evil;
-  const over = loversFaction(players) ? LOVERS_WIN : wolves === 0 ? { text: 'No Werewolves are left. The Village wins!', color: '#34D399' } : evil >= village ? { text: 'The Werewolves match or outnumber the Village. The Werewolves win!', color: '#F87171' } : null;
+  const over = loversFaction(players) ? { ...LOVERS_WIN, kind: 'lovers' } : wolves === 0 ? { text: 'No Werewolves are left. The Village wins!', color: '#34D399', kind: 'village' } : evil >= village ? { text: 'The Werewolves match or outnumber the Village. The Werewolves win!', color: '#F87171', kind: 'werewolf' } : null;
+  const sung = useRef('');
+  useEffect(() => { if (over && sung.current !== over.kind) { sung.current = over.kind; Sfx.win(over.kind); } if (!over) sung.current = ''; }, [over && over.kind]);
   // Eliminates players; a Lover's partner dies of heartbreak with them. Returns the heartbroken players.
   const kill = (ids) => {
     const all = [...ids], hb = [];
@@ -3466,11 +3525,11 @@ function DayTrial({ players, setPlayers, night, info, onNight, onAgain, onHome }
           )}
           {stoneds.length > 0 && (
             <p role="alert" className="mt-3 rounded-xl px-4 py-2.5 text-center text-sm font-semibold text-teal-100" style={{ background: 'rgba(45,212,191,0.16)', border: '1px solid rgba(45,212,191,0.6)' }}>
-              {stoneds.map((p) => p.name).join(', ')} {stoneds.length > 1 ? 'have' : 'has'} been turned to stone by Medusa until dusk. They cannot speak, vote or be voted out today.
+              {stoneds.map((p) => p.name).join(', ')} {stoneds.length > 1 ? 'have' : 'has'} been turned to stone by Medusa until dusk. They cannot speak or vote today.
             </p>
           )}
           {over && <p role="status" className="mt-3 rounded-xl px-4 py-3 text-center text-sm font-bold" style={{ color: over.color, background: 'rgba(10,10,18,0.8)', border: `1px solid ${over.color}66` }}>{over.text}</p>}
-          <div className="mt-3"><DayTimer /></div>
+          <div className="mt-3"><DayTimer disabled={!!over} onEnd={over ? undefined : () => startVote()} /></div>
           <Panel className="mt-3" style={{ background: 'rgba(21,26,36,0.82)' }}>
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Players still alive</h2>
             <ul className="flex flex-col gap-1.5">
@@ -4161,8 +4220,8 @@ function RoleChip({ role }) {
   );
 }
 
-function Panel({ children, className = '', style }) {
-  return <section className={`rounded-2xl p-4 ${className}`} style={{ background: 'var(--card)', border: '1px solid var(--line)', ...style }}>{children}</section>;
+function Panel({ children, className = '', style, id }) {
+  return <section id={id} className={`rounded-2xl p-4 ${className}`} style={{ background: 'var(--card)', border: '1px solid var(--line)', ...style }}>{children}</section>;
 }
 
 function MpHeader({ code, roomName, onLeave, leaveLabel }) {
@@ -4739,13 +4798,10 @@ function useNightDirector({ room, players, write }) {
         await wait(2200); if (!live()) return;
       }
       setDir({ on: true, label: 'Dawn' });
-      const morning = Narrator.say('Everyone, open your eyes. Morning has broken.');
+      await Narrator.say('Everyone, open your eyes. Morning has broken.'); if (!live()) return;
       const result = mpResolveNight(latest.current.room);
       await write(result.patch);
-      setDir({ on: false, label: '' });
-      await morning; if (!live()) return;
-      const spoken = result.lines.concat(result.silencedLine || [], result.stonedLine || []);
-      for (const line of spoken) { await wait(800); if (!live()) return; await Narrator.say(line); if (!live()) return; }
+      setDir({ on: false, label: '' }); // the casualty screen is silent: players read it themselves
     } catch (e) { setDir({ on: false, label: '' }); }
   };
   return { dir, start, stop, skipRole };
@@ -4757,7 +4813,7 @@ function mpTally(players) {
   const alive = players.filter((p) => p.a === 1);
   const voters = alive.filter((p) => p.s !== 1 && p.x !== 1);
   const tally = {};
-  voters.forEach((p) => { if (p.v && byId[p.v] && byId[p.v].a === 1 && byId[p.v].x !== 1) tally[p.v] = (tally[p.v] || 0) + (p.r === 'mayor' ? 2 : 1); });
+  voters.forEach((p) => { if (p.v && byId[p.v] && byId[p.v].a === 1) tally[p.v] = (tally[p.v] || 0) + (p.r === 'mayor' ? 2 : 1); });
   const ranked = Object.keys(tally).sort((x, y) => tally[y] - tally[x]);
   const top = ranked[0] || '';
   const tie = ranked.length > 1 && tally[ranked[1]] === tally[top];
@@ -4790,11 +4846,11 @@ function MpVote({ me, players, room, write }) {
   if (room.vd === 1) return <Panel className="text-center text-sm text-slate-300">The village has decided.</Panel>;
   if (me.a !== 1) return <Panel className="text-center text-sm text-slate-400">The village is voting. {voted} of {voters.length} votes are in.</Panel>;
   return (
-    <Panel>
+    <Panel id="mp-vote">
       <h3 className="font-display text-lg font-bold">Trial vote</h3>
       {me.r === 'mayor' && !silenced && <MayorNote className="mt-2" />}
       <p className="mb-3 mt-1 text-xs text-slate-300">{stonedMe ? 'You are turned to stone and cannot vote today.' : silenced ? 'You cannot vote today.' : 'Discuss, then vote for the player you want eliminated.'} {voted} of {voters.length} votes are in.</p>
-      <PickList players={alive.filter((p) => p.id !== me.id && p.x !== 1)} value={silenced ? '' : pick} onChange={setPick} locked={silenced} />
+      <PickList players={alive.filter((p) => p.id !== me.id)} value={silenced ? '' : pick} onChange={setPick} locked={silenced} />
       <Btn className="mt-3" disabled={silenced || !pick || pick === me.v} onClick={() => write({ [`pl/${me.id}/v`]: pick })}>{silenced ? 'Voting disabled' : me.v ? 'Change Vote' : 'Cast Vote'}</Btn>
       {!silenced && me.v && <p className="mt-2 text-center text-xs text-emerald-300">Your vote: {nm(me.v)}</p>}
     </Panel>
@@ -4864,11 +4920,11 @@ function MpDay({ me, players, room, write }) {
         </div>
       )}
       <AnnounceCard room={room} players={players} />
-      <DayTimer />
+      <DayTimer startAt={fxKey ? Number(fxKey) : 0} onEnd={() => { try { const el = document.getElementById('mp-vote'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ } }} />
       {me.a !== 1
         ? <Panel className="text-center text-sm text-slate-300">You are eliminated. You can still watch, but keep quiet.</Panel>
         : me.x === 1
-          ? <Panel className="text-center text-sm font-semibold text-teal-100" style={{ border: '1px solid rgba(45,212,191,0.7)', background: 'rgba(13,148,136,0.25)' }} role="alert">You have been turned to stone by Medusa until dusk &mdash; you cannot speak or vote, and you cannot be voted out today.</Panel>
+          ? <Panel className="text-center text-sm font-semibold text-teal-100" style={{ border: '1px solid rgba(45,212,191,0.7)', background: 'rgba(13,148,136,0.25)' }} role="alert">You have been turned to stone by Medusa until dusk &mdash; you cannot speak or vote today.</Panel>
         : me.s === 1
           ? <Panel className="text-center text-sm font-semibold text-violet-100" style={{ border: '1px solid rgba(167,139,250,0.7)', background: 'rgba(109,40,217,0.25)' }} role="alert">You have been silenced by the Spellcaster &mdash; you cannot speak or vote today.</Panel>
           : <Panel className="text-center text-sm text-slate-300">You are alive. Discuss and find the werewolves.</Panel>}
@@ -4891,6 +4947,7 @@ function MpDay({ me, players, room, write }) {
 
 function MpOver({ room, players, meId }) {
   const village = room.w === 'village', lovers = room.w === 'lovers';
+  useEffect(() => { Sfx.win(room.w === 'zombie' ? 'zombie' : room.w); }, []);
   return (
     <div className="flex flex-1 flex-col gap-4">
       <Panel className="text-center" style={{ border: `1px solid ${lovers ? '#F472B6' : village ? '#34D399' : '#EF4444'}`, background: lovers ? 'rgba(244,114,182,0.12)' : village ? 'rgba(16,185,129,0.1)' : 'rgba(220,38,38,0.12)' }}>

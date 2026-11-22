@@ -5951,10 +5951,10 @@ function MpDay({ me, players, room, write, onTimeUp }) {
           <Btn className="mt-3" disabled={!target} onClick={shoot}>Fire</Btn>
         </Panel>
       )}
+      {!(voting && me.a === 1) && <AnnounceCard room={room} players={players} />}
+      <DayTimer startAt={fxKey ? Number(fxKey) : 0} onEnd={() => { if (me.a === 1) setVoting(true); if (onTimeUp) onTimeUp(); }} />{/* stays mounted on both pages so Pause and +1 min carry over */}
       {!(voting && me.a === 1) ? (
         <>
-          <AnnounceCard room={room} players={players} />
-          <DayTimer startAt={fxKey ? Number(fxKey) : 0} onEnd={() => { if (me.a === 1) setVoting(true); if (onTimeUp) onTimeUp(); }} />
           {me.a !== 1
             ? <Panel className="text-center text-sm text-slate-300">You are eliminated. You can still watch, but keep quiet.</Panel>
             : me.x === 1

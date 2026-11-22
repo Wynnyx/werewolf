@@ -3190,10 +3190,14 @@ const NIGHT_PROMPT = {
   cured: 'YOU HAVE BEEN CURED!'
 };
 const PROTECTED_LINE = 'The Werewolves attacked overnight, but the victim was protected!';
+const SAVED_LINE = 'The Werewolves attacked overnight, but the victim was saved!'; // the Witch's potion (the Bodyguard protects)
 const stoneLine = (name) => `${name} has been turned to stone until dusk. They cannot speak or vote.`;
-function dawnLines(saved, deadNames, silencedName, stonedName, brokenNames = [], sniperHit = false) {
+function dawnLines(saved, deadNames, silencedName, stonedName, brokenNames = [], sniperHit = false, savedBy = 'g') {
   const out = [];
-  if (saved) out.push(deadNames.length || brokenNames.length ? PROTECTED_LINE : PROTECTED_LINE + ' No one was eliminated.');
+  if (saved) {
+    const kinds = savedBy === 'both' ? [SAVED_LINE, PROTECTED_LINE] : [savedBy === 'w' ? SAVED_LINE : PROTECTED_LINE];
+    kinds.forEach((l, i) => out.push(i === kinds.length - 1 && !deadNames.length && !brokenNames.length ? l + ' No one was eliminated.' : l));
+  }
   deadNames.forEach((n) => out.push(`${n} was found dead this morning.`));
   brokenNames.forEach((n) => out.push(`${n} died of heartbreak.`));
   if (!out.length) out.push('The night passed quietly. No one was eliminated.');
@@ -3783,12 +3787,12 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
           ? <p className="mt-2 text-xs font-semibold text-slate-400">{actor.poisonUsed ? 'Both potions have been used' : 'Save Used'}</p>
           : two
             ? <div className="mt-3 flex flex-col gap-2">{victims.map((v) => (
-                <button key={v} onClick={() => setSave(save === v ? false : v)} aria-pressed={save === v}
+                <button key={v} onClick={() => { if (save !== v) setPick(null); setSave(save === v ? false : v); }} aria-pressed={save === v}
                   className="flex min-h-[52px] w-full items-center justify-center rounded-xl text-[15px] font-bold transition"
                   style={{ background: save === v ? 'rgba(16,185,129,0.28)' : 'var(--card-2)', border: `1px solid ${save === v ? '#34D399' : 'var(--line)'}`, color: '#E6EAF2' }}>
                   {save === v ? `Saving ${nm(v)} ✓` : `Save ${nm(v)}`}
                 </button>))}</div>
-            : <button disabled={!canSave} onClick={() => setSave(!save)} aria-pressed={save}
+            : <button disabled={!canSave} onClick={() => { if (!save) setPick(null); setSave(!save); }} aria-pressed={save}
               className="mt-3 flex min-h-[52px] w-full items-center justify-center rounded-xl text-[15px] font-bold transition disabled:opacity-40"
               style={{ background: save ? 'rgba(16,185,129,0.28)' : 'var(--card-2)', border: `1px solid ${save ? '#34D399' : 'var(--line)'}`, color: '#E6EAF2' }}>
               {save ? `Saving ${nm(victim)} ✓` : 'Save Target'}
@@ -3797,8 +3801,8 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
       {actor.poisonUsed
         ? (actor.saveUsed ? null : <p className="mt-4 text-center text-xs font-semibold text-slate-400">Poison Used</p>)
         : <>
-            <div className="mb-2 mt-4 text-center text-xs font-semibold uppercase tracking-widest text-slate-400">Poison a player (optional)</div>
-            <PickList players={opts(alive.filter((p) => p.id !== actor.id && !(ext && ext.group.includes(p.id))))} value={val} onChange={choose} />
+            <div className="mb-2 mt-4 text-center text-xs font-semibold uppercase tracking-widest text-slate-400">{save && canSave ? 'Poison is locked while you save' : 'Poison a player (optional)'}</div>
+            <PickList players={opts(alive.filter((p) => p.id !== actor.id && !(ext && ext.group.includes(p.id))))} value={val} onChange={choose} locked={!!save && canSave} />
           </>}
       <Btn className="mt-5" onClick={() => onDone({ witchSave: !!save && canSave, witchSaveTo: two && save ? save : undefined, witchPoison: pick })}>{pick !== null ? 'Confirm Poison' : save && canSave ? 'Confirm Save' : 'Do Nothing Tonight'}</Btn>
     </div>
@@ -3823,6 +3827,9 @@ function resolveNightPP(players, c0, night) {
   const saveTarget = witchSave ? (has(c.witchSaveTo) ? c.witchSaveTo : victim) : null;
   const protectedV = (v) => v === guarded || (saveTarget !== null && v === saveTarget);
   const saved = [victim, victim2].some((v) => v !== null && protectedV(v));
+  const byGuard = [victim, victim2].some((v) => v !== null && v === guarded);
+  const bySave = [victim, victim2].some((v) => v !== null && saveTarget !== null && v === saveTarget && v !== guarded);
+  const savedBy = byGuard && bySave ? 'both' : bySave ? 'w' : 'g'; // who stopped the hunt: the Witch (w) or the Bodyguard (g)
   const dead = [];
   [victim, victim2].forEach((v) => { if (v !== null && !protectedV(v) && !dead.includes(v)) dead.push(v); }); // each hunt is blocked on its own
   if (poison !== null && !dead.includes(poison)) dead.push(poison); // the Bodyguard blocks hunts and bites, never the Witch's poison
@@ -3876,7 +3883,7 @@ function resolveNightPP(players, c0, night) {
   });
   const silencedName = silenced !== null && byId.get(silenced) && !dead.includes(silenced) ? byId.get(silenced).name : '';
   const stonedName = stoneId !== null && !dead.includes(stoneId) ? stoned.name : '';
-  return { next, dead, shot: shotHit, broken: brokenIds, saved, victim, poisoned: poison, hunted: [victim, victim2].filter((v) => v !== null && !protectedV(v)), silenced, silencedName, stoned: stonedName ? stoneId : null, stonedName, lines: dawnLines(saved, dead.filter((id) => !brokenIds.includes(id)).map((id) => byId.get(id).name), silencedName, stonedName, brokenIds.map((id) => byId.get(id).name), shotHit !== null), bitten: bitten !== null ? bitten : pdInfect !== null ? pdInfect : infBite, shotHit };
+  return { next, dead, shot: shotHit, broken: brokenIds, saved, savedBy, victim, poisoned: poison, hunted: [victim, victim2].filter((v) => v !== null && !protectedV(v)), silenced, silencedName, stoned: stonedName ? stoneId : null, stonedName, lines: dawnLines(saved, dead.filter((id) => !brokenIds.includes(id)).map((id) => byId.get(id).name), silencedName, stonedName, brokenIds.map((id) => byId.get(id).name), shotHit !== null), bitten: bitten !== null ? bitten : pdInfect !== null ? pdInfect : infBite, shotHit };
 }
 
 // Pass & Play: the narrator runs the whole night by voice. One device, passed to each role in turn.
@@ -4731,7 +4738,7 @@ function mpResolveNight(room) {
   const silencedAlive = res.silencedName ? res.silenced : '';
   const stonedAlive = res.stoned !== null && res.stoned !== undefined ? res.stoned : '';
   const shotHit = res.shot !== null && res.shot !== undefined ? res.shot : '';
-  const lines = dawnLines(res.saved, res.dead.filter((id) => !res.broken.includes(id)).map(nameOf), '', '', res.broken.map(nameOf), !!shotHit);
+  const lines = dawnLines(res.saved, res.dead.filter((id) => !res.broken.includes(id)).map(nameOf), '', '', res.broken.map(nameOf), !!shotHit, res.savedBy);
   const an = { k: room.k || 0, t: Date.now(), l: Object.fromEntries(lines.map((t, i) => [i, t])), sv: res.saved ? 1 : 0, si: silencedAlive, st: stonedAlive };
   const cz = {}; // why each player died, so the eliminated screen can say so
   res.dead.forEach((id) => { cz[id] = res.broken.includes(id) ? 'h' : id === shotHit ? 's' : res.hunted.includes(id) ? 'w' : id === res.poisoned ? 'p' : 'w'; });

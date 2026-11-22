@@ -67,6 +67,10 @@
   .map-badge { animation: mapLantern 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
   .map-bob { animation: mapBob 3.4s ease-in-out infinite; } @keyframes mapBob { 0%, 100% { translate: 0 0; } 50% { translate: 0 6px; } }
   .map-fade { transition: opacity 0.9s ease; }
+  .l1-bg { animation: l1Fade 0.7s ease-out both; }
+  @keyframes l1Fade { from { opacity: 0; transform: scale(1.07); } to { opacity: 1; transform: scale(1); } }
+  .l1-cta { transition: opacity 0.55s ease, transform 0.55s ease; }
+  @media (prefers-reduced-motion: reduce) { .l1-bg { animation: none; } .l1-cta { transition: none; } }
   .map-shimmer { background: linear-gradient(110deg, #0b0f2a 30%, #1b2150 48%, #0b0f2a 66%); background-size: 220% 100%; animation: mapShimmer 1.6s linear infinite; }
   @keyframes mapShimmer { from { background-position: 120% 0; } to { background-position: -100% 0; } }
   @media (prefers-reduced-motion: reduce) { .map-shimmer { animation: none; } }
@@ -1805,6 +1809,8 @@ const TH_PAIRS = [
   ['Waiting for the other night roles to finish…', 'กำลังรอบทบาทกลางคืนอื่น ๆ ทำให้เสร็จ…'], ['Choose one action and a new target, or skip.', 'เลือกการกระทำหนึ่งอย่างและเป้าหมายใหม่ หรือข้าม'],
   ['Your vision is clouding. Waiting for the Shadow Figure…', 'นิมิตของคุณพร่ามัว กำลังรอร่างเงา…'], ['redirects an action → {}', 'เปลี่ยนเป้าหมายการกระทำ → {1}'], ['no redirect', 'ไม่เปลี่ยนเป้าหมาย'],
   ['World Map Art Style', 'สไตล์ภาพแผนที่ผจญภัย'], ['Storybook Hand-Painted', 'ภาพวาดนิทานดาร์กแฟนตาซี'], ['Storybook Hand-Painted HD', 'ภาพวาดนิทานดาร์กแฟนตาซี HD'], ['Storybook Ultra HD', 'ภาพวาดนิทาน อัลตร้า HD'], ['Artwork for the Adventure Classic world map. Change it any time.', 'ภาพพื้นหลังของแผนที่คลาสสิกในโหมดผจญภัย เปลี่ยนได้ทุกเมื่อ'],
+  ['LEVEL 1 — The First Howl', 'ด่าน 1 — เสียงหอนแรก'], ['Harbor Cottage', 'กระท่อมท่าเรือ'], ['Your Role: Bodyguard (Training)', 'บทบาทของคุณ: บอดี้การ์ด (ฝึกหัด)'], ['Play Level 1', 'เล่นด่าน 1'], ['Unlocked', 'ปลดล็อกแล้ว'], ['Cleared ★', 'ผ่านแล้ว ★'], ['House #1', 'บ้านหลังที่ 1'], ['Back to map', 'กลับไปแผนที่'],
+  ['Tip: As Bodyguard, protect someone each night. Guess who the Werewolf will attack!', 'เคล็ดลับ: ในฐานะบอดี้การ์ด ให้ปกป้องใครสักคนทุกคืน ลองเดาว่ามนุษย์หมาป่าจะโจมตีใคร!'], ['Tip: Read the Village Chat, work out who the Werewolf is, and vote together!', 'เคล็ดลับ: อ่านแชตหมู่บ้าน หาว่าใครคือมนุษย์หมาป่า แล้วโหวตไปด้วยกัน!'],
   ['Level {#} — Locked (Coming Soon)', 'ด่าน {1} — ล็อกอยู่ (เร็ว ๆ นี้)'],
   ['Harbor Village', 'หมู่บ้านท่าเรือ'], ['The Underground Sinkhole', 'หลุมยุบใต้ดิน'], ['Roadless Dark Pine Forest', 'ป่าสนมืดไร้ทาง'], ['Cliff Cavern & Vampire Castle', 'ถ้ำผาและปราสาทแวมไพร์'], ['Frozen Alpine Summit', 'ยอดเขาน้ำแข็ง'],
   ['House #1 — Harbor Cottage', 'บ้านหลังที่ 1 — กระท่อมท่าเรือ'], ['Pier Watchpost', 'ป้อมเฝ้าท่าเทียบเรือ'], ['Harbor Square', 'จัตุรัสท่าเรือ'], ['Village Gate', 'ประตูหมู่บ้าน'],
@@ -4732,10 +4738,11 @@ function mpDealPatch(room, deck) {
     const b = `pl/${p.id}/`;
     Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0, [b + 'v']: '', [b + 'lv']: '', [b + 't2']: '', [b + 'la']: 0, [b + 'bt']: 0, [b + 'jt']: 0, [b + 'cu']: 0, [b + 'cj']: 0, [b + 'sd']: 0, [b + 'sn']: 0, [b + 'fr']: '', [b + 'pdc']: 0, [b + 'pdi']: 0, [b + 'pdl']: '', [b + 'ic']: 0 });
   });
-  if (room.adv === 1) { // Adventure Level 1: the human always holds the Seer card (swapped with whoever was dealt it)
-    const h = players.find((p) => p.bot !== 1); const sp = players.find((p) => patch[`pl/${p.id}/r`] === 'seer');
-    if (h && sp && sp.id !== h.id) { patch[`pl/${sp.id}/r`] = patch[`pl/${h.id}/r`]; patch[`pl/${h.id}/r`] = 'seer'; }
+  if (room.adv === 1) { // Adventure Level 1: the human always holds the Bodyguard card (swapped with whoever was dealt it)
+    const h = players.find((p) => p.bot !== 1); const sp = players.find((p) => patch[`pl/${p.id}/r`] === 'bodyguard');
+    if (h && sp && sp.id !== h.id) { patch[`pl/${sp.id}/r`] = patch[`pl/${h.id}/r`]; patch[`pl/${h.id}/r`] = 'bodyguard'; }
   }
+  if (room.ai === 1) players.filter((p) => p.bot === 1).forEach((p) => { patch[`pl/${p.id}/d`] = 1; }); // Solo AI: the bots are ready from the start, so the human's tap is the only one that counts
   return patch;
 }
 function mpLobbyPatch(room) {
@@ -5234,7 +5241,7 @@ function MpJoinForm({ onBack, onJoined, onHost }) {
 }
 
 /* ---------- player-side views ---------- */
-function MpReveal({ me, ready, readyCount, total, onReady, onLeave }) {
+function MpReveal({ me, ready, readyCount, total, onReady, onLeave, instant = false }) {
   const [phase, setPhase] = useState('idle'); // idle | lift | flipping | open
   const [sent, setSent] = useState(false);
   const [showAbility, setShowAbility] = useState(false);
@@ -5248,7 +5255,15 @@ function MpReveal({ me, ready, readyCount, total, onReady, onLeave }) {
     timers.current.push(setTimeout(() => setPhase('flipping'), 300));
     timers.current.push(setTimeout(() => setPhase('open'), 1500));
   };
+  useEffect(() => { if (instant) { const t = setTimeout(reveal, 250); return () => clearTimeout(t); } return undefined; }, []); // Solo AI / Adventure: the card flips by itself, no tap to reveal
   const done = ready || sent;
+  if (done && instant) {
+    return (
+      <NightStage fixed onExit={onLeave}>
+        <div className="flex flex-1 flex-col items-center justify-center text-center"><p className="font-display screen-in text-3xl font-bold tracking-wide">Night begins</p></div>
+      </NightStage>
+    );
+  }
   if (done) {
     return (
       <NightStage fixed onExit={onLeave}>
@@ -5264,10 +5279,10 @@ function MpReveal({ me, ready, readyCount, total, onReady, onLeave }) {
   }
   return (
     <div className="flex flex-1 flex-col items-center">
-      <div role="note" className="mt-1 flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left text-sm leading-snug"
+      {!instant && <div role="note" className="mt-1 flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left text-sm leading-snug"
         style={{ color: '#FDE68A', background: 'linear-gradient(135deg, rgba(220,38,38,0.16), rgba(245,158,11,0.12))', border: '1px solid rgba(245,158,11,0.55)' }}>
         <span><strong className="font-bold text-amber-200">Eyes only!</strong> Make sure nobody can see your screen before you reveal your card.</span>
-      </div>
+      </div>}
       <div className="flex flex-1 flex-col items-center justify-center gap-3 py-3">
         <div role="button" tabIndex={phase === 'idle' ? 0 : -1} onClick={reveal} aria-label="Tap the card to reveal your role"
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); reveal(); } }}
@@ -5275,7 +5290,7 @@ function MpReveal({ me, ready, readyCount, total, onReady, onLeave }) {
           <RoleCard role={me.r} phase={phase} />
         </div>
         <div className="relative w-full text-center" style={{ minHeight: '3.5rem' }}>
-          {phase === 'idle' && <p className="hint-pulse pt-1 text-sm font-semibold tracking-wide text-slate-300">Tap the card to reveal</p>}
+          {phase === 'idle' && !instant && <p className="hint-pulse pt-1 text-sm font-semibold tracking-wide text-slate-300">Tap the card to reveal</p>}
           <div className={`absolute inset-x-0 top-0 mx-auto text-center transition-opacity duration-500 ${phase === 'open' ? 'opacity-100' : 'opacity-0'}`} style={{ width: 'min(19rem, 86vw)' }}>
             <TeamBadge team={ROLES_DATA[me.r].team} />
             {!hasImg && <p className="mt-2 text-xs leading-snug text-slate-300">{ROLES_DATA[me.r].ability}</p>}
@@ -6401,7 +6416,7 @@ function MpRoom({ session, onExit, onPhase }) {
     if (!hostPlays || director.dir.on) return;
     const key = `${ph}:${room.k}:${room.vd}:${autoWinner}`;
     let t = 0;
-    if (ph === 'reveal' && allSeen) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, 1800);
+    if (ph === 'reveal' && allSeen) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, room.ai === 1 ? 250 : 1800);
     else if (ph === 'night') t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start({ again: true }); } }, 6000); // only if the director is not running (for example after a refresh)
     else if (ph === 'day' && autoWinner) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; write({ ph: 'over', w: autoWinner }); } }, hunterPending ? 20000 : 7000);
     else if (ph === 'day' && room.vd === 1) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, hunterPending ? 30000 : 12000); // time to read who was voted out
@@ -6496,7 +6511,7 @@ function MpRoom({ session, onExit, onPhase }) {
       </div>
     );
   } else if (showPlayer) {
-    if (ph === 'reveal') body = <MpReveal me={me} ready={me.d === 1} readyCount={players.filter((p) => p.d === 1).length} total={players.length} onReady={() => write({ [`pl/${pid}/d`]: 1 })} onLeave={() => setConfirmLeave(true)} />;
+    if (ph === 'reveal') body = <MpReveal me={me} ready={me.d === 1} readyCount={players.filter((p) => p.d === 1).length} total={players.length} onReady={() => write({ [`pl/${pid}/d`]: 1 })} onLeave={() => setConfirmLeave(true)} instant={room.ai === 1} />;
     else if (ph === 'night') body = <MpNight key={`n${room.k}`} me={me} players={players} room={room} write={write} immersive={!isHost || hostPlays} onLeave={() => setConfirmLeave(true)} />;
     else if (ph === 'day') body = <MpDay key={`d${room.k}`} me={me} players={players} room={room} write={write} onTimeUp={isHost && hostPlays ? () => { if (room.vd === 1) return; const t = mpTally(players); write(mpVotePatch(players, t.tie ? '' : t.top, { tie: t.tie, skip: t.skip, none: t.voted === 0 })); } : undefined} />;
     else body = <MpOver room={room} players={players} meId={pid} />;
@@ -6509,7 +6524,7 @@ function MpRoom({ session, onExit, onPhase }) {
   return (
     <>
     {ph === 'day' && <DayBackdrop />}
-    {showPlayer && me && room.adv === 1 && room.k === 1 && (ph === 'night' || ph === 'day') && <AdvTip key={ph} text={ph === 'night' ? 'Tip: As Seer, inspect a player to uncover who the Werewolf is!' : 'Tip: Share what you saw in the Village Chat so allies vote with you!'} />}
+    {showPlayer && me && room.adv === 1 && room.k === 1 && (ph === 'night' || ph === 'day') && <AdvTip key={ph} text={ph === 'night' ? 'Tip: As Bodyguard, protect someone each night. Guess who the Werewolf will attack!' : 'Tip: Read the Village Chat, work out who the Werewolf is, and vote together!'} />}
     {showPlayer && me && ph === 'day' && <VoteResultGate room={room} code={code} />}
     {showPlayer && me && ph === 'day' && <ElimGate me={me} room={room} code={code} />}
     {fullHost && session.ai && (ph === 'day' || (ph === 'reveal' && !(me && me.d === 1))) && (
@@ -7398,10 +7413,48 @@ const MapPainted = React.memo(function MapPainted({ tab, src, tiles, w, h, clear
   );
 });
 
+const L1_REDUCED = () => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Level 1: the first-person Harbor Cottage scene that opens after the camera zooms into House #1.
+function Level1Scene({ cleared, onBack, onPlay }) {
+  const [cta, setCta] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setCta(true), L1_REDUCED() ? 0 : 1000); return () => clearTimeout(t); }, []);
+  const pill = (id) => { const r = ROLES_DATA[id]; return <span key={id} className="rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider" style={{ color: teamColor(r.team), background: 'rgba(8,10,18,0.72)', border: `1px solid ${teamColor(r.team)}88` }}>{r.name}</span>; };
+  const IMG = 'images/level1-harbor-pov.webp';
+  return (
+    <div role="dialog" aria-label="Level 1 Harbor Cottage" className="fixed inset-0 z-30 overflow-hidden" style={{ background: '#05060d' }}>
+      <img src={IMG} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 h-full w-full select-none" style={{ objectFit: 'cover', filter: 'blur(26px) brightness(0.45)', transform: 'scale(1.15)' }} />
+      <div className="absolute inset-y-0 left-1/2 w-full -translate-x-1/2" style={{ maxWidth: 'calc(100dvh * 9 / 16)' }}>
+        <img src={IMG} alt="" draggable={false} className="l1-bg h-full w-full select-none" style={{ objectFit: 'cover', objectPosition: '50% 42%' }} />
+        <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(4,6,14,0.7) 0%, rgba(4,6,14,0) 22%, rgba(4,6,14,0) 40%, rgba(4,6,14,0.86) 70%, rgba(4,6,14,0.97) 100%)' }} />
+      </div>
+      <div className="absolute inset-x-0 top-0 z-10 flex items-center px-3" style={{ paddingTop: 'max(8px, env(safe-area-inset-top))' }}>
+        <button onClick={onBack} aria-label="Back to map" className="flex h-11 w-11 items-center justify-center rounded-full text-slate-100" style={{ background: 'rgba(8,10,18,0.55)', border: '1px solid rgba(148,163,184,0.4)' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5 L8 12 L15 19" /></svg>
+        </button>
+      </div>
+      <div className="absolute inset-x-0 bottom-0 z-10 mx-auto w-full max-w-md px-5" style={{ paddingBottom: 'max(22px, env(safe-area-inset-bottom))' }}>
+        <div className="screen-in">
+          <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-amber-300">{cleared ? 'Cleared ★' : 'Unlocked'} · House #1</div>
+          <h2 className="font-display mt-1 text-2xl font-black leading-tight text-slate-50">LEVEL 1 &mdash; The First Howl</h2>
+          <p className="text-sm text-slate-300">Harbor Cottage</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">{['werewolf', 'seer', 'bodyguard', 'villager'].map(pill)}</div>
+          <p className="mt-3 text-sm font-semibold text-slate-100">Your Role: Bodyguard (Training)</p>
+        </div>
+        <div className="l1-cta mt-3" style={{ opacity: cta ? 1 : 0, transform: cta ? 'translateY(0)' : 'translateY(18px)', pointerEvents: cta ? 'auto' : 'none' }} aria-hidden={!cta}>
+          <Btn onClick={onPlay} tabIndex={cta ? 0 : -1}>Play Level 1</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdvHub({ onBack, onCustom, onPlay1 }) {
   const [tab, setTab] = useState('classic');
   const [sel, setSel] = useState(null);
   const [toast, setToast] = useState(0);
+  const [zoomIn, setZoomIn] = useState(false); // camera is zooming into House #1
+  const [scene, setScene] = useState(false); // Level 1 first-person scene is open
+  const lockR = useRef(false);
   const [art, setArt] = useState({}); // painted maps found in /images: { classic: { w, h }, outbreak: { w, h } }
   const [artReady, setArtReady] = useState(false);
   const cleared = !!loadAdv().classicLevel1Cleared;
@@ -7427,9 +7480,15 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
   const size = () => { const el = vp.current; return { w: el ? el.clientWidth : 390, h: el ? el.clientHeight : 800 }; };
   const clampCam = (c, slack) => { const { w, h } = size(); const ww = dimR.current.w * c.k, hh = dimR.current.h * c.k; return { k: c.k, x: ww <= w ? (w - ww) / 2 : Math.min(slack, Math.max(w - ww - slack, c.x)), y: hh <= h ? (h - hh) / 2 : Math.min((paR.current ? topPad() : 0) + slack, Math.max(h - hh - slack, c.y)) }; };
   const topPad = () => 110; // painted maps: lets the summit scroll down clear of the header bar and tabs
-  const apply = (c, ms) => { cam.current = c; const el = world.current; if (!el) return; el.style.setProperty('--ps', String((0.8 + 0.25 * c.k) / c.k)); el.style.transition = ms ? `transform ${ms}ms cubic-bezier(.2,.8,.2,1)` : 'none'; el.style.transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.k})`; };
+  const apply = (c, ms, ease) => { cam.current = c; const el = world.current; if (!el) return; el.style.setProperty('--ps', String((0.8 + 0.25 * c.k) / c.k)); el.style.transition = ms ? `transform ${ms}ms ${ease || 'cubic-bezier(.2,.8,.2,1)'}` : 'none'; el.style.transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.k})`; };
   const zoomAt = (px, py, nk, ms, slack = 0) => { const c = cam.current; const k = Math.min(KMAX, Math.max(kmin(), nk)); apply(clampCam({ k, x: px - ((px - c.x) * k) / c.k, y: py - ((py - c.y) * k) / c.k }, slack), ms); };
-  const focus = (n, k, ms) => { const { w, h } = size(); const o = pa ? { x: (MAP_PINS[n - 1][0] * dim.w) / 100, y: (MAP_PINS[n - 1][1] * dim.h) / 100 } : MAP_NODES[n - 1]; apply(clampCam({ k, x: w / 2 - o.x * k, y: h * 0.58 - o.y * k }, 0), ms); };
+  const focus = (n, k, ms, ease) => { const { w, h } = size(); const o = pa ? { x: (MAP_PINS[n - 1][0] * dim.w) / 100, y: (MAP_PINS[n - 1][1] * dim.h) / 100 } : MAP_NODES[n - 1]; apply(clampCam({ k, x: w / 2 - o.x * k, y: h * 0.58 - o.y * k }, 0), ms, ease); };
+  const goL1 = () => { // zoom the camera into House #1, then open the first-person scene
+    if (lockR.current) return; lockR.current = true; setSel(1); setToast(0); setZoomIn(true);
+    const ms = L1_REDUCED() ? 0 : 850; focus(1, pa ? KMAX : 1.3, ms, 'cubic-bezier(.65,0,.35,1)');
+    setTimeout(() => setScene(true), ms ? ms + 60 : 0);
+  };
+  const backFromL1 = () => { setScene(false); setZoomIn(false); setSel(null); focus(1, homeK(), L1_REDUCED() ? 0 : 600); setTimeout(() => { lockR.current = false; }, 650); };
   const homeK = () => (pa ? Math.min(KMAX, kmin() * 1.5) : Math.min(1.3, Math.max(0.6, size().w / 520)));
   useEffect(() => { // open on the whole map, then glide to the harbor
     if (!artReady) return undefined;
@@ -7446,6 +7505,7 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
   }, []);
   const rect = () => vp.current.getBoundingClientRect();
   const down = (e) => {
+    if (lockR.current) return;
     ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const s = g.current;
     if (ptrs.current.size === 1) { s.moved = 0; s.target = e.target; } else { s.moved = 99; }
@@ -7469,7 +7529,7 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
     if (!had) return;
     if (ptrs.current.size === 0) {
       apply(clampCam(cam.current, 0), 260); // rubber band back inside the map
-      if (s.moved < 8 && s.target && s.target.closest) { const nd = s.target.closest('[data-node]'); if (nd) { const n = Number(nd.getAttribute('data-node')); setSel(n); setToast(tab === 'classic' && n === 1 ? 0 : n); } }
+      if (s.moved < 8 && s.target && s.target.closest) { const nd = s.target.closest('[data-node]'); if (nd) { const n = Number(nd.getAttribute('data-node')); if (tab === 'classic' && n === 1) goL1(); else { setSel(n); setToast(n); } } }
     } else if (ptrs.current.size === 1) { s.dist = 0; }
   };
   const zoomBtn = (f) => { const { w, h } = size(); zoomAt(w / 2, h / 2, cam.current.k * f, 240); };
@@ -7479,7 +7539,6 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
       style={{ background: tab === id ? (id === 'outbreak' ? 'rgba(5,150,105,0.55)' : 'rgba(79,70,229,0.55)') : 'rgba(21,26,36,0.85)', border: `1px solid ${tab === id ? (id === 'outbreak' ? '#6EE7B7' : '#A5B4FC') : 'var(--line)'}`, color: tab === id ? '#F8FAFC' : '#94A3B8' }}>{label}</button>
   );
   const fab = { background: 'rgba(12,16,26,0.88)', border: '1px solid rgba(167,139,250,0.55)', color: '#EDE9FE', boxShadow: '0 6px 18px rgba(0,0,0,0.55)' };
-  const showL1 = tab === 'classic' && sel === 1;
   return (
     <div className="fixed inset-0 z-0 overflow-hidden" style={{ background: '#0a1a2e' }}>
       {!artReady && <div aria-hidden="true" className="map-shimmer absolute inset-0" />}
@@ -7501,7 +7560,7 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
         </div>
         <div role="tablist" className="pointer-events-auto mx-auto mt-2 flex w-full max-w-xl gap-2 px-4">{tabBtn('classic', 'Classic')}{tabBtn('outbreak', 'Outbreak')}</div>
       </div>
-      <div className="absolute right-3 z-10 flex flex-col gap-2" style={{ bottom: showL1 ? 'calc(max(18px, env(safe-area-inset-bottom)) + 250px)' : 'max(20px, env(safe-area-inset-bottom))' }}>
+      <div className="absolute right-3 z-10 flex flex-col gap-2" style={{ bottom: 'max(20px, env(safe-area-inset-bottom))' }}>
         <button onClick={() => zoomBtn(1.3)} aria-label="Zoom in" className="flex h-11 w-11 items-center justify-center rounded-full text-xl font-bold" style={fab}>+</button>
         <button onClick={() => zoomBtn(1 / 1.3)} aria-label="Zoom out" className="flex h-11 w-11 items-center justify-center rounded-full text-xl font-bold" style={fab}>&minus;</button>
         <button onClick={() => focus(1, homeK(), 700)} aria-label="Reset view" title="Reset view" className="flex h-11 w-11 items-center justify-center rounded-full" style={fab}>
@@ -7516,21 +7575,8 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
           </div>
         </div>
       )}
-      {showL1 && (
-        <div role="dialog" aria-label="Level 1 mission" className="screen-in absolute inset-x-0 bottom-0 z-20 mx-auto w-full max-w-xl rounded-t-3xl p-4" style={{ background: 'linear-gradient(180deg, rgba(40,28,70,0.97), rgba(12,14,24,0.99))', border: '1px solid rgba(251,191,36,0.55)', borderBottom: 'none', paddingBottom: 'max(18px, env(safe-area-inset-bottom))', boxShadow: '0 -14px 40px rgba(0,0,0,0.6)' }}>
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-amber-300">{cleared ? 'Cleared ★' : 'Unlocked'} · House #1</div>
-              <h2 className="font-display mt-0.5 text-xl font-black text-slate-50">LEVEL 1 &mdash; The First Howl</h2>
-              <p className="text-xs text-slate-400">Harbor Cottage</p>
-            </div>
-            <button onClick={() => setSel(null)} aria-label="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-300 hover:bg-white/10">&#10005;</button>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">{['werewolf', 'seer', 'bodyguard', 'villager'].map(pill)}</div>
-          <p className="mt-3 text-sm font-semibold text-slate-200">Your Role: Seer (Training)</p>
-          <Btn className="mt-3" onClick={onPlay1}>Play Level 1</Btn>
-        </div>
-      )}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[15]" style={{ background: 'radial-gradient(circle at 50% 58%, rgba(2,4,12,0) 18%, rgba(2,4,12,0.78) 62%, rgba(2,4,12,1) 100%)', opacity: zoomIn ? 1 : 0, transition: L1_REDUCED() ? 'none' : 'opacity 850ms ease-in-out' }} />
+      {scene && <Level1Scene cleared={cleared} onBack={backFromL1} onPlay={onPlay1} />}
     </div>
   );
 }
@@ -7564,7 +7610,7 @@ function AiScreen({ onBack, onPhase }) {
     setBusy(false);
   };
   if (view === 'room' && session) return <MpRoom session={session} onExit={exitRoom} onPhase={onPhase} />;
-  const playLevel1 = () => { // fixed training match: no deck builder, the human is the Seer
+  const playLevel1 = () => { // fixed training match: no deck builder, the human is the Bodyguard
     setGameMode('classic');
     const c = { n: 4, deck: { ...emptyDeck(), ...ADV_L1_DECK }, adv: 1 };
     setCfg(c);

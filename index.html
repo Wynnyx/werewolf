@@ -6049,7 +6049,7 @@ function ElimGate({ me, room, code }) {
 
 const VR_SEEN = { key: '' };
 // Full-screen result once the vote closes (everyone voted, or the discussion timer ran out): who was voted out and what they were.
-function VoteResultGate({ room, code }) {
+function VoteResultGate({ room, code, onContinue }) {
   const [, bump] = useState(0);
   const vr = room.vr;
   const key = `${code}:${room.dl || 0}:${room.k}`;
@@ -6063,7 +6063,7 @@ function VoteResultGate({ room, code }) {
       {vr.t === 'out' && r && <><NightCard player={{ role: vr.r }} line="" /><p className="text-base text-slate-200">They were the <b style={{ color: r.color }}>{r.name}</b>.</p></>}
       {vr.t !== 'out' && <p className="max-w-xs text-sm text-slate-300">No one was eliminated.</p>}
       <p className="text-xs text-slate-400">Night falls soon...</p>
-      <div className="mt-1 w-full max-w-xs"><Btn variant="secondary" onClick={() => { VR_SEEN.key = key; bump((x) => x + 1); }}>Continue</Btn></div>
+      <div className="mt-1 w-full max-w-xs"><Btn variant="secondary" onClick={() => { VR_SEEN.key = key; bump((x) => x + 1); if (onContinue) onContinue(); }}>Continue</Btn></div>
     </div>
   );
 }
@@ -6575,7 +6575,7 @@ function MpRoom({ session, onExit, onPhase, onRetry }) {
     if (ph === 'reveal' && allSeen && (room.adv !== 1 || l1Pro)) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, soloAi ? 250 : 1800);
     else if (ph === 'night') t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start({ again: true }); } }, 6000); // only if the director is not running (for example after a refresh)
     else if (ph === 'day' && autoWinner) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; write({ ph: 'over', w: autoWinner }); } }, hunterPending ? 20000 : 7000);
-    else if (ph === 'day' && room.vd === 1) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, hunterPending ? 30000 : 12000); // time to read who was voted out
+    else if (ph === 'day' && room.vd === 1) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, hunterPending ? 30000 : room.adv === 1 && VR_SEEN.key === `${code}:${room.dl || 0}:${room.k}` ? 400 : 12000); // time to read who was voted out
     return () => clearTimeout(t);
   }, [hostPlays, ph, room && room.k, room && room.vd, allSeen, autoWinner, hunterPending, director.dir.on, l1Pro]);
   const voteClosed = useRef('');
@@ -6682,7 +6682,7 @@ function MpRoom({ session, onExit, onPhase, onRetry }) {
     {ph === 'day' && <DayBackdrop />}
     {ph === 'reveal' && <RevealBackdrop />}
     {showPlayer && me && room.adv === 1 && room.k === 1 && ((ph === 'night' && room.ns === 'i') || ph === 'day') && <AdvTip key={ph} text={ph === 'night' ? "Tip: Remember everyone's alibi before the lantern went out..." : 'Tip: Read the Village Chat, work out who the Werewolf is, and vote together!'} />}
-    {showPlayer && me && ph === 'day' && <VoteResultGate room={room} code={code} />}
+    {showPlayer && me && ph === 'day' && <VoteResultGate room={room} code={code} onContinue={room.adv === 1 && hostPlays && !autoWinner && !hunterPending ? () => { if (director.dir.on || autoFired.current === `${ph}:${room.k}:${room.vd}:${autoWinner}`) return; autoFired.current = `${ph}:${room.k}:${room.vd}:${autoWinner}`; director.start(); } : undefined} />}
     {showPlayer && me && ph === 'day' && <ElimGate me={me} room={room} code={code} />}
     {fullHost && session.ai && (ph === 'day' || (ph === 'reveal' && !(me && me.d === 1))) && (
       <ExitButton onClick={() => setConfirmLeave(true)} className="fixed left-3 z-50" style={{ top: 'max(10px, env(safe-area-inset-top))' }} />

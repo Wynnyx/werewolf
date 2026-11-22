@@ -3216,7 +3216,7 @@ function nightActions(c) {
   if (hasV(c.medusa)) out.push({ key: 'medusa', target: c.medusa });
   if (hasV(c.bodyguard)) out.push({ key: 'bodyguard', target: c.bodyguard });
   if (hasV(c.seer)) out.push({ key: 'seer', target: c.seer });
-  if (hasV(c.werewolf) && hasV(c.werewolf2)) { out.push({ key: 'wolf1', target: c.werewolf }); out.push({ key: 'wolf2', target: c.werewolf2 }); } // Blood Moon: both hunt targets can be redirected
+  // The Werewolf pack's own hunt (wolf1 / wolf2) is never listed: the Shadow Figure works for the wolves and can only redirect non-wolf actions.
   if (c.witchSave && hasV(c.werewolf)) out.push({ key: 'witchSave', target: hasV(c.witchSaveTo) ? c.witchSaveTo : c.werewolf });
   if (hasV(c.witchPoison)) out.push({ key: 'witchPoison', target: c.witchPoison });
   if (hasV(c.spellcaster)) out.push({ key: 'spellcaster', target: c.spellcaster });
@@ -3232,6 +3232,7 @@ const wolfTargetName = (c, nm) => (hasV(c.werewolf) ? (hasV(c.werewolf2) ? `${nm
 // redirecting the stone moves it to the new target; redirecting any other action leaves the stone on the Shadow Figure.
 function applyShadow(c, sh, shadowId) {
   if (!sh || !hasV(sh.to) || !sh.key || !hasV(shadowId)) return c;
+  if (sh.key === 'wolf1' || sh.key === 'wolf2' || sh.key === 'werewolf') return c; // never redirect the pack's hunt
   if (!nightActions(c).some((a) => a.key === sh.key)) return c;
   const out = { ...c };
   if (sh.key === 'witchSave') out.witchSaveTo = sh.to; else if (sh.key === 'wolf1') out.werewolf = sh.to; else if (sh.key === 'wolf2') out.werewolf2 = sh.to; else out[sh.key] = sh.to;
@@ -6544,12 +6545,25 @@ function aiNightWrites(b, role, ns, ctx, M) {
     const t = aiTop(M, fresh.length ? fresh : others);
     return wr((id) => done(id, t ? t.id : ''));
   }
-  if (role === 'shadow') { // frees itself from Medusa's stone, or moves a killing blow off itself; otherwise stays out of it
+  if (role === 'shadow') { // works for the wolves: never touches the pack's hunt, shields wolves from the stone, then sabotages Village powers
     const c0 = mpChoices(players);
     const acts = nightActions(c0);
-    const mine = acts.find((a) => a.target === b.id && ['medusa', 'werewolf', 'wolf1', 'wolf2', 'zombie', 'infector'].includes(a.key));
-    const to = mine ? aiPick(others) : null;
-    return { [`pl/${b.id}/t`]: to ? to.id : '', [`pl/${b.id}/sa`]: to ? mine.key : '', [`pl/${b.id}/nd`]: 1 };
+    const byId = Object.fromEntries(players.map((p) => [p.id, p]));
+    const isWolf = (id) => !!byId[id] && aiPack(byId[id]);
+    const safe = others.filter((p) => !aiPack(p)); // non-wolf players only
+    const go = (key, avoid) => { const pool = safe.filter((p) => p.id !== avoid); const t = aiPick(pool.length ? pool : safe); return t ? { [`pl/${b.id}/t`]: t.id, [`pl/${b.id}/sa`]: key, [`pl/${b.id}/nd`]: 1 } : null; };
+    const A = (key) => acts.find((a) => a.key === key);
+    const stone = A('medusa');
+    let w = null;
+    if (stone && isWolf(stone.target) && stone.target !== b.id) w = go('medusa'); // 1. a wolf ally is about to be stoned
+    if (!w && stone && stone.target === b.id) w = go('medusa'); // 2. the stone is aimed at me
+    const sv = A('witchSave'), bg = A('bodyguard'), sr = A('seer'), ps = A('witchPoison');
+    if (!w && sv) w = go('witchSave', c0.werewolf); // 3. Village powers, most damaging first: a save/guard that would stop the hunt now misses it
+    if (!w && bg) w = go('bodyguard', c0.werewolf);
+    if (!w && sr && isWolf(sr.target)) w = go('seer');
+    if (!w && ps && isWolf(ps.target)) w = go('witchPoison');
+    if (!w) { const mine = acts.find((a) => a.target === b.id && ['zombie', 'infector'].includes(a.key)); if (mine) w = go(mine.key); }
+    return w || { [`pl/${b.id}/t`]: '', [`pl/${b.id}/sa`]: '', [`pl/${b.id}/nd`]: 1 };
   }
   return done(b.id, '');
 }

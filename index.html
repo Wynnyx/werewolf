@@ -2477,13 +2477,13 @@ function StartScreen({ onPlay, onMulti, onAi, gameCount, onClearGames }) {
                   <span className="mt-1 block text-[13px] font-semibold leading-snug text-white/90">Share one phone around the circle</span>
                 </span>
               </button>
-              <button data-ui-sound="primary" onClick={onAi} aria-label="Play with AI"
+              <button data-ui-sound="primary" onClick={onAi} aria-label="Adventure"
                 className="relative flex min-h-[142px] flex-col items-start justify-between overflow-hidden rounded-2xl p-4 text-left text-white transition hover:brightness-110 active:scale-[0.98] md:min-h-[162px]"
                 style={{ background: 'linear-gradient(160deg,#6D28D9,#3B1782)', border: '1px solid rgba(167,139,250,0.6)', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.8)' }}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="8" width="16" height="11" rx="3" /><path d="M12 4v4" /><circle cx="12" cy="3.5" r="1" fill="currentColor" /><circle cx="9" cy="13" r="1.2" fill="currentColor" /><circle cx="15" cy="13" r="1.2" fill="currentColor" /><path d="M9.5 16.5h5" /></svg>
                 <span>
-                  <span className="block text-xl font-bold leading-tight tracking-wide md:text-2xl">Play with AI</span>
-                  <span className="mt-1 block text-[13px] font-semibold leading-snug text-white/90">Solo match against smart AI players</span>
+                  <span className="block text-xl font-bold leading-tight tracking-wide md:text-2xl">Adventure</span>
+                  <span className="mt-1 block text-[13px] font-semibold leading-snug text-white/90">Campaign levels &amp; custom AI matches</span>
                 </span>
               </button>
               <button data-ui-sound="primary" onClick={onMulti} aria-label="Online Multiplayer"
@@ -2763,7 +2763,7 @@ function QtyPill({ role, n, canAdd, onChange }) {
   );
 }
 
-function ChooseCards({ count, deck, setDeck, onBack, onStart, startLabel = 'Start & Deal Cards', showBalance = false }) {
+function ChooseCards({ count, deck, setDeck, onBack, onStart, startLabel = 'Start & Deal Cards', showBalance = false, adv = null }) {
   const [q, setQ] = useState('');
   useEffect(() => { Sfx.preload(); }, []);
   const [notice, setNotice] = useState('');
@@ -2779,7 +2779,10 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart, startLabel = 'Star
   const wolves = deck.werewolf;
   const canStart = slotsLeft === 0 && wolves >= 1;
 
+  const medLocked = !!adv && adv.locked; // Adventure: Medusa stays locked until Level 1 is cleared
+  const rareMsg = 'Locked \u2014 Clear Adventure Level 1';
   const change = (id, d) => {
+    if (d > 0 && medLocked && id === 'medusa') { warn(rareMsg); return; }
     const next = deck[id] + d;
     if (next < 0 || next > ROLES_DATA[id].max) return;
     if (d > 0 && slotsLeft <= 0) return;
@@ -2813,7 +2816,7 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart, startLabel = 'Star
             <div className="mt-1 text-sm tabular-nums text-slate-400">{total} / {count} selected</div>
           </div>
           <div className="flex gap-1.5">
-            <button onClick={() => setDeck(autoFill(count))} className="min-h-[40px] rounded-lg px-3 text-xs font-semibold text-slate-200 hover:bg-white/5" style={{ border: '1px solid var(--line)' }}>Auto-fill</button>
+            <button onClick={() => { let d = autoFill(count); for (let i = 0; i < 25 && medLocked && d.medusa; i++) d = autoFill(count); if (medLocked && d.medusa) d = { ...d, medusa: 0 }; setDeck(d); }} className="min-h-[40px] rounded-lg px-3 text-xs font-semibold text-slate-200 hover:bg-white/5" style={{ border: '1px solid var(--line)' }}>Auto-fill</button>
             <button onClick={() => setDeck(emptyDeck())} disabled={total === 0} className="min-h-[40px] rounded-lg px-3 text-xs font-semibold text-slate-400 hover:bg-white/5 disabled:opacity-30" style={{ border: '1px solid var(--line)' }}>Clear</button>
           </div>
         </div>
@@ -2822,6 +2825,12 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart, startLabel = 'Star
           <span aria-hidden="true">{ruleOk ? '✓' : '!'}</span>
           At least 1 Werewolf required
         </div>
+        {adv && (
+          <button type="button" aria-pressed={adv.sandbox} onClick={() => { const on = !adv.sandbox; adv.setSandbox(on); if (!on && !adv.cleared && deck.medusa) setDeck({ ...deck, medusa: 0 }); }}
+            className="ml-2 mt-2.5 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold" style={{ color: adv.sandbox ? '#FBBF24' : '#94A3B8', background: adv.sandbox ? 'rgba(251,191,36,0.12)' : 'transparent', border: `1px solid ${adv.sandbox ? 'rgba(251,191,36,0.6)' : 'var(--line)'}` }}>
+            Unlock All (Sandbox): {adv.sandbox ? 'On' : 'Off'}
+          </button>
+        )}
         {showBalance && (() => {
           const bal = deckBalance(deck);
           const fair = bal >= BALANCE_MIN && bal <= BALANCE_MAX;
@@ -2857,7 +2866,8 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart, startLabel = 'Star
               style={{ boxShadow: ring, opacity: n === 0 && slotsLeft === 0 ? 0.6 : 1, cursor: n === 0 && slotsLeft > 0 ? 'pointer' : 'default' }}
               onClick={(e) => {
                 if (e.target.closest && e.target.closest('button')) return;
-                if (n === 0 && slotsLeft > 0) change(id, 1);
+                if (medLocked && id === 'medusa') warn(rareMsg);
+                else if (n === 0 && slotsLeft > 0) change(id, 1);
                 else if (slotsLeft <= 0 && (n === 0 || n < r.max)) warn(`All ${count} slots are filled. Remove a card with \u2212 to make room for ${r.name}.`);
                 else if (n >= r.max) warn(`Only ${r.max} ${r.name} ${r.max === 1 ? 'card is' : 'cards are'} allowed per game.`);
               }}>
@@ -2865,7 +2875,12 @@ function ChooseCards({ count, deck, setDeck, onBack, onStart, startLabel = 'Star
                 style={{ filter: n === 0 ? 'grayscale(0.5) brightness(0.78)' : 'none' }}>
                 <PlayingCard role={id} />
               </div>
-              <QtyPill role={id} n={n} canAdd={slotsLeft > 0 && n < r.max} onChange={(d) => change(id, d)} />
+              {adv && id === 'medusa' && (
+                <span className="pointer-events-none absolute left-2 top-2 z-10 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: medLocked ? '#FBBF24' : '#6EE7B7', background: 'rgba(5,7,12,0.85)', border: `1px solid ${medLocked ? 'rgba(251,191,36,0.7)' : 'rgba(52,211,153,0.7)'}` }}>
+                  {medLocked ? '🔒 ' + rareMsg : adv.cleared ? 'Unlocked via Adventure' : 'Sandbox unlocked'}
+                </span>
+              )}
+              <QtyPill role={id} n={n} canAdd={slotsLeft > 0 && n < r.max && !(medLocked && id === 'medusa')} onChange={(d) => change(id, d)} />
             </div>
           );
         })}
@@ -4671,6 +4686,10 @@ function mpDealPatch(room, deck) {
     const b = `pl/${p.id}/`;
     Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0, [b + 'v']: '', [b + 'lv']: '', [b + 't2']: '', [b + 'la']: 0, [b + 'bt']: 0, [b + 'jt']: 0, [b + 'cu']: 0, [b + 'cj']: 0, [b + 'sd']: 0, [b + 'sn']: 0, [b + 'fr']: '', [b + 'pdc']: 0, [b + 'pdi']: 0, [b + 'pdl']: '', [b + 'ic']: 0 });
   });
+  if (room.adv === 1) { // Adventure Level 1: the human always holds the Seer card (swapped with whoever was dealt it)
+    const h = players.find((p) => p.bot !== 1); const sp = players.find((p) => patch[`pl/${p.id}/r`] === 'seer');
+    if (h && sp && sp.id !== h.id) { patch[`pl/${sp.id}/r`] = patch[`pl/${h.id}/r`]; patch[`pl/${h.id}/r`] = 'seer'; }
+  }
   return patch;
 }
 function mpLobbyPatch(room) {
@@ -6008,13 +6027,32 @@ function MpDay({ me, players, room, write, onTimeUp }) {
   );
 }
 
+// A brief Training Tip for Adventure Level 1; it fades by itself and never blocks a tap.
+function AdvTip({ text }) {
+  const [show, setShow] = useState(true);
+  useEffect(() => { const t = setTimeout(() => setShow(false), 11000); return () => clearTimeout(t); }, []);
+  if (!show) return null;
+  return (
+    <div role="status" className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-4" style={{ top: 'max(56px, calc(env(safe-area-inset-top) + 46px))' }}>
+      <div className="screen-in max-w-sm rounded-2xl px-4 py-2.5 text-center text-[13px] font-semibold text-amber-100" style={{ background: 'rgba(30,22,8,0.92)', border: '1px solid rgba(251,191,36,0.6)', boxShadow: '0 8px 26px rgba(0,0,0,0.55)' }}>{text}</div>
+    </div>
+  );
+}
+
 function MpOver({ room, players, meId }) {
   const W = WIN_UI[room.w] || WIN_UI.werewolf;
   const [seen, setSeen] = useState({});
   const [view, setView] = useState('');
-  useEffect(() => { Sfx.win(room.w === 'zombie' ? 'zombie' : room.w); }, []);
+  useEffect(() => { Sfx.win(room.w === 'zombie' ? 'zombie' : room.w); if (room.adv === 1 && room.w === 'village') saveAdv({ ...loadAdv(), classicLevel1Cleared: true }); }, []);
   return (
     <div className="flex flex-1 flex-col gap-4">
+      {room.adv === 1 && room.w === 'village' && (
+        <Panel className="text-center" role="status" style={{ border: '1px solid rgba(251,191,36,0.8)', background: 'linear-gradient(160deg, rgba(120,53,15,0.55), rgba(21,26,36,0.95))', boxShadow: '0 0 30px -6px rgba(251,191,36,0.6)' }}>
+          <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-amber-300">Level 1 cleared ★</div>
+          <h2 className="font-display mt-1 text-2xl font-black text-amber-100">Victory! Rare Card Unlocked: Medusa</h2>
+        </Panel>
+      )}
+      {room.adv === 1 && room.w !== 'village' && <p className="text-center text-sm font-semibold text-amber-200">Level 1 not cleared. Play again and find the Werewolf!</p>}
       <Panel className="text-center" style={{ border: `1px solid ${W.color}`, background: W.bg }}>
         <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-300">Game over</div>
         <h2 className="font-display mt-1 text-3xl font-black" style={{ color: W.title }}>{W.name}</h2>
@@ -6425,6 +6463,7 @@ function MpRoom({ session, onExit, onPhase }) {
   return (
     <>
     {ph === 'day' && <DayBackdrop />}
+    {showPlayer && me && room.adv === 1 && room.k === 1 && (ph === 'night' || ph === 'day') && <AdvTip key={ph} text={ph === 'night' ? 'Tip: As Seer, inspect a player to uncover who the Werewolf is!' : 'Tip: Share what you saw in the Village Chat so allies vote with you!'} />}
     {showPlayer && me && ph === 'day' && <VoteResultGate room={room} code={code} />}
     {showPlayer && me && ph === 'day' && <ElimGate me={me} room={room} code={code} />}
     {fullHost && session.ai && (ph === 'day' || (ph === 'reveal' && !(me && me.d === 1))) && (
@@ -6480,6 +6519,10 @@ function MpRoom({ session, onExit, onPhase }) {
 /* bots are ordinary players whose choices are written by the host       */
 /* device, so every night still goes through the one resolution engine.  */
 /* ------------------------------------------------------------------ */
+// Adventure progress lives on this device only.
+const loadAdv = () => { try { const v = JSON.parse(localStorage.getItem('adventureProgress') || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } };
+const saveAdv = (o) => { try { localStorage.setItem('adventureProgress', JSON.stringify(o)); } catch (e) { /* storage unavailable */ } };
+const ADV_L1_DECK = { werewolf: 1, seer: 1, bodyguard: 1, villager: 1 };
 const AI_NAMES = ['Darren', 'Jenna', 'Charlie', 'James', 'Ava', 'Stacy', 'Mira', 'Bram', 'Ivy', 'Corvin', 'Sable', 'Thorn', 'Wren', 'Dax', 'Lysa', 'Odin', 'Pia', 'Rook', 'Nyx', 'Hale', 'Juno', 'Kade', 'Vera', 'Finn'];
 
 // The six house names come first (in random order), then the rest at random; never a name already in the room.
@@ -6498,7 +6541,7 @@ async function aiCreateRoom(name, cfg) {
   if (!code) code = randLetters();
   const pl = { [pid]: { n: name, o: 1, a: 1, d: 0 } };
   aiPickNames(new Set([name.toLowerCase()]), cfg.n - 1).forEach((nm, i) => { pl[randId()] = { n: nm, o: i + 2, a: 1, d: 0, bot: 1 }; });
-  const room = { v: 1, host: pid, hp: 1, rn: 'AI Village', hn: name, md: getGameMode(), ph: 'lobby', k: 0, lk: 0, w: '', ts: Date.now(), pub: 0, st: 'waiting', mx: cfg.n, dk: cfg.deck, nightStyle: 'eyes_open', ai: 1, pl };
+  const room = { v: 1, host: pid, hp: 1, rn: 'AI Village', hn: name, md: getGameMode(), ph: 'lobby', k: 0, lk: 0, w: '', ts: Date.now(), pub: 0, st: 'waiting', mx: cfg.n, dk: cfg.deck, nightStyle: 'eyes_open', ai: 1, ...(cfg.adv ? { adv: 1 } : {}), pl };
   await Mp.put(`rooms/${code}`, room);
   await Mp.patch(`rooms/${code}`, mpDealPatch(room, { ...emptyDeck(), ...cfg.deck })); // the human's secret card is dealt with everyone else's
   return { code, pid, host: true, local: true, ai: true };
@@ -6983,9 +7026,65 @@ function AiNameStep({ onBack, onStart, busy, err }) {
   );
 }
 
+function AdvHub({ onBack, onCustom, onPlay1 }) {
+  const [tab, setTab] = useState('classic');
+  const cleared = !!loadAdv().classicLevel1Cleared;
+  const lock = (n) => (
+    <div key={n} className="flex min-h-[96px] flex-col items-center justify-center gap-1 rounded-2xl px-2 py-3 text-center" style={{ background: 'var(--card)', border: '1px solid var(--line)', opacity: 0.7 }}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+      <span className="font-display text-sm font-bold text-slate-200">Level {n}</span>
+      <span className="text-[11px] font-semibold leading-tight text-slate-400">Locked &mdash; Coming Soon</span>
+    </div>
+  );
+  const pill = (id) => { const r = ROLES_DATA[id]; return <span key={id} className="rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider" style={{ color: teamColor(r.team), background: teamColor(r.team) + '1A', border: `1px solid ${teamColor(r.team)}55` }}>{r.name}</span>; };
+  const tabBtn = (id, label) => (
+    <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className="min-h-[42px] flex-1 rounded-full text-sm font-bold uppercase tracking-wider transition"
+      style={{ background: tab === id ? 'rgba(109,40,217,0.5)' : 'var(--card-2)', border: `1px solid ${tab === id ? '#C4B5FD' : 'var(--line)'}`, color: tab === id ? '#F5F3FF' : '#94A3B8' }}>{label}</button>
+  );
+  return (
+    <Screen>
+      <header className="flex items-center gap-1 pb-4">
+        <button onClick={onBack} aria-label="Back to start" className="flex h-11 w-11 items-center justify-center rounded-full text-slate-300 hover:bg-white/10">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5 L8 12 L15 19" /></svg>
+        </button>
+        <h1 className="font-display text-lg font-bold tracking-wide">ADVENTURE</h1>
+        <button onClick={onCustom} aria-label="Custom AI" title="Custom AI" className="ml-auto flex h-11 min-w-[44px] items-center justify-center gap-1 rounded-full px-3 text-violet-100 hover:bg-white/10" style={{ border: '1px solid rgba(167,139,250,0.55)' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          <span className="text-[11px] font-bold uppercase tracking-wider">Custom AI</span>
+        </button>
+      </header>
+      <div role="tablist" className="flex gap-2 pb-4">{tabBtn('classic', 'Classic')}{tabBtn('outbreak', 'Outbreak')}</div>
+      <div className="flex flex-col gap-3 pb-6">
+        {tab === 'classic' && (
+          <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(160deg, rgba(109,40,217,0.35), rgba(21,26,36,0.95))', border: `1px solid ${cleared ? 'rgba(251,191,36,0.7)' : 'rgba(167,139,250,0.6)'}` }}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-violet-300">Unlocked</div>
+                <h2 className="font-display mt-0.5 text-xl font-black text-slate-50">LEVEL 1 &mdash; The First Howl</h2>
+              </div>
+              {cleared && <span className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-200" style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.6)' }}>Cleared &#9733;</span>}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">{['werewolf', 'seer', 'bodyguard', 'villager'].map(pill)}</div>
+            <p className="mt-3 text-sm font-semibold text-slate-200">Your Role: Seer (Training)</p>
+            <Btn className="mt-3" onClick={onPlay1}>Play Level 1</Btn>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {(tab === 'classic' ? Array.from({ length: 19 }, (_, i) => i + 2) : Array.from({ length: 20 }, (_, i) => i + 1)).map(lock)}
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
 function AiScreen({ onBack, onPhase }) {
-  const [view, setView] = useState('mode'); // mode | count | deck | name | room
+  const [view, setView] = useState('hub'); // hub | mode | count | deck | name | lvlname | room
   const [cfg, setCfg] = useState({ n: 8, deck: null });
+  const [sandbox, setSandboxS] = useState(() => !!loadAdv().sandbox);
+  const setSandbox = (on) => { setSandboxS(on); saveAdv({ ...loadAdv(), sandbox: on }); };
+  const cleared = !!loadAdv().classicLevel1Cleared;
+  const advProps = { locked: !cleared && !sandbox, sandbox, setSandbox, cleared };
+  const noRare = (n) => { let d = autoFill(n); for (let i = 0; i < 25 && advProps.locked && d.medusa; i++) d = autoFill(n); return advProps.locked && d.medusa ? { ...d, medusa: 0 } : d; };
   const [session, setSession] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -7000,29 +7099,38 @@ function AiScreen({ onBack, onPhase }) {
     return () => { live = false; };
   }, []);
   const exitRoom = () => { Mp.local = false; saveSession(null); setSession(null); onBack(); };
-  const start = async (name) => {
+  const start = async (name, c) => {
     setBusy(true); setErr('');
-    try { const s = await aiCreateRoom(name, cfg); saveSession(s); setSession(s); setView('room'); }
+    try { const s = await aiCreateRoom(name, c || cfg); saveSession(s); setSession(s); setView('room'); }
     catch (e) { Mp.local = false; setErr('Could not start the match. Try again.'); }
     setBusy(false);
   };
   if (view === 'room' && session) return <MpRoom session={session} onExit={exitRoom} onPhase={onPhase} />;
-  if (view === 'deck' && cfg.deck) return <ChooseCards count={cfg.n} deck={cfg.deck} setDeck={(d) => setCfg((c) => ({ ...c, deck: d }))} onBack={() => setView('count')} onStart={() => setView('name')} startLabel="Lock Deck" showBalance />;
+  const playLevel1 = () => { // fixed training match: no deck builder, the human is the Seer
+    setGameMode('classic');
+    const c = { n: 4, deck: { ...emptyDeck(), ...ADV_L1_DECK }, adv: 1 };
+    setCfg(c);
+    if (loadName().trim()) start(loadName().trim(), c); else setView('lvlname');
+  };
+  if (view === 'hub' && !checking) return <AdvHub onBack={onBack} onCustom={() => setView('mode')} onPlay1={playLevel1} />;
+  if (view === 'deck' && cfg.deck) return <ChooseCards count={cfg.n} deck={cfg.deck} setDeck={(d) => setCfg((c) => ({ ...c, deck: d }))} onBack={() => setView('count')} onStart={() => setView('name')} startLabel="Lock Deck" showBalance adv={advProps} />;
   return (
     <Screen>
       <header className="flex items-center gap-1 pb-5">
         <button onClick={onBack} aria-label="Back to start" className="flex h-11 w-11 items-center justify-center rounded-full text-slate-300 hover:bg-white/10">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5 L8 12 L15 19" /></svg>
         </button>
-        <h1 className="font-display text-lg font-bold tracking-wide">PLAY WITH AI</h1>
+        <h1 className="font-display text-lg font-bold tracking-wide">{checking ? 'ADVENTURE' : 'CUSTOM AI'}</h1>
       </header>
       {checking
         ? <p className="hint-pulse mt-16 text-center text-slate-300">Looking for your match...</p>
+        : view === 'lvlname'
+          ? <AiNameStep onBack={() => setView('hub')} onStart={(n) => start(n)} busy={busy} err={err} />
         : view === 'name'
-          ? <AiNameStep onBack={() => setView('deck')} onStart={start} busy={busy} err={err} />
+          ? <AiNameStep onBack={() => setView('deck')} onStart={(n) => start(n, { ...cfg, adv: 0 })} busy={busy} err={err} />
           : view === 'count'
-            ? <MpCountStep n={cfg.n} setN={(n) => setCfg((c) => ({ ...c, n }))} onBack={() => setView('mode')} onNext={() => { setCfg((c) => ({ ...c, deck: autoFill(c.n) })); setView('deck'); }} />
-            : <MpModeStep onBack={onBack} onPick={(m) => { setGameMode(m); setView('count'); }} />}
+            ? <MpCountStep n={cfg.n} setN={(n) => setCfg((c) => ({ ...c, n }))} onBack={() => setView('mode')} onNext={() => { setCfg((c) => ({ ...c, deck: noRare(c.n), adv: 0 })); setView('deck'); }} />
+            : <MpModeStep onBack={() => setView('hub')} onPick={(m) => { setGameMode(m); setView('count'); }} />}
     </Screen>
   );
 }

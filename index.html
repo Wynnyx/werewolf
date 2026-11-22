@@ -84,12 +84,13 @@
   @keyframes mapPinRing { 0% { transform: scale(0.9); opacity: 0.95; } 100% { transform: scale(2.1); opacity: 0; } }
   .map-pin-lock { position: absolute; right: -6px; top: -6px; width: 10px; height: 10px; background: #0f141d; border: 1px solid #64748B; border-radius: 9999px; padding: 2px; }
   .map-pin-star { position: absolute; right: -9px; top: -12px; font-size: 17px; color: #FDE68A; }
+  .guide-wave { position: absolute; inset: -2px; border-radius: 50%; border: 2px solid rgba(253,230,138,0.9); pointer-events: none; animation: guideWave 2s ease-out infinite; } .guide-wave.w2 { animation-delay: 1s; } @keyframes guideWave { 0% { transform: scale(1); opacity: 0.85; } 100% { transform: scale(1.65); opacity: 0; } }
   .guide-dot { animation: guidePulse 1.6s ease-out infinite; } @keyframes guidePulse { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); } 80%, 100% { box-shadow: 0 0 0 9px rgba(239,68,68,0); } }
   .guide-arrow { position: absolute; right: calc(100% - 5px); top: -9px; width: 40px; height: 28px; transform: rotate(38deg); transform-origin: 100% 50%; pointer-events: none; filter: drop-shadow(0 0 7px rgba(239,68,68,0.95)) drop-shadow(0 2px 4px rgba(0,0,0,0.7)); } .guide-arrow svg { display: block; animation: guideArrow 0.8s ease-in-out infinite alternate; } @keyframes guideArrow { from { transform: translateX(-10px); } to { transform: translateX(0); } }
   .guide-arrow.gy { top: calc(62% - 14px); right: calc(100% - 6px); transform: rotate(-38deg); }
   .guide-bub { transform-origin: 100% 0; animation: guideIn 0.4s cubic-bezier(.2,.9,.3,1.2) both; } @keyframes guideIn { from { opacity: 0; transform: translateX(46px) scale(0.82); } to { opacity: 1; transform: none; } }
-  .guide-dots span { display: inline-block; width: 6px; height: 6px; margin: 0 2px; border-radius: 9999px; background: #DBEAFE; animation: guideType 1s ease-in-out infinite; } .guide-dots span:nth-child(2) { animation-delay: 0.15s; } .guide-dots span:nth-child(3) { animation-delay: 0.3s; } @keyframes guideType { 0%, 60%, 100% { opacity: 0.35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
-  @media (prefers-reduced-motion: reduce) { .guide-dot, .guide-arrow svg, .guide-dots span, .guide-bub { animation: none; } }
+  .guide-dots span { display: inline-block; width: 6px; height: 6px; margin: 0 2px; border-radius: 9999px; background: #CBD5E1; animation: guideType 1s ease-in-out infinite; } .guide-dots span:nth-child(2) { animation-delay: 0.15s; } .guide-dots span:nth-child(3) { animation-delay: 0.3s; } @keyframes guideType { 0%, 60%, 100% { opacity: 0.35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+  @media (prefers-reduced-motion: reduce) { .guide-dot, .guide-wave, .guide-arrow svg, .guide-dots span, .guide-bub { animation: none; } }
   .map-pin-label { position: absolute; top: 30px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 12px; font-weight: 700; color: #FDE68A; background: rgba(10,10,16,0.88); border: 1px solid rgba(251,191,36,0.7); border-radius: 9999px; padding: 3px 10px; }
   @media (prefers-reduced-motion: reduce) { .map-pin-ring { animation: none; } }
   @media (prefers-reduced-motion: reduce) { .map-wave, .map-foam, .map-mist, .map-flake, .map-flame, .map-lantern, .map-badge, .map-bob { animation: none; } .map-flake { display: none; } }
@@ -1610,6 +1611,10 @@ const Sfx = (() => {
     });
     lastAt = Date.now();
   };
+  const msg = () => synth((c, out, t) => { // chat message arriving: a soft two-note pop
+    voice(c, out, { type: 'sine', f0: 520, f1: 900, glide: 0.07, t0: t, dur: 0.13, gain: 0.24, attack: 0.004 });
+    voice(c, out, { type: 'sine', f0: 1244.5, t0: t + 0.08, dur: 0.18, gain: 0.15, attack: 0.004 });
+  });
   const chime = () => { synth((c, out, t) => { voice(c, out, { type: 'sine', f0: 880, t0: t, dur: 0.4, gain: 0.14, attack: 0.01 }); voice(c, out, { type: 'sine', f0: 1318.5, t0: t + 0.09, dur: 0.5, gain: 0.12, attack: 0.01 }); }); };
   const rumble = () => synth((c, out, t) => { // Blood Moon: a low crimson rumble
     voice(c, out, { type: 'sawtooth', f0: 46, f1: 38, glide: 2.2, t0: t, dur: 2.6, gain: 0.3, attack: 0.5, filter: 'lowpass', ff: 160, ff1: 90, trem: 5 });
@@ -1617,7 +1622,7 @@ const Sfx = (() => {
     voice(c, out, { type: 'sawtooth', f0: 92, f1: 70, glide: 2, t0: t + 0.2, dur: 2, gain: 0.1, attack: 0.6, filter: 'lowpass', ff: 260, vib: 4, vibDepth: 20 });
   });
   return {
-    bell, win, click, chime, rumble,
+    bell, win, click, chime, rumble, msg,
     preload: () => { try { FILES.forEach(load); } catch (e) { /* ignore */ } },
     unlock: () => { try { const c = getCtx(); if (c && c.state !== 'running') { const r = c.resume(); if (r && r.catch) r.catch(() => {}); } } catch (e) { /* ignore */ } },
     flip: () => play('audio/card-flip.mp3'),
@@ -7506,9 +7511,8 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
   const openChat = () => {
     ctimers.current.forEach(clearTimeout); ctimers.current = [];
     setChat(true); setUnread(false);
-    if (heard) { setCstep(GUIDE_MSGS.length); setRead(true); return; }
     setCstep(0);
-    GUIDE_MSGS.forEach((_, i) => ctimers.current.push(setTimeout(() => { setCstep(i + 1); Sfx.chime(); if (i === GUIDE_MSGS.length - 1) { setRead(true); setHeard(true); saveAdv({ ...loadAdv(), guideL1: 1 }); } }, 800 + i * 1700)));
+    GUIDE_MSGS.forEach((_, i) => ctimers.current.push(setTimeout(() => { setCstep(i + 1); Sfx.msg(); if (i === GUIDE_MSGS.length - 1) { setRead(true); setHeard(true); saveAdv({ ...loadAdv(), guideL1: 1 }); } }, 900 + i * 1900)));
   };
   const closeChat = () => { ctimers.current.forEach(clearTimeout); ctimers.current = []; setChat(false); if (cstep >= GUIDE_MSGS.length) { setRead(true); setHeard(true); saveAdv({ ...loadAdv(), guideL1: 1 }); } };
   useEffect(() => () => ctimers.current.forEach(clearTimeout), []);
@@ -7599,6 +7603,7 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
       {tab === 'classic' && !zoomIn && (
         <button type="button" onClick={chat ? closeChat : openChat} aria-label="Message from the Bodyguard" className="absolute z-30 flex items-center justify-center" style={{ right: 12, top: 'calc(max(8px, env(safe-area-inset-top)) + 200px)', width: 54, height: 66, borderRadius: '50%', padding: 0, background: '#0a0e18', border: '2px solid #FDE68A', boxShadow: '0 0 16px rgba(251,191,36,0.45), 0 6px 16px rgba(0,0,0,0.6)' }}>
           <span className="block h-full w-full overflow-hidden" style={{ borderRadius: '50%' }}><img src="images/guide-bodyguard.webp" alt="" draggable={false} className="h-full w-full select-none" style={{ objectFit: 'cover' }} /></span>
+          {!read && !cleared && !chat && <><span className="guide-wave" aria-hidden="true" /><span className="guide-wave w2" aria-hidden="true" /></>}
           {!read && !cleared && !chat && <span className="guide-arrow gy" aria-hidden="true"><svg width="40" height="28" viewBox="0 0 40 28"><path d="M2 9 H20 V2 L38 14 L20 26 V19 H2 Z" fill="#EF4444" stroke="#7F1D1D" strokeWidth="2" strokeLinejoin="round" /></svg></span>}
           {unread && <span className="guide-dot absolute" style={{ right: -2, top: 2, width: 15, height: 15, borderRadius: 9999, background: '#EF4444', border: '2px solid #0a0e18' }} />}
         </button>
@@ -7608,12 +7613,12 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
           <button type="button" data-no-ui-sound aria-label="Close chat" onClick={closeChat} className="absolute inset-0 z-20 cursor-default" style={{ background: 'rgba(2,4,12,0.18)' }} />
           <div role="log" aria-label="Chat with the Bodyguard" className="pointer-events-none absolute z-30 flex flex-col items-end gap-2" style={{ right: 14, top: 'calc(max(8px, env(safe-area-inset-top)) + 200px + 74px)', width: 'min(calc(100vw - 36px), 320px)' }}>
             {GUIDE_MSGS.slice(0, cstep).map((m, i) => (
-              <div key={i} className="guide-bub relative max-w-full rounded-[22px] px-4 py-2.5 text-[14px] font-semibold leading-snug text-white" style={{ background: 'linear-gradient(160deg, #3B82F6, #1D4ED8)', border: '1px solid rgba(191,219,254,0.55)', boxShadow: '0 8px 22px rgba(2,6,23,0.55), 0 0 18px rgba(59,130,246,0.35)' }}>
-                {i === 0 && <><span aria-hidden="true" className="absolute rounded-full" style={{ right: 14, top: -14, width: 11, height: 11, background: '#2563EB', border: '1px solid rgba(191,219,254,0.55)' }} /><span aria-hidden="true" className="absolute rounded-full" style={{ right: 26, top: -22, width: 6, height: 6, background: '#2563EB', border: '1px solid rgba(191,219,254,0.55)' }} /></>}
+              <div key={i} className="guide-bub relative max-w-full rounded-[22px] px-4 py-2.5 text-[14px] font-semibold leading-snug text-white" style={{ background: 'linear-gradient(160deg, #46587A, #2B3B58)', border: '1px solid rgba(148,163,184,0.5)', boxShadow: '0 8px 22px rgba(2,6,23,0.6)' }}>
+                {i === 0 && <><span aria-hidden="true" className="absolute rounded-full" style={{ right: 14, top: -14, width: 11, height: 11, background: '#3A4B6B', border: '1px solid rgba(148,163,184,0.5)' }} /><span aria-hidden="true" className="absolute rounded-full" style={{ right: 26, top: -22, width: 6, height: 6, background: '#3A4B6B', border: '1px solid rgba(148,163,184,0.5)' }} /></>}
                 <p>{m}</p>
               </div>
             ))}
-            {cstep < GUIDE_MSGS.length && <div className="guide-dots guide-bub rounded-[20px] px-3.5 py-2.5" style={{ background: 'linear-gradient(160deg, #3B82F6, #1D4ED8)', border: '1px solid rgba(191,219,254,0.55)' }} aria-hidden="true"><span /><span /><span /></div>}
+            {cstep < GUIDE_MSGS.length && <div className="guide-dots guide-bub rounded-[20px] px-3.5 py-2.5" style={{ background: 'linear-gradient(160deg, #46587A, #2B3B58)', border: '1px solid rgba(148,163,184,0.5)' }} aria-hidden="true"><span /><span /><span /></div>}
           </div>
         </>
       )}

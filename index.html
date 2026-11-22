@@ -88,9 +88,10 @@
   .guide-dot { animation: guidePulse 1.6s ease-out infinite; } @keyframes guidePulse { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); } 80%, 100% { box-shadow: 0 0 0 9px rgba(239,68,68,0); } }
   .guide-arrow { position: absolute; right: calc(100% - 5px); top: -9px; width: 40px; height: 28px; transform: rotate(38deg); transform-origin: 100% 50%; pointer-events: none; filter: drop-shadow(0 0 7px rgba(239,68,68,0.95)) drop-shadow(0 2px 4px rgba(0,0,0,0.7)); } .guide-arrow svg { display: block; animation: guideArrow 0.8s ease-in-out infinite alternate; } @keyframes guideArrow { from { transform: translateX(-10px); } to { transform: translateX(0); } }
   .guide-arrow.gy { top: calc(62% - 14px); right: calc(100% - 6px); transform: rotate(-38deg); }
+  .guide-bub-l { transform-origin: 0 100%; animation: guideInL 0.4s cubic-bezier(.2,.9,.3,1.2) both; } @keyframes guideInL { from { opacity: 0; transform: translateX(-46px) scale(0.82); } to { opacity: 1; transform: none; } }
   .guide-bub { transform-origin: 100% 0; animation: guideIn 0.4s cubic-bezier(.2,.9,.3,1.2) both; } @keyframes guideIn { from { opacity: 0; transform: translateX(46px) scale(0.82); } to { opacity: 1; transform: none; } }
   .guide-dots span { display: inline-block; width: 6px; height: 6px; margin: 0 2px; border-radius: 9999px; background: #CBD5E1; animation: guideType 1s ease-in-out infinite; } .guide-dots span:nth-child(2) { animation-delay: 0.15s; } .guide-dots span:nth-child(3) { animation-delay: 0.3s; } @keyframes guideType { 0%, 60%, 100% { opacity: 0.35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
-  @media (prefers-reduced-motion: reduce) { .guide-dot, .guide-wave, .guide-arrow svg, .guide-dots span, .guide-bub { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .guide-bub-l, .guide-dot, .guide-wave, .guide-arrow svg, .guide-dots span, .guide-bub { animation: none; } }
   .map-pin-label { position: absolute; top: 30px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 12px; font-weight: 700; color: #FDE68A; background: rgba(10,10,16,0.88); border: 1px solid rgba(251,191,36,0.7); border-radius: 9999px; padding: 3px 10px; }
   @media (prefers-reduced-motion: reduce) { .map-pin-ring { animation: none; } }
   @media (prefers-reduced-motion: reduce) { .map-wave, .map-foam, .map-mist, .map-flake, .map-flame, .map-lantern, .map-badge, .map-bob { animation: none; } .map-flake { display: none; } }
@@ -1824,6 +1825,12 @@ const TH_PAIRS = [
   ['World Map Art Style', 'สไตล์ภาพแผนที่ผจญภัย'], ['Storybook Hand-Painted', 'ภาพวาดนิทานดาร์กแฟนตาซี'], ['Storybook Hand-Painted HD', 'ภาพวาดนิทานดาร์กแฟนตาซี HD'], ['Storybook Ultra HD', 'ภาพวาดนิทาน อัลตร้า HD'], ['Artwork for the Adventure Classic world map. Change it any time.', 'ภาพพื้นหลังของแผนที่คลาสสิกในโหมดผจญภัย เปลี่ยนได้ทุกเมื่อ'],
   ['LEVEL 1 — The First Howl', 'ด่าน 1 — เสียงหอนแรก'], ['Harbor Cottage', 'กระท่อมท่าเรือ'], ['Your Role: Bodyguard', 'บทบาทของคุณ: บอดี้การ์ด'], ['Play Level 1', 'เล่นด่าน 1'], ['Unlocked', 'ปลดล็อกแล้ว'], ['Cleared ★', 'ผ่านแล้ว ★'], ['House #1', 'บ้านหลังที่ 1'], ['Back to map', 'กลับไปแผนที่'],
   ['Tip: As Bodyguard, protect someone each night. Guess who the Werewolf will attack!', 'เคล็ดลับ: ในฐานะบอดี้การ์ด ให้ปกป้องใครสักคนทุกคืน ลองเดาว่ามนุษย์หมาป่าจะโจมตีใคร!'], ['Tip: Read the Village Chat, work out who the Werewolf is, and vote together!', 'เคล็ดลับ: อ่านแชตหมู่บ้าน หาว่าใครคือมนุษย์หมาป่า แล้วโหวตไปด้วยกัน!'],
+  ['Solo Campaign · Night {#}', 'แคมเปญเดี่ยว · คืนที่ {1}'], ['🛡️ Choose Who to Protect', '🛡️ เลือกคนที่จะปกป้อง'], ['Slipped out to the bathroom earlier', 'แอบออกไปห้องน้ำเมื่อกี้'], ['Hid under the blankets, silent', 'ซ่อนใต้ผ้าห่ม เงียบกริบ'], ['Watched from the window', 'เฝ้ามองจากหน้าต่าง'], ["Tip: Remember everyone's alibi before the lantern went out...", 'เคล็ดลับ: จำคำแก้ตัวของทุกคนก่อนตะเกียงจะดับไว้...'],
+  ["We barred the harbor cottage doors for the night, yet I can't shake the feeling the beast is already inside with us...", 'เราขัดประตูกระท่อมท่าเรือไว้ตลอดคืน แต่ฉันยังสลัดความรู้สึกไม่ได้ว่าเจ้าสัตว์ร้ายอยู่ในนี้กับเราแล้ว...'],
+  ["Stacy slipped out earlier claiming she needed the bathroom before hurrying back. Across the room, Jenna pulled the blankets tightly over herself\u2014hard to tell if it's fear or if she's hiding something.", 'เมื่อกี้สเตซี่แอบออกไปอ้างว่าต้องเข้าห้องน้ำ แล้วรีบกลับมา ส่วนอีกฟากของห้อง เจนนาดึงผ้าห่มคลุมตัวแน่น\u2014ดูไม่ออกว่าเพราะกลัวหรือกำลังปิดบังอะไรอยู่'],
+  ["I watched Stacy go outside from the window... there's something off about her.", 'ฉันเห็นสเตซี่เดินออกไปข้างนอกจากหน้าต่าง... เธอดูแปลก ๆ'],
+  ["Come on, what's wrong with you? I really just needed to go, and I can't exactly help that... If anything, are we sure about Jenna? She wouldn't say a word when I asked her.", 'เอาจริงดิ เป็นอะไรของนาย? ฉันแค่ปวดจริง ๆ ห้ามกันไม่ได้นี่... ถ้าจะสงสัยใคร แน่ใจเหรอว่าเจนนาไม่มีพิรุธ? ตอนฉันถามเธอไม่ยอมตอบสักคำ'],
+  ["The last lantern dies out. Everyone is pointing fingers in the dark\u2014I have to decide who to protect tonight.", 'ตะเกียงดวงสุดท้ายดับลง ทุกคนต่างชี้นิ้วใส่กันในความมืด\u2014ฉันต้องตัดสินใจว่าคืนนี้จะปกป้องใคร'],
   ['Accept', 'ตกลง'], ['Village Chat', 'แชทหมู่บ้าน'], ['Message from the Bodyguard', 'ข้อความจากบอดี้การ์ด'], ['Chat with the Bodyguard', 'แชทกับบอดี้การ์ด'], ['Close chat', 'ปิดแชท'], ['● Online', '● ออนไลน์'],
   ['Something tells me a Werewolf is sleeping in this house.', 'ฉันรู้สึกว่ามีมนุษย์หมาป่าหลับอยู่ในบ้านหลังนี้'], ['One of them has been hiding among us, slaughtering our villagers. Someone\'s already dead.', 'มันแฝงตัวอยู่ในหมู่พวกเราและฆ่าชาวบ้านไป มีคนตายไปแล้ว'], ['We can\'t let anyone else get hurt. Let\'s check it out.', 'เราปล่อยให้ใครต้องเจ็บอีกไม่ได้ ไปดูกันเถอะ'],
   ['Leave match', 'ออกจากแมตช์'], ['You will leave this match against the bots. Your progress in this match will be lost.', 'คุณจะออกจากแมตช์กับบอท ความคืบหน้าในแมตช์นี้จะหายไป'],
@@ -3669,7 +3676,7 @@ function ShadowAct({ actions: allActions, victimName, alive, wolves = [], selfId
 }
 
 // One role's secret choice screen on a single shared device. Names only, never anyone's role.
-function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOverride, hideSelf, ext, bloodMoon }) {
+function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOverride, hideSelf, ext, bloodMoon, tags }) {
   const alive = players.filter((p) => p.alive);
   const opts = (list) => list.map((p) => ({ id: p.id, n: p.name }));
   const nm = (id) => (players.find((p) => p.id === id) || {}).name || '?';
@@ -3849,7 +3856,7 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
     return (
       <div className="flex flex-1 flex-col">
         <ActHeader role={role} sub={last !== undefined && last !== null ? `You cannot protect ${nm(last)} two nights in a row.` : 'They cannot be eliminated tonight.'} />
-        <PickList players={opts(alive)} value={val} onChange={choose} disabled={last !== undefined && last !== null ? [last] : []} />
+        <PickList players={opts(alive)} value={val} onChange={choose} disabled={last !== undefined && last !== null ? [last] : []} tags={tags} />
         <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ bodyguard: pick })}>{pick === null ? 'Select a player' : 'Confirm Protection'}</Btn>
       </div>
     );
@@ -4758,6 +4765,8 @@ function mpDealPatch(room, deck) {
   if (room.adv === 1) { // Adventure Level 1: the human always holds the Bodyguard card (swapped with whoever was dealt it)
     const h = players.find((p) => p.bot !== 1); const sp = players.find((p) => patch[`pl/${p.id}/r`] === 'bodyguard');
     if (h && sp && sp.id !== h.id) { patch[`pl/${sp.id}/r`] = patch[`pl/${h.id}/r`]; patch[`pl/${h.id}/r`] = 'bodyguard'; }
+    const ch = players.find((p) => p.bot === 1 && p.n === 'Charlie'); const wf = players.find((p) => patch[`pl/${p.id}/r`] === 'werewolf'); // Charlie is always the Werewolf in Level 1
+    if (ch && wf && ch.id !== wf.id) { patch[`pl/${wf.id}/r`] = patch[`pl/${ch.id}/r`]; patch[`pl/${ch.id}/r`] = 'werewolf'; }
   }
   if (room.ai === 1 && players.filter((p) => p.bot !== 1).length === 1) players.filter((p) => p.bot === 1).forEach((p) => { patch[`pl/${p.id}/d`] = 1; }); // Solo AI: the bots are ready from the start, so the human's tap is the only one that counts
   return patch;
@@ -5258,7 +5267,7 @@ function MpJoinForm({ onBack, onJoined, onHost }) {
 }
 
 /* ---------- player-side views ---------- */
-function MpReveal({ me, ready, readyCount, total, onReady, onLeave, instant = false }) {
+function MpReveal({ me, ready, readyCount, total, onReady, onLeave, instant = false, prologue = null }) {
   const [phase, setPhase] = useState('idle'); // idle | lift | flipping | open
   const [sent, setSent] = useState(false);
   const [showAbility, setShowAbility] = useState(false);
@@ -5275,9 +5284,12 @@ function MpReveal({ me, ready, readyCount, total, onReady, onLeave, instant = fa
   useEffect(() => { if (instant) { const t = setTimeout(reveal, 250); return () => clearTimeout(t); } return undefined; }, []); // Solo AI / Adventure: the card flips by itself, no tap to reveal
   const done = ready || sent;
   if (done && instant) {
+    if (prologue && !prologue.done) return <Level1Prologue onDone={prologue.finish} onLeave={onLeave} />;
     return (
       <NightStage fixed onExit={onLeave}>
-        <div className="flex flex-1 flex-col items-center justify-center text-center"><p className="font-display screen-in text-3xl font-bold tracking-wide">Night begins</p></div>
+        {prologue
+          ? <LockView key="i" title={`Night ${nightWord(1)} Begins...`} sub="The village falls silent." />
+          : <div className="flex flex-1 flex-col items-center justify-center text-center"><p className="font-display screen-in text-3xl font-bold tracking-wide">Night begins</p></div>}
       </NightStage>
     );
   }
@@ -5377,7 +5389,7 @@ function ppZMarks(players, actor) {
   players.forEach((p) => { if (!p.alive || p.id === actor.id) return; if (p.role === 'zombie') out[p.id] = 'ZOMBIE'; else if ((p.bitten || p.incub) && p.role !== 'infector') out[p.id] = 'INCUBATING'; });
   return out;
 }
-function PickList({ players, value, onChange, disabled = [], locked, team = [], teamLabel = 'Werewolf team', TeamIcon = WolfIcon, badges = [], marks = {} }) {
+function PickList({ players, value, onChange, disabled = [], locked, team = [], teamLabel = 'Werewolf team', TeamIcon = WolfIcon, badges = [], marks = {}, tags }) {
   return (
     <ul className="flex flex-col gap-2" role="listbox">
       {players.map((p) => {
@@ -5391,7 +5403,7 @@ function PickList({ players, value, onChange, disabled = [], locked, team = [], 
               style={mate ? { background: 'rgba(127,29,29,0.25)', border: '1px solid rgba(239,68,68,0.55)', color: '#FCA5A5' }
                 : { background: sel ? 'rgba(109,40,217,0.4)' : 'var(--card-2)', border: `${sel ? 2 : 1}px solid ${sel ? '#C4B5FD' : 'var(--line)'}`, boxShadow: sel ? '0 0 18px -4px rgba(167,139,250,0.7)' : 'none', color: '#E6EAF2' }}>
               {mate ? <><span>{p.n}</span><span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider"><TeamIcon width="18" height="18" aria-hidden="true" />{teamLabel}</span></>
-                : <><span className="flex items-center gap-2">{p.n}{badges.includes(p.id) && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-200" style={{ background: 'rgba(127,29,29,0.5)', border: '1px solid rgba(239,68,68,0.75)' }}>Werewolf</span>}{marks[p.id] && <ZMark t={marks[p.id]} />}</span>{sel && <span aria-hidden="true" className="text-lg">✓</span>}</>}
+                : <><span className="flex flex-col py-1.5"><span className="flex items-center gap-2">{p.n}{badges.includes(p.id) && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-200" style={{ background: 'rgba(127,29,29,0.5)', border: '1px solid rgba(239,68,68,0.75)' }}>Werewolf</span>}{marks[p.id] && <ZMark t={marks[p.id]} />}</span>{tags && tags[p.n] && <span className="mt-0.5 text-[11.5px] font-medium text-slate-400">{tags[p.n]}</span>}</span>{sel && <span aria-hidden="true" className="text-lg">✓</span>}</>}
             </button>
           </li>
         );
@@ -5693,7 +5705,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
   const chatGroup = group.length > 1 && me.a === 1 && me.r === role && me.nd !== 1;
   const [spL, setSpL] = useState(null);
   const mine0 = isWave && !!role && sent !== tag && me.nd !== 1 && me.cj !== 2 && me.jt !== 2;
-  const wrap = (body, pitch) => <NightStage fixed={!!immersive} pitch={pitch} blood={!!room.bm} onExit={immersive ? onLeave : undefined}>{(isWave || (viewing && room.nightStyle === 'eyes_open')) && me.a === 1 && mine0 && <WaveBadge players={players} room={room} />}{isWave && <p role="note" className="mb-3 rounded-xl px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-amber-100" style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.5)' }}>Keep your screen hidden from others!</p>}{!pitch && partner && <LoverBadge name={partner.n} className="mb-3" />}{body}{!pitch && chatGroup && <TeamChat me={me} group={group} room={room} write={write} tag={tag} />}</NightStage>;
+  const wrap = (body, pitch) => <NightStage fixed={!!immersive} pitch={pitch} blood={!!room.bm} onExit={immersive ? onLeave : undefined}>{(isWave || (viewing && room.nightStyle === 'eyes_open')) && me.a === 1 && mine0 && <WaveBadge players={players} room={room} />}{isWave && <p role="note" className="mb-3 rounded-xl px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-amber-100" style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.5)' }}>{room.adv === 1 ? `Solo Campaign \u00B7 Night ${room.k || 1}` : 'Keep your screen hidden from others!'}</p>}{!pitch && partner && <LoverBadge name={partner.n} className="mb-3" />}{body}{!pitch && chatGroup && <TeamChat me={me} group={group} room={room} write={write} tag={tag} />}</NightStage>;
   const mine = me.a === 1 && ((!!role && me.r === role && me.nd !== 1) || (viewing && me.r === 'seer' && me.rd !== 1) || (role === 'infected' && me.jt === 1) || (role === 'cured' && me.cj === 1)) && sent !== tag;
 
   if (ns === 'i') return wrap(<><LockView key="i" title={`Night ${nightWord(room.k)} Begins...`} sub="The village falls silent." />{room.bm ? <BloodMoonBanner className="mb-6" /> : null}</>);
@@ -5732,7 +5744,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
       const sv = mpSeerView(players, me.id);
       return wrap(<NightActPP key={tag} role="seerResult" players={adapted} actor={actor} choices={mpChoices(players)} onDone={submit} seerOverride={sv} />);
     }
-    return wrap(<NightActPP key={tag} role={role} players={adapted} actor={actor} choices={mpChoices(players)} deferSeer={shadowAlive} ext={ext} hideSelf bloodMoon={!!room.bm} onDone={submit} />);
+    return wrap(<NightActPP key={tag} role={role} players={adapted} actor={actor} choices={mpChoices(players)} deferSeer={shadowAlive} ext={ext} hideSelf bloodMoon={!!room.bm} onDone={submit} tags={room.adv === 1 && role === 'bodyguard' ? L1_TAGS : undefined} />);
   }
   if (isWave || (ns === 'v:seer' && room.nightStyle === 'eyes_open')) {
     return wrap(<><LockView key={'z' + tag} title="Night has fallen." sub={me.a !== 1 ? 'You have been eliminated. Stay silent.' : null} />{ns !== 'v:seer' && <WaveWait players={players} room={room} />}</>, false);
@@ -6106,6 +6118,76 @@ function MpDay({ me, players, room, write, onTimeUp }) {
   );
 }
 
+// Campaign Level 1: the cottage dialogue that plays right after "I'm Ready" and before Night 1.
+const L1_LINES = [
+  { s: 'r', w: 'bodyguard', t: "We barred the harbor cottage doors for the night, yet I can't shake the feeling the beast is already inside with us..." },
+  { s: 'r', w: 'bodyguard', t: "Stacy slipped out earlier claiming she needed the bathroom before hurrying back. Across the room, Jenna pulled the blankets tightly over herself—hard to tell if it's fear or if she's hiding something." },
+  { s: 'l', w: 'charlie', t: "I watched Stacy go outside from the window... there's something off about her." },
+  { s: 'l', w: 'stacy', t: "Come on, what's wrong with you? I really just needed to go, and I can't exactly help that... If anything, are we sure about Jenna? She wouldn't say a word when I asked her." },
+  { s: 'r', w: 'bodyguard', t: "The last lantern dies out. Everyone is pointing fingers in the dark—I have to decide who to protect tonight." }
+];
+const L1_TAGS = { Stacy: 'Slipped out to the bathroom earlier', Jenna: 'Hid under the blankets, silent', Charlie: 'Watched from the window' };
+const L1_NPC = { charlie: { n: 'Charlie', c: '#5EEAD4', bg: 'linear-gradient(160deg, #0F766E, #134E4A)' }, stacy: { n: 'Stacy', c: '#F9A8D4', bg: 'linear-gradient(160deg, #BE185D, #831843)' } };
+const L1_BUB = { background: 'linear-gradient(160deg, #46587A, #2B3B58)', border: '1px solid rgba(148,163,184,0.5)', boxShadow: '0 8px 22px rgba(2,6,23,0.6)' };
+function L1Avatar({ w, big = false }) {
+  const npc = L1_NPC[w]; const sz = big ? { width: 58, height: 72 } : { width: 40, height: 50 };
+  return (
+    <span className="relative block shrink-0 overflow-hidden" style={{ ...sz, borderRadius: '50%', border: `2px solid ${npc ? npc.c : '#FDE68A'}`, background: npc ? npc.bg : '#0a0e18', boxShadow: npc ? '0 4px 12px rgba(0,0,0,0.55)' : '0 0 16px rgba(251,191,36,0.45), 0 6px 16px rgba(0,0,0,0.6)' }}>
+      {npc ? <span className="flex h-full w-full items-center justify-center font-display text-lg font-black text-white">{npc.n[0]}</span> : <img src="images/guide-bodyguard.webp" alt="" draggable={false} className="h-full w-full select-none" style={{ objectFit: 'cover' }} />}
+    </span>
+  );
+}
+function Level1Prologue({ onDone, onLeave }) {
+  const total = L1_LINES.length;
+  const [n, setN] = useState(0); // lines shown so far
+  const [typing, setTyping] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const endRef = useRef(null);
+  useEffect(() => {
+    if (n >= total) { setTyping(false); return undefined; }
+    const lead = n === 0 ? 650 : 450; const t1 = setTimeout(() => setTyping(true), lead);
+    const t2 = setTimeout(() => { setTyping(false); setN(n + 1); Sfx.msg(); }, lead + Math.min(1800, 900 + L1_LINES[n].t.length * 5));
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [n]);
+  useEffect(() => { if (endRef.current && endRef.current.scrollIntoView) endRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [n, typing]);
+  const skip = () => { if (n < total && !leaving) { setTyping(false); setN(n + 1); Sfx.msg(); } }; // tap anywhere: show the next line right away
+  const go = (e) => { e.stopPropagation(); if (leaving) return; setLeaving(true); setTimeout(onDone, 500); };
+  const IMG = 'images/level1-harbor-pov.webp';
+  const row = (L, i, body, key) => (L.s === 'r'
+    ? <div key={key} className="flex justify-end">{body}</div>
+    : <div key={key} className="flex items-end gap-2"><L1Avatar w={L.w} />{body}</div>);
+  const bubble = (L, i) => row(L, i,
+    <div className={`max-w-[80%] ${L.s === 'r' ? 'text-right' : ''}`}>
+      {L.s === 'l' && <div className="mb-1 ml-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: L1_NPC[L.w].c }}>{L1_NPC[L.w].n}</div>}
+      <div className={`${L.s === 'r' ? 'guide-bub' : 'guide-bub-l'} inline-block rounded-[22px] px-4 py-2.5 text-left text-[14px] leading-snug text-white ${L.s === 'r' ? 'italic' : 'font-semibold'}`} style={L1_BUB}><p>{L.t}</p></div>
+    </div>, i);
+  const cur = n < total ? L1_LINES[n] : null;
+  return (
+    <div role="dialog" aria-label="Harbor Cottage, before Night 1" className="fixed inset-0 z-40 overflow-hidden" style={{ background: '#05060d' }} onClick={skip}>
+      <img src={IMG} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 h-full w-full select-none" style={{ objectFit: 'cover', filter: 'blur(26px) brightness(0.4)', transform: 'scale(1.15)' }} />
+      <div className="absolute inset-y-0 left-1/2 w-full -translate-x-1/2" style={{ maxWidth: 'calc(100dvh * 9 / 16)' }}>
+        <img src={IMG} alt="" draggable={false} className="h-full w-full select-none" style={{ objectFit: 'cover', objectPosition: '50% 42%' }} />
+        <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(4,6,14,0.82) 0%, rgba(4,6,14,0.7) 45%, rgba(4,6,14,0.88) 100%)' }} />
+      </div>
+      <ExitButton onClick={(e) => { e.stopPropagation(); onLeave(); }} className="absolute z-20" style={{ left: 12, top: 'max(10px, env(safe-area-inset-top))' }} />
+      <div className="absolute z-20" style={{ right: 16, top: 'max(10px, env(safe-area-inset-top))' }}><L1Avatar w="bodyguard" big /></div>
+      <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md overflow-y-auto px-4" style={{ top: 'calc(max(10px, env(safe-area-inset-top)) + 86px)', paddingBottom: 96 }}>
+        <div className="flex min-h-full flex-col justify-end gap-3">
+          {L1_LINES.slice(0, n).map((L, i) => bubble(L, i))}
+          {typing && cur && row(cur, n, <div className={`${cur.s === 'r' ? 'guide-bub' : 'guide-bub-l'} guide-dots rounded-[20px] px-3.5 py-2.5`} style={L1_BUB} aria-hidden="true"><span /><span /><span /></div>, 'typing')}
+          <div ref={endRef} />
+        </div>
+      </div>
+      {n >= total && (
+        <div className="absolute z-20 flex justify-end" style={{ right: 16, bottom: 'max(22px, env(safe-area-inset-bottom))' }}>
+          <button type="button" data-ui-sound="primary" onClick={go} className="guide-bub flex min-h-[48px] items-center gap-2 rounded-full px-6 text-[15px] font-bold text-white" style={{ background: 'linear-gradient(180deg, #3B82F6, #1D4ED8)', border: '1px solid rgba(191,219,254,0.7)', boxShadow: '0 6px 18px rgba(2,6,23,0.6), 0 0 16px rgba(59,130,246,0.45)' }}>{'🛡️ Choose Who to Protect'}</button>
+        </div>
+      )}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-30" style={{ background: '#03040a', opacity: leaving ? 1 : 0, transition: 'opacity 480ms ease-in-out' }} />
+    </div>
+  );
+}
+
 // A brief Training Tip for Adventure Level 1; it fades by itself and never blocks a tap.
 function AdvTip({ text }) {
   const [show, setShow] = useState(true);
@@ -6431,16 +6513,17 @@ function MpRoom({ session, onExit, onPhase }) {
   const autoWinner = ph === 'day' ? mpWinner(players) : '';
   const hunterPending = players.some((p) => p.r === 'hunter' && p.a !== 1 && p.hs !== 1);
   const autoFired = useRef('');
+  const [l1Pro, setL1Pro] = useState(false); // Campaign Level 1: the cottage dialogue before Night 1 has finished
   useEffect(() => {
     if (!hostPlays || director.dir.on) return;
     const key = `${ph}:${room.k}:${room.vd}:${autoWinner}`;
     let t = 0;
-    if (ph === 'reveal' && allSeen) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, soloAi ? 250 : 1800);
+    if (ph === 'reveal' && allSeen && (room.adv !== 1 || l1Pro)) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, soloAi ? 250 : 1800);
     else if (ph === 'night') t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start({ again: true }); } }, 6000); // only if the director is not running (for example after a refresh)
     else if (ph === 'day' && autoWinner) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; write({ ph: 'over', w: autoWinner }); } }, hunterPending ? 20000 : 7000);
     else if (ph === 'day' && room.vd === 1) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, hunterPending ? 30000 : 12000); // time to read who was voted out
     return () => clearTimeout(t);
-  }, [hostPlays, ph, room && room.k, room && room.vd, allSeen, autoWinner, hunterPending, director.dir.on]);
+  }, [hostPlays, ph, room && room.k, room && room.vd, allSeen, autoWinner, hunterPending, director.dir.on, l1Pro]);
   const voteClosed = useRef('');
   useEffect(() => {
     if (!hostPlays || ph !== 'day' || room.vd === 1) return;
@@ -6530,7 +6613,7 @@ function MpRoom({ session, onExit, onPhase }) {
       </div>
     );
   } else if (showPlayer) {
-    if (ph === 'reveal') body = <MpReveal me={me} ready={me.d === 1} readyCount={players.filter((p) => p.d === 1).length} total={players.length} onReady={() => write({ [`pl/${pid}/d`]: 1 })} onLeave={() => setConfirmLeave(true)} instant={soloAi} />;
+    if (ph === 'reveal') body = <MpReveal me={me} ready={me.d === 1} readyCount={players.filter((p) => p.d === 1).length} total={players.length} onReady={() => write({ [`pl/${pid}/d`]: 1 })} onLeave={() => setConfirmLeave(true)} instant={soloAi} prologue={soloAi && room.adv === 1 ? { done: l1Pro, finish: () => setL1Pro(true) } : null} />;
     else if (ph === 'night') body = <MpNight key={`n${room.k}`} me={me} players={players} room={room} write={write} immersive={!isHost || hostPlays} onLeave={() => setConfirmLeave(true)} />;
     else if (ph === 'day') body = <MpDay key={`d${room.k}`} me={me} players={players} room={room} write={write} onTimeUp={isHost && hostPlays ? () => { if (room.vd === 1) return; const t = mpTally(players); write(mpVotePatch(players, t.tie ? '' : t.top, { tie: t.tie, skip: t.skip, none: t.voted === 0 })); } : undefined} />;
     else body = <MpOver room={room} players={players} meId={pid} />;
@@ -6543,7 +6626,7 @@ function MpRoom({ session, onExit, onPhase }) {
   return (
     <>
     {ph === 'day' && <DayBackdrop />}
-    {showPlayer && me && room.adv === 1 && room.k === 1 && (ph === 'night' || ph === 'day') && <AdvTip key={ph} text={ph === 'night' ? 'Tip: As Bodyguard, protect someone each night. Guess who the Werewolf will attack!' : 'Tip: Read the Village Chat, work out who the Werewolf is, and vote together!'} />}
+    {showPlayer && me && room.adv === 1 && room.k === 1 && ((ph === 'night' && room.ns === 'i') || ph === 'day') && <AdvTip key={ph} text={ph === 'night' ? "Tip: Remember everyone's alibi before the lantern went out..." : 'Tip: Read the Village Chat, work out who the Werewolf is, and vote together!'} />}
     {showPlayer && me && ph === 'day' && <VoteResultGate room={room} code={code} />}
     {showPlayer && me && ph === 'day' && <ElimGate me={me} room={room} code={code} />}
     {fullHost && session.ai && (ph === 'day' || (ph === 'reveal' && !(me && me.d === 1))) && (
@@ -6620,7 +6703,7 @@ async function aiCreateRoom(name, cfg) {
   for (let i = 0; i < words.length; i++) { if (!(await Mp.get(`rooms/${words[i]}`))) { code = words[i]; break; } }
   if (!code) code = randLetters();
   const pl = { [pid]: { n: name, o: 1, a: 1, d: 0 } };
-  aiPickNames(new Set([name.toLowerCase()]), cfg.n - 1).forEach((nm, i) => { pl[randId()] = { n: nm, o: i + 2, a: 1, d: 0, bot: 1 }; });
+  (cfg.adv ? ['Stacy', 'Jenna', 'Charlie'].filter((x) => x.toLowerCase() !== name.toLowerCase()).concat(aiPickNames(new Set([name.toLowerCase(), 'stacy', 'jenna', 'charlie']), 3)).slice(0, cfg.n - 1) : aiPickNames(new Set([name.toLowerCase()]), cfg.n - 1)).forEach((nm, i) => { pl[randId()] = { n: nm, o: i + 2, a: 1, d: 0, bot: 1 }; }); // Level 1 cast: Stacy, Jenna and Charlie
   const room = { v: 1, host: pid, hp: 1, rn: 'AI Village', hn: name, md: getGameMode(), ph: 'lobby', k: 0, lk: 0, w: '', ts: Date.now(), pub: 0, st: 'waiting', mx: cfg.n, dk: cfg.deck, nightStyle: 'eyes_open', ai: 1, ...(cfg.adv ? { adv: 1 } : {}), pl };
   await Mp.put(`rooms/${code}`, room);
   await Mp.patch(`rooms/${code}`, mpDealPatch(room, { ...emptyDeck(), ...cfg.deck })); // the human's secret card is dealt with everyone else's
@@ -6653,7 +6736,8 @@ function aiNightWrites(b, role, ns, ctx, M) {
   if (b.sd === k) return { [`pl/${b.id}/nd`]: 1 }; // sedated: sleeps through it
   if (role === 'werewolf') { // prefers non-wolves, and anyone who claimed to be the Seer
     const c = others.filter((p) => !aiPack(p));
-    const t1 = aiTop(M, c, (p) => (M.claims[p.id] === 'seer' ? 3 : 0));
+    const scripted = room.adv === 1 && k === 1 ? c.find((p) => p.n === 'Stacy') : null; // Level 1, Night 1: Charlie goes for Stacy
+    const t1 = scripted || aiTop(M, c, (p) => (M.claims[p.id] === 'seer' ? 3 : 0));
     const t2 = room.bm ? aiTop(M, c.filter((p) => !t1 || p.id !== t1.id)) : null;
     return wr((id) => done(id, t1 ? t1.id : '', { [`pl/${id}/t2`]: t2 ? t2.id : '' }));
   }

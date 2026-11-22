@@ -5817,7 +5817,8 @@ function useNightDirector({ room, players, write }) {
         const isDone = () => idle().length === 0; // after the time limit anyone who has not chosen is recorded as a Skip
         skip.current = false; const t0 = Date.now();
         while (live() && latest.current.room.ns !== curNs && Date.now() - t0 < 4000) await wait(100); // wait until this step has reached us, so last night's answers are not mistaken for tonight's
-        while (live() && !isDone() && !skip.current && Date.now() - t0 < ms) await wait(500);
+        const soloH = soloHuman(latest.current);
+        while (live() && !isDone() && !skip.current && (soloH || Date.now() - t0 < ms)) await wait(500);
         if (live() && !isDone()) { const o = {}; idle().forEach((p) => { if (seer) o[`pl/${p.id}/rd`] = 1; else if (p.jt === 1) o[`pl/${p.id}/jt`] = 2; else if (p.cj === 1) o[`pl/${p.id}/cj`] = 2; else o[`pl/${p.id}/nd`] = 1; }); if (Object.keys(o).length) await write(o); }
       };
       try {
@@ -5842,8 +5843,8 @@ function useNightDirector({ room, players, write }) {
             const now = Date.now();
             const wolvesDone = !latest.current.players.some((p) => p.a === 1 && p.r === 'werewolf' && p.nd !== 1);
             if (wolvesDone && !wd) wd = now;
-            if (o.length && now - t1 >= MP_WAVE_SECS * 1000) { await skipAll(o); continue; }
-            if (w.length && wolvesDone && now - Math.max(wd, t1) >= MP_WAVE_SECS * 1000) { await skipAll(w); continue; }
+            if (o.length && !soloHuman(latest.current) && now - t1 >= MP_WAVE_SECS * 1000) { await skipAll(o); continue; }
+            if (w.length && wolvesDone && !soloHuman(latest.current) && now - Math.max(wd, t1) >= MP_WAVE_SECS * 1000) { await skipAll(w); continue; }
             await wait(500);
           }
           if (!live()) return;
@@ -5884,7 +5885,7 @@ function useNightDirector({ room, players, write }) {
         while (live()) {
           const holders = r === 'infected' ? latest.current.players.filter((p) => p.a === 1 && p.jt === 1) : r === 'cured' ? latest.current.players.filter((p) => p.a === 1 && p.cj === 1) : latest.current.players.filter((p) => p.a === 1 && p.r === r);
           if (r === 'infected' || r === 'cured' ? holders.length === 0 : holders.every((p) => p.nd === 1)) break;
-          if (skip.current || Date.now() - t0 > 90000) break;
+          if (skip.current || (!soloHuman(latest.current) && Date.now() - t0 > 90000)) break;
           await wait(500);
         }
         if (!live()) return;
@@ -5901,7 +5902,7 @@ function useNightDirector({ room, players, write }) {
         const t1 = Date.now();
         while (live()) {
           const seers = latest.current.players.filter((p) => p.a === 1 && p.r === 'seer');
-          if (seers.every((p) => p.rd === 1) || skip.current || Date.now() - t1 > 90000) break;
+          if (seers.every((p) => p.rd === 1) || skip.current || (!soloHuman(latest.current) && Date.now() - t1 > 90000)) break;
           await wait(500);
         }
         if (!live()) return;
@@ -6100,7 +6101,7 @@ function MpDay({ me, players, room, write, onTimeUp }) {
       : me.s === 1 ? <Panel className="text-center text-sm font-semibold text-violet-100" style={{ border: '1px solid rgba(167,139,250,0.7)', background: 'rgba(109,40,217,0.25)' }} role="alert">You have been silenced by the Spellcaster &mdash; you cannot speak or vote today.</Panel>
       : me.sn === 1 ? <Panel className="text-center text-sm font-semibold text-sky-100" style={{ border: '1px solid rgba(96,165,250,0.7)', background: 'rgba(37,99,235,0.25)' }} role="alert">The Sniper shot you &mdash; your vote is disabled for today.</Panel>
       : <p className="text-center text-xs text-slate-400">You are alive. Discuss and find the werewolves.</p>;
-    const timer = room.adv === 1 ? null : <DayTimer startAt={fxKey ? Number(fxKey) : 0} onEnd={() => { setStep('vote'); if (onTimeUp) onTimeUp(); }} />;
+    const timer = null; // one human against bots: no day countdown
     return (
       <div className={`flex flex-1 flex-col gap-4 ${fx ? 'dawn-shake' : ''}`}>
         {me.lv && players.some((x) => x.id === me.lv) && <LoverBadge name={players.find((x) => x.id === me.lv).n} />}
@@ -6598,6 +6599,7 @@ function mpWaveLeft(players, room) {
   return [];
 }
 const MP_WAVE_SECS = 45;
+const soloHuman = (l) => !!l.room && l.room.ai === 1 && l.players.filter((p) => p.bot !== 1).length === 1; // one human against bots: night waits have no time limit
 function useWaveClock(room) {
   const [t0, setT0] = useState(Date.now());
   const [, tick] = useState(0);
@@ -6607,6 +6609,7 @@ function useWaveClock(room) {
 }
 function WaveBadge({ players, room }) {
   const secs = useWaveClock(room);
+  if (room.ai === 1 && players.filter((p) => p.bot !== 1).length === 1) return null; // one human against bots: no countdown
   const n = mpWaveLeft(players, room).length;
   return <div aria-live="off" className="pointer-events-none fixed left-1/2 z-[45] -translate-x-1/2 rounded-full px-3 py-1 text-xs font-bold tabular-nums text-slate-100" style={{ top: 'max(16px, env(safe-area-inset-top))', background: 'rgba(10,10,18,0.7)', border: '1px solid rgba(203,213,225,0.35)' }}>{secs}s · {n} left</div>;
 }

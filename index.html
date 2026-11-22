@@ -7351,7 +7351,7 @@ const MapWorld = React.memo(function MapWorld({ tab, cleared, selected, art }) {
 });
 
 // Painted-map mode: level pins sit on the artwork's own landmarks, given as % of the image (x, y).
-const MAP_PINS = [[42, 84], [33, 86], [50, 82], [48, 74], [26, 66], [20, 69], [24, 74], [38, 58], [45, 50], [50, 44], [61, 47], [78, 62], [79, 47], [84, 38], [88, 31], [74, 30], [64, 26], [68, 17], [54, 20], [46, 22]];
+const MAP_PINS = [[42, 84], [33, 86], [50, 82], [51, 73], [26, 66], [20, 69], [24, 74], [38, 58], [45, 50], [50, 42], [61, 47], [78, 62], [79, 47], [84, 38], [88, 31], [74, 30], [64, 26], [68, 17], [54, 20], [46, 22]];
 const MAP_PIN_ADJ = { cinematic: { 20: [60, 10] }, animated: { 20: [60, 10] } }; // the dark tunnel sits higher in the cinematic painting than in the storybook one
 const MAP_ZONES = [[1, 4], [5, 7], [8, 11], [12, 16], [17, 20]]; // level ranges that share one landmark; each gets its own trail
 const mapBow = (a, b, sg, f) => { const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1; return [(a[0] + b[0]) / 2 - (dy / L) * L * f * sg, (a[1] + b[1]) / 2 + (dx / L) * L * f * sg]; };
@@ -7417,7 +7417,8 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
   }, [mapStyle]);
   useEffect(() => { if (!toast) return undefined; const t = setTimeout(() => setToast(0), 2400); return () => clearTimeout(t); }, [toast]);
   const size = () => { const el = vp.current; return { w: el ? el.clientWidth : 390, h: el ? el.clientHeight : 800 }; };
-  const clampCam = (c, slack) => { const { w, h } = size(); const ww = dimR.current.w * c.k, hh = dimR.current.h * c.k; return { k: c.k, x: ww <= w ? (w - ww) / 2 : Math.min(slack, Math.max(w - ww - slack, c.x)), y: hh <= h ? (h - hh) / 2 : Math.min(slack, Math.max(h - hh - slack, c.y)) }; };
+  const clampCam = (c, slack) => { const { w, h } = size(); const ww = dimR.current.w * c.k, hh = dimR.current.h * c.k; return { k: c.k, x: ww <= w ? (w - ww) / 2 : Math.min(slack, Math.max(w - ww - slack, c.x)), y: hh <= h ? (h - hh) / 2 : Math.min((paR.current ? topPad() : 0) + slack, Math.max(h - hh - slack, c.y)) }; };
+  const topPad = () => 110; // painted maps: lets the summit scroll down clear of the header bar and tabs
   const apply = (c, ms) => { cam.current = c; const el = world.current; if (!el) return; el.style.setProperty('--ps', String((0.8 + 0.25 * c.k) / c.k)); el.style.transition = ms ? `transform ${ms}ms cubic-bezier(.2,.8,.2,1)` : 'none'; el.style.transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.k})`; };
   const zoomAt = (px, py, nk, ms, slack = 0) => { const c = cam.current; const k = Math.min(KMAX, Math.max(kmin(), nk)); apply(clampCam({ k, x: px - ((px - c.x) * k) / c.k, y: py - ((py - c.y) * k) / c.k }, slack), ms); };
   const focus = (n, k, ms) => { const { w, h } = size(); const o = pa ? { x: (MAP_PINS[n - 1][0] * dim.w) / 100, y: (MAP_PINS[n - 1][1] * dim.h) / 100 } : MAP_NODES[n - 1]; apply(clampCam({ k, x: w / 2 - o.x * k, y: h * 0.58 - o.y * k }, 0), ms); };

@@ -6487,9 +6487,12 @@ function mpTally(players) {
   voters.forEach((p) => { const w = p.r === 'mayor' ? 2 : 1; if (p.v === 'skip') skips += w; else if (p.v && byId[p.v] && byId[p.v].a === 1) tally[p.v] = (tally[p.v] || 0) + w; });
   const ranked = Object.keys(tally).sort((x, y) => tally[y] - tally[x]);
   const lead = ranked[0] || '';
-  const skip = skips > 0 && (ADV1 ? skips > (tally[lead] || 0) : skips >= (tally[lead] || 0)); // skipping wins when it matches or beats the top vote (Level 1: only when it beats it)
-  const top = skip ? '' : lead;
-  const tie = !skip && ranked.length > 1 && tally[ranked[1]] === tally[lead];
+  const L = tally[lead] || 0; const S2 = ranked.length > 1 ? tally[ranked[1]] : 0;
+  const need = Math.floor(alive.length / 2) + 1; // a majority of the living
+  const tie = L > 0 && ranked.length > 1 && L === S2 && L > skips; // two players level at the top, both ahead of Skip
+  const valid = L > 0 && L > skips && L > S2 && L >= need; // beats Skip and everyone else AND reaches a majority; otherwise no one is eliminated
+  const skip = !valid && !tie;
+  const top = valid ? lead : '';
   return { tally, ranked, top, tie, skip, skips, voters, voted: voters.filter((p) => p.v).length };
 }
 function mpVotePatch(players, id, opts) {

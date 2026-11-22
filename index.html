@@ -7597,7 +7597,7 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
         </button>
       </div>
       {tab === 'classic' && !zoomIn && (
-        <button type="button" onClick={chat ? closeChat : openChat} aria-label="Message from the Bodyguard" className="absolute z-30 flex items-center justify-center" style={{ right: 12, top: 'calc(max(8px, env(safe-area-inset-top)) + 150px)', width: 54, height: 66, borderRadius: '50%', padding: 0, background: '#0a0e18', border: '2px solid #FDE68A', boxShadow: '0 0 16px rgba(251,191,36,0.45), 0 6px 16px rgba(0,0,0,0.6)' }}>
+        <button type="button" onClick={chat ? closeChat : openChat} aria-label="Message from the Bodyguard" className="absolute z-30 flex items-center justify-center" style={{ right: 12, top: 'calc(max(8px, env(safe-area-inset-top)) + 200px)', width: 54, height: 66, borderRadius: '50%', padding: 0, background: '#0a0e18', border: '2px solid #FDE68A', boxShadow: '0 0 16px rgba(251,191,36,0.45), 0 6px 16px rgba(0,0,0,0.6)' }}>
           <span className="block h-full w-full overflow-hidden" style={{ borderRadius: '50%' }}><img src="images/guide-bodyguard.webp" alt="" draggable={false} className="h-full w-full select-none" style={{ objectFit: 'cover' }} /></span>
           {!read && !cleared && !chat && <span className="guide-arrow gy" aria-hidden="true"><svg width="40" height="28" viewBox="0 0 40 28"><path d="M2 9 H20 V2 L38 14 L20 26 V19 H2 Z" fill="#EF4444" stroke="#7F1D1D" strokeWidth="2" strokeLinejoin="round" /></svg></span>}
           {unread && <span className="guide-dot absolute" style={{ right: -2, top: 2, width: 15, height: 15, borderRadius: 9999, background: '#EF4444', border: '2px solid #0a0e18' }} />}
@@ -7606,7 +7606,7 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
       {chat && !zoomIn && (
         <>
           <button type="button" data-no-ui-sound aria-label="Close chat" onClick={closeChat} className="absolute inset-0 z-20 cursor-default" style={{ background: 'rgba(2,4,12,0.18)' }} />
-          <div role="log" aria-label="Chat with the Bodyguard" className="pointer-events-none absolute z-30 flex flex-col items-end gap-2" style={{ right: 14, top: 'calc(max(8px, env(safe-area-inset-top)) + 150px + 74px)', width: 'min(calc(100vw - 36px), 320px)' }}>
+          <div role="log" aria-label="Chat with the Bodyguard" className="pointer-events-none absolute z-30 flex flex-col items-end gap-2" style={{ right: 14, top: 'calc(max(8px, env(safe-area-inset-top)) + 200px + 74px)', width: 'min(calc(100vw - 36px), 320px)' }}>
             {GUIDE_MSGS.slice(0, cstep).map((m, i) => (
               <div key={i} className="guide-bub relative max-w-full rounded-[22px] px-4 py-2.5 text-[14px] font-semibold leading-snug text-white" style={{ background: 'linear-gradient(160deg, #3B82F6, #1D4ED8)', border: '1px solid rgba(191,219,254,0.55)', boxShadow: '0 8px 22px rgba(2,6,23,0.55), 0 0 18px rgba(59,130,246,0.35)' }}>
                 {i === 0 && <><span aria-hidden="true" className="absolute rounded-full" style={{ right: 14, top: -14, width: 11, height: 11, background: '#2563EB', border: '1px solid rgba(191,219,254,0.55)' }} /><span aria-hidden="true" className="absolute rounded-full" style={{ right: 26, top: -22, width: 6, height: 6, background: '#2563EB', border: '1px solid rgba(191,219,254,0.55)' }} /></>}

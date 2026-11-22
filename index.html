@@ -1835,6 +1835,7 @@ const TH_PAIRS = [
   ["If anything, are we sure about Jenna? She wouldn't say a single word when I asked her.", 'ถ้าจะสงสัยใคร แน่ใจเหรอว่าเจนนาไม่มีพิรุธ? ตอนฉันถามเธอไม่ยอมพูดสักคำ'],
   ["The last lantern dies out. Everyone is pointing fingers\u2014I have to choose who to protect tonight.", 'ตะเกียงดวงสุดท้ายดับลง ทุกคนต่างชี้นิ้วใส่กัน\u2014ฉันต้องเลือกว่าคืนนี้จะปกป้องใคร'],
   ['Skip', 'ข้าม'],
+  ['(yourself)', '(ตัวคุณเอง)'],
   ['Accept', 'ตกลง'], ['Village Chat', 'แชทหมู่บ้าน'], ['Message from the Bodyguard', 'ข้อความจากบอดี้การ์ด'], ['Chat with the Bodyguard', 'แชทกับบอดี้การ์ด'], ['Close chat', 'ปิดแชท'], ['● Online', '● ออนไลน์'],
   ['Something tells me a Werewolf is sleeping in this house.', 'ฉันรู้สึกว่ามีมนุษย์หมาป่าหลับอยู่ในบ้านหลังนี้'], ['One of them has been hiding among us, slaughtering our villagers. Someone\'s already dead.', 'มันแฝงตัวอยู่ในหมู่พวกเราและฆ่าชาวบ้านไป มีคนตายไปแล้ว'], ['We can\'t let anyone else get hurt. Let\'s check it out.', 'เราปล่อยให้ใครต้องเจ็บอีกไม่ได้ ไปดูกันเถอะ'],
   ['Leave match', 'ออกจากแมตช์'], ['You will leave this match against the bots. Your progress in this match will be lost.', 'คุณจะออกจากแมตช์กับบอท ความคืบหน้าในแมตช์นี้จะหายไป'],
@@ -5751,7 +5752,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
       const sv = mpSeerView(players, me.id);
       return wrap(<NightActPP key={tag} role="seerResult" players={adapted} actor={actor} choices={mpChoices(players)} onDone={submit} seerOverride={sv} />);
     }
-    return wrap(<NightActPP key={tag} role={role} players={adapted} actor={actor} choices={mpChoices(players)} deferSeer={shadowAlive} ext={ext} hideSelf bloodMoon={!!room.bm} onDone={submit} tags={room.adv === 1 && role === 'bodyguard' ? L1_TAGS : undefined} />);
+    return wrap(<NightActPP key={tag} role={role} players={adapted} actor={actor} choices={mpChoices(players)} deferSeer={shadowAlive} ext={ext} hideSelf bloodMoon={!!room.bm} onDone={submit} tags={room.adv === 1 && role === 'bodyguard' ? { ...L1_TAGS, [me.n]: '(yourself)' } : undefined} />);
   }
   if (isWave || (ns === 'v:seer' && room.nightStyle === 'eyes_open')) {
     return wrap(<><LockView key={'z' + tag} title="Night has fallen." sub={me.a !== 1 ? 'You have been eliminated. Stay silent.' : null} />{ns !== 'v:seer' && <WaveWait players={players} room={room} />}</>, false);

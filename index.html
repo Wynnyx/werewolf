@@ -6513,6 +6513,7 @@ function aiTop(M, cands, bonus) { // the most suspected candidate, with a little
 }
 
 // What one bot submits for its night turn, in the same short fields a phone writes.
+const aiZ = (p) => p.r === 'zombie' || p.r === 'infector' || p.r === 'plaguedoctor'; // the Zombie team
 const aiPack = (p) => p.r === 'werewolf' || p.r === 'shadow'; // the wolf team: a Shadow Figure is never a target for the pack
 function aiNightWrites(b, role, ns, ctx, M) {
   const { room, players } = ctx;
@@ -6653,7 +6654,6 @@ function aiReply(b, m, ctx, M) {
   const low = String(m.m || '').toLowerCase();
   const acc = m.a ? players.find((p) => p.id === m.a && p.a === 1) : null;
   if (m.c && ROLES_DATA[m.c]) { // the human claimed a role
-    M.sus[m.i] = (M.sus[m.i] || 0) + (aiPack(b) ? 0.8 : 0.2);
     if (m.c === 'seer' && b.r === 'seer') return { m: AI_L.seerClash(hn) };
     if (m.c === 'seer' && aiPack(b)) return { m: AI_L.wolfVsSeer(hn), a: m.i };
     if (aiPack(b) && Math.random() < 0.4) return { m: AI_L.doubt(hn) };
@@ -6668,6 +6668,43 @@ function aiReply(b, m, ctx, M) {
   if (/trust me|on your side|not a wolf|not a werewolf|innocent/.test(low)) return { m: AI_L.skeptic(hn) };
   if (low.indexOf('?') >= 0) return { m: AI_L.answer() };
   return { m: AI_L.chat(hn) };
+}
+
+// Reads what a human typed in the Village Chat (or tapped as a chip) with plain keyword and name matching, and turns it into suspicion.
+// Points are the spec's scores divided by 25: +35 = 1.4, +60 = 2.4, -25 = -1, +50 = 2.
+const AI_CLAIMABLE = ['seer', 'witch', 'doctor', 'medusa', 'bodyguard', 'sniper', 'villager', 'hunter', 'mayor', 'cupid', 'spellcaster'];
+function aiParseChat(m, ctx, M) {
+  const { players } = ctx;
+  const speaker = players.find((p) => p.id === m.i);
+  const low = String(m.m || '').toLowerCase();
+  const nameIn = (n) => new RegExp('(^|[^a-z0-9])' + String(n).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z0-9])').test(low);
+  const alive = players.filter((p) => p.a === 1);
+  const named = alive.filter((p) => p.id !== m.i && nameIn(p.n)).map((p) => p.id);
+  const neg = /\b(not|isn'?t|isnt|never|no)\b[^.!?]{0,14}\b(wolf|werewolf|werewolves|zombie|infected|sus|suspicious|liar|fake)\b/.test(low);
+  const acc = !neg && /\b(werewolf|werewolves|wolf|wolves|zombie|infected|sus|suspicious|vote|liar|fake|kill|eliminate)\b/.test(low);
+  const vouch = neg || /\b(good|safe|clean|innocent|legit|trustworthy)\b/.test(low);
+  const det = /\b(seer|sniper|doctor|checked|scanned|inspected)\b/.test(low) || /\bi (looked at|saw)\b/.test(low);
+  const accused = [];
+  if (acc || (m.a && !neg)) {
+    const ts = named.slice(); if (m.a && m.a !== m.i && alive.some((p) => p.id === m.a) && !ts.includes(m.a)) ts.push(m.a);
+    ts.forEach((id) => { M.sus[id] = (M.sus[id] || 0) + (det || m.c ? 2.4 : 1.4); accused.push(id); });
+    if (accused.length) M.hTarget = accused[0];
+  } else if (vouch && named.length) {
+    named.forEach((id) => { M.sus[id] = (M.sus[id] || 0) - 1; });
+  }
+  // role claims and defenses by the speaker
+  let role = m.c && AI_CLAIMABLE.includes(m.c) ? m.c : '';
+  if (!role) { const r = AI_CLAIMABLE.find((x) => new RegExp("\\b(i'?m|i am|im)\\b[^.!?]{0,25}\\b" + x + '\\b').test(low)); if (r) role = r; }
+  if (!role && /\b(trust me|i'?m innocent|i am innocent|i'?m not a|i am not a|im not a)\b/.test(low)) role = 'villager';
+  if (role && speaker) {
+    M.claims[m.i] = role;
+    const unique = role !== 'villager' && ROLES_DATA[role] && ROLES_DATA[role].max === 1;
+    const holder = unique ? alive.find((p) => p.bot === 1 && p.r === role && p.id !== m.i) : null;
+    const rivals = alive.some((p) => p.id !== m.i && M.claims[p.id] === role);
+    if (holder) { M.sus[m.i] = (M.sus[m.i] || 0) + 2; (M.counter = M.counter || []).push({ id: holder.id, to: m.i, role, at: Date.now() + 1500 + Math.random() * 2000 }); } // a bot really holds that role: the speaker is lying
+    else if (!rivals) M.sus[m.i] = (M.sus[m.i] || 0) - 1;
+  }
+  return accused;
 }
 
 function aiSpeak(b, ctx, M) {
@@ -6705,12 +6742,27 @@ function aiVoteChoice(b, ctx, M) {
   const { players } = ctx;
   const others = players.filter((p) => p.a === 1 && p.id !== b.id);
   const human = players.find((p) => p.bot !== 1 && p.a === 1);
-  const humanBonus = (p) => (human && human.v === p.id ? 0.7 : 0);
+  const hVote = human && human.v && human.v !== 'skip' ? human.v : '';
+  const hPick = (p) => (hVote === p.id ? 0.9 : 0) + (M.hTarget === p.id ? 0.6 : 0); // where the human is pointing: a live vote or the chat accusation
+  const co = (p) => Math.min(3, (M.callout && M.callout[p.id]) || 0);
+  if (aiPack(b)) { // wolves and the Shadow Figure: never a teammate; punish whoever called out the pack or claimed a power role
+    const pool = others.filter((p) => !aiPack(p));
+    const t = aiTop(M, pool, (p) => (M.claims[p.id] === 'seer' ? 2.5 : ['witch', 'doctor'].includes(M.claims[p.id]) ? 1.5 : 0) + co(p) * 1.5 + hPick(p));
+    return t && Math.random() > 0.08 ? t.id : 'skip';
+  }
+  if (aiZ(b)) { // the horde: never its own, prefer the uninfected, and whoever called the horde out
+    const pool = others.filter((p) => !aiZ(p));
+    const clean = pool.filter((p) => !p.bt && !p.ic);
+    const t = aiTop(M, clean.length ? clean : pool, (p) => co(p) * 1.5 + hPick(p));
+    return t && Math.random() > 0.08 ? t.id : 'skip';
+  }
   if (b.r === 'seer') { const seen = M.seen[b.id] || {}; const w = others.find((p) => seen[p.id] === true); if (w) return w.id; }
-  if (aiPack(b)) { const t = aiTop(M, others.filter((p) => !aiPack(p)), (p) => (M.claims[p.id] === 'seer' ? 2 : 0) + humanBonus(p)); return t && Math.random() > 0.08 ? t.id : 'skip'; }
-  const t = aiTop(M, others, humanBonus);
+  const t = aiTop(M, others, hPick);
   if (!t) return 'skip';
-  if (aiSus(M, t.id) <= 0 && Math.random() < ((ctx.room.k || 1) <= 1 ? 0.4 : 0.15)) return 'skip'; // nobody looks guilty yet, so the bot may skip
+  if (aiSus(M, t.id) >= 0.7) return t.id; // someone is clearly under suspicion: the Village backs the top suspect
+  const follow = others.find((p) => p.id === (hVote || M.hTarget));
+  if (follow && Math.random() < 0.6) return follow.id; // nothing solid yet: usually back the human's pick instead of scattering votes
+  if (aiSus(M, t.id) <= 0 && Math.random() < ((ctx.room.k || 1) <= 1 ? 0.4 : 0.15)) return 'skip';
   return t.id;
 }
 
@@ -6761,7 +6813,7 @@ function aiTick(ctx, M) {
   }
   if (room.ph !== 'day') return;
   const alive = players.filter((p) => p.a === 1);
-  if (M.dayK !== k) { M.dayK = k; M.defend = []; M.said = {}; M.defended = {}; M.dayStart = now; M.sent = {}; M.fake = 0; M.nextChat = 0; M.plan = {}; M.inbox = []; M.myClaim = M.myClaim || {};
+  if (M.dayK !== k) { M.dayK = k; M.defend = []; M.said = {}; M.defended = {}; M.dayStart = now; M.sent = {}; M.fake = 0; M.nextChat = 0; M.plan = {}; M.inbox = []; M.callout = {}; M.hTarget = ''; M.counter = []; M.myClaim = M.myClaim || {};
     const cand = bots.filter((b) => b.a === 1 && b.s !== 1 && b.x !== 1 && b.sn !== 1); // each bot speaks on its own once (about 2 in 3 of them), spread over the first ~25s
     cand.forEach((b) => { const sure = b.r === 'seer' && alive.some((p) => p.id !== b.id && (M.seen[b.id] || {})[p.id] === true); if (sure || Math.random() < 0.65) M.plan[b.id] = now + 3000 + Math.random() * 22000; });
     if (!Object.keys(M.plan).length && cand.length) M.plan[aiPick(cand).id] = now + 6000 + Math.random() * 12000; Object.keys(M.sus).forEach((id) => { M.sus[id] *= 0.7; }); }
@@ -6777,12 +6829,16 @@ function aiTick(ctx, M) {
   Object.entries(room.dc || {}).sort((x, y) => (x[0] < y[0] ? -1 : 1)).forEach(([key, m]) => {
     if (!m || M.proc[key]) return;
     M.proc[key] = 1;
+    const fromHuman = !bots.some((b) => b.id === m.i);
     if (m.c) M.claims[m.i] = m.c;
-    if (m.a) {
-      M.sus[m.a] = (M.sus[m.a] || 0) + (bots.some((b) => b.id === m.i) ? 0.9 : 1.4);
-      const fromHuman = !bots.some((b) => b.id === m.i);
-      if (bots.some((b) => b.id === m.a && b.a === 1) && (fromHuman || !M.defended[m.a])) { M.defended[m.a] = 1; M.defend.push({ id: m.a, by: m.i, human: fromHuman, at: now + 1800 + Math.random() * 2500 }); }
-    }
+    let accused = m.a ? [m.a] : [];
+    if (fromHuman) accused = aiParseChat(m, ctx, M); // keywords + names -> suspicion, trust and role counter-claims
+    else if (m.a) M.sus[m.a] = (M.sus[m.a] || 0) + 0.9;
+    accused.forEach((aid) => {
+      const tp = players.find((x) => x.id === aid);
+      if (tp && (aiPack(tp) || aiZ(tp)) && !aiPack(players.find((x) => x.id === m.i) || {})) M.callout[m.i] = (M.callout[m.i] || 0) + 1; // who called out the wolves / the horde
+      if (bots.some((b) => b.id === aid && b.a === 1) && (fromHuman || !M.defended[aid])) { M.defended[aid] = 1; M.defend.push({ id: aid, by: m.i, human: fromHuman, at: now + 1800 + Math.random() * 2500 }); }
+    });
     if (!bots.some((b) => b.id === m.i) && !m.q && now - Number(String(key).slice(0, 13)) < 20000 && M.inbox.length < 3) { // the human said something: a bot answers it, whether it tells the truth or not
       const low = String(m.m || '').toLowerCase();
       const named = bots.find((b) => b.a === 1 && low.includes(String(b.n).toLowerCase()));
@@ -6791,8 +6847,13 @@ function aiTick(ctx, M) {
   });
   const speakers = bots.filter((b) => b.a === 1 && b.s !== 1 && b.x !== 1 && b.sn !== 1); // silenced and stoned bots stay mute
   const post = (b, o) => write({ ['dc/' + Date.now() + String(10 + Math.floor(Math.random() * 90))]: { i: b.id, m: o.m, a: o.a || '', c: o.c || '' } });
+  const ct = (M.counter || []).find((c) => now >= c.at);
   const df = M.defend.find((d) => now >= d.at);
-  if (df) { // an accused bot answers right away with a role claim (at most 2 messages per bot per day)
+  if (ct) { // "No, I'm the real Seer!" when a human claims a role that a bot truly holds
+    M.counter = M.counter.filter((c) => c !== ct);
+    const b = speakers.find((x) => x.id === ct.id); const hp = players.find((x) => x.id === ct.to);
+    if (b && hp && hp.a === 1) post(b, { m: `No, I'm the real ${ROLES_DATA[ct.role].name}! Don't trust ${hp.n}!`, a: hp.id, c: ct.role });
+  } else if (df) { // an accused bot answers right away with a role claim (at most 2 messages per bot per day)
     M.defend = M.defend.filter((d) => d !== df);
     const b = speakers.find((x) => x.id === df.id);
     if (b && (df.human || (M.sent[b.id] || 0) < 2)) { if (!df.human) M.sent[b.id] = (M.sent[b.id] || 0) + 1; post(b, aiDefense(b, ctx, M)); } // answering the human is never capped

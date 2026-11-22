@@ -3538,6 +3538,12 @@ function ShadowAct({ actions: allActions, victimName, alive, wolves = [], selfId
           {stoneIx >= 0 && <Btn className="mt-3" onClick={() => { setAct(stoneIx); setSkip(false); setPick(null); }}>Redirect the stone</Btn>}
         </Panel>
       )}
+      {wolves.length > 0 && (
+        <Panel className="mb-3 text-center" style={{ border: '1px solid rgba(251,113,133,0.6)', background: 'rgba(136,19,55,0.25)' }}>
+          <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-rose-300">{wolves.length > 1 ? 'Your Werewolves' : 'Your Werewolf'}</div>
+          <div className="font-display mt-1 text-xl font-black text-slate-50">{wolves.map((id) => nm(id)).join(' & ')}</div>
+        </Panel>
+      )}
       <Panel className="text-center" style={{ border: '1px solid rgba(239,68,68,0.6)', background: 'rgba(127,29,29,0.22)' }}>
         <div className="font-display text-lg font-bold text-slate-50">{`Werewolf Target: ${victimName}`}</div>
       </Panel>

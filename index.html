@@ -1836,6 +1836,19 @@ const TH_PAIRS = [
   ["The last lantern dies out. Everyone is pointing fingers\u2014I have to choose who to protect tonight.", 'ตะเกียงดวงสุดท้ายดับลง ทุกคนต่างชี้นิ้วใส่กัน\u2014ฉันต้องเลือกว่าคืนนี้จะปกป้องใคร'],
   ['Skip', 'ข้าม'],
   ['(yourself)', '(ตัวคุณเอง)'],
+  ["Nobody died last night. Voting blind is too risky\u2014I'm skipping.", 'เมื่อคืนไม่มีใครตาย โหวตมั่ว ๆ เสี่ยงเกินไป\u2014ฉันขอข้าม'],
+  ["Same here. One wrong vote and we kill a villager. I'm skipping too.", 'ฉันก็เหมือนกัน โหวตผิดครั้งเดียวเราก็ฆ่าชาวบ้านเอง ฉันข้ามด้วย'],
+  ["She hid crying under her blankets all night\u2014she couldn't face what she did to Stacy!", 'เธอซ่อนร้องไห้อยู่ใต้ผ้าห่มทั้งคืน\u2014เธอทนเผชิญสิ่งที่ทำกับสเตซี่ไม่ได้!'],
+  ["That's a lie! Charlie is pointing fingers to hide something!", 'โกหก! ชาร์ลีชี้นิ้วใส่คนอื่นเพื่อปิดบังอะไรบางอย่าง!'],
+  ["Two nights and Jenna still refuses to speak up!", 'สองคืนแล้ว เจนนายังไม่ยอมพูดอะไรเลย!'],
+  ["He's right. That silence is suspicious. I'm voting Jenna.", 'เขาพูดถูก ความเงียบแบบนั้นมีพิรุธ ฉันโหวตเจนนา'],
+  ["I'm scared, not guilty! Charlie is steering every vote!", 'ฉันกลัว ไม่ได้ผิด! ชาร์ลีนั่นแหละคอยชี้นำทุกโหวต!'],
+  ["Stacy slipped out that first night. She's the wolf!", 'สเตซี่แอบออกไปข้างนอกตั้งแต่คืนแรก เธอคือหมาป่า!'],
+  ["Charlie keeps pointing at everyone but himself. He's the wolf!", 'ชาร์ลีเอาแต่ชี้คนอื่นยกเว้นตัวเอง เขาคือหมาป่า!'],
+  ['Rare Card Unlocked: Medusa', 'ปลดล็อกการ์ดหายาก: เมดูซ่า'],
+  ['Victory!', 'ชนะแล้ว!'], ['You defeated the Baby Werewolf\u2014but the real Alpha is still hiding deeper in the forest...', 'คุณปราบหมาป่าน้อยได้แล้ว\u2014แต่จ่าฝูงตัวจริงยังซ่อนอยู่ลึกเข้าไปในป่า...'],
+  ['Seer unlocked', 'ปลดล็อกผู้หยั่งรู้แล้ว'], ['Bodyguard is resting and will recover for Level 2', 'บอดี้การ์ดกำลังพักฟื้น และจะกลับมาพร้อมสำหรับด่าน 2'],
+  ['Level 1 failed', 'ด่าน 1 ล้มเหลว'], ['Defeat', 'พ่ายแพ้'], ['The Werewolf got to the village first. Watch who you protect and find Charlie in time.', 'มนุษย์หมาป่าลงมือก่อน ระวังว่าจะปกป้องใคร และหาตัวชาร์ลีให้ทัน'], ['Retry Level 1', 'ลองด่าน 1 ใหม่'],
   ['Accept', 'ตกลง'], ['Village Chat', 'แชทหมู่บ้าน'], ['Message from the Bodyguard', 'ข้อความจากบอดี้การ์ด'], ['Chat with the Bodyguard', 'แชทกับบอดี้การ์ด'], ['Close chat', 'ปิดแชท'], ['● Online', '● ออนไลน์'],
   ['Something tells me a Werewolf is sleeping in this house.', 'ฉันรู้สึกว่ามีมนุษย์หมาป่าหลับอยู่ในบ้านหลังนี้'], ['One of them has been hiding among us, slaughtering our villagers. Someone\'s already dead.', 'มันแฝงตัวอยู่ในหมู่พวกเราและฆ่าชาวบ้านไป มีคนตายไปแล้ว'], ['We can\'t let anyone else get hurt. Let\'s check it out.', 'เราปล่อยให้ใครต้องเจ็บอีกไม่ได้ ไปดูกันเถอะ'],
   ['Leave match', 'ออกจากแมตช์'], ['You will leave this match against the bots. Your progress in this match will be lost.', 'คุณจะออกจากแมตช์กับบอท ความคืบหน้าในแมตช์นี้จะหายไป'],
@@ -4746,6 +4759,7 @@ const roomPlayers = (room) => Object.entries((room && room.pl) || {}).map(([id, 
 const mpNightRoles = (players) => Array.from(new Set(players.map((p) => p.r).filter((r) => MP_ACTIVE.includes(r)))).sort((a, b) => ROLES_DATA[a].nightOrder - ROLES_DATA[b].nightOrder);
 function mpWinner(players) {
   if (!players.some((p) => p.r)) return '';
+  if (ADV1) { const h = players.find((p) => p.bot !== 1); if (h && h.r && h.a !== 1) return 'werewolf'; } // Level 1: if Pooh falls, the level is lost
   if (loversFaction(players.map((p) => ({ id: p.id, role: p.r, alive: p.a === 1 && !!p.r, lover: p.lv })).filter((i) => i.role))) return 'lovers';
   return threeWay(players.map((p) => ({ role: p.r, alive: p.a === 1, side: pdSide(p.pdc, p.pdi, p.pdl) })));
 }
@@ -5904,6 +5918,7 @@ function useNightDirector({ room, players, write }) {
 }
 
 // Votes in a room snapshot. Silenced players cannot vote, so they are left out of the voter count and their ballots are ignored.
+let ADV1 = false; // set by MpRoom: Campaign Level 1 rules (a tied skip does not block a vote; the Bodyguard's death loses the level)
 function mpTally(players) {
   const byId = Object.fromEntries(players.map((p) => [p.id, p]));
   const alive = players.filter((p) => p.a === 1);
@@ -5913,7 +5928,7 @@ function mpTally(players) {
   voters.forEach((p) => { const w = p.r === 'mayor' ? 2 : 1; if (p.v === 'skip') skips += w; else if (p.v && byId[p.v] && byId[p.v].a === 1) tally[p.v] = (tally[p.v] || 0) + w; });
   const ranked = Object.keys(tally).sort((x, y) => tally[y] - tally[x]);
   const lead = ranked[0] || '';
-  const skip = skips > 0 && skips >= (tally[lead] || 0); // skipping wins when it matches or beats the top vote
+  const skip = skips > 0 && (ADV1 ? skips > (tally[lead] || 0) : skips >= (tally[lead] || 0)); // skipping wins when it matches or beats the top vote (Level 1: only when it beats it)
   const top = skip ? '' : lead;
   const tie = !skip && ranked.length > 1 && tally[ranked[1]] === tally[lead];
   return { tally, ranked, top, tie, skip, skips, voters, voted: voters.filter((p) => p.v).length };
@@ -6223,20 +6238,33 @@ function AdvTip({ text }) {
   );
 }
 
-function MpOver({ room, players, meId }) {
+function MpOver({ room, players, meId, onRetry }) {
   const W = WIN_UI[room.w] || WIN_UI.werewolf;
   const [seen, setSeen] = useState({});
   const [view, setView] = useState('');
-  useEffect(() => { Sfx.win(room.w === 'zombie' ? 'zombie' : room.w); if (room.adv === 1 && room.w === 'village') saveAdv({ ...loadAdv(), classicLevel1Cleared: true }); }, []);
+  useEffect(() => { Sfx.win(room.w === 'zombie' ? 'zombie' : room.w); if (room.adv === 1 && room.w === 'village') saveAdv({ ...loadAdv(), classicLevel1Cleared: true, seerUnlocked: true, bodyguardResting: true }); }, []);
   return (
     <div className="flex flex-1 flex-col gap-4">
       {room.adv === 1 && room.w === 'village' && (
         <Panel className="text-center" role="status" style={{ border: '1px solid rgba(251,191,36,0.8)', background: 'linear-gradient(160deg, rgba(120,53,15,0.55), rgba(21,26,36,0.95))', boxShadow: '0 0 30px -6px rgba(251,191,36,0.6)' }}>
           <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-amber-300">Level 1 cleared ★</div>
-          <h2 className="font-display mt-1 text-2xl font-black text-amber-100">Victory! Rare Card Unlocked: Medusa</h2>
+          <h2 className="font-display mt-1 text-2xl font-black text-amber-100">Victory!</h2>
+          <p className="mt-2 text-sm leading-snug text-amber-50">You defeated the Baby Werewolf&mdash;but the real Alpha is still hiding deeper in the forest...</p>
+          <ul className="mt-3 flex flex-col gap-1.5 text-left text-[13px] font-semibold">
+            <li className="rounded-lg px-3 py-2 text-emerald-200" style={{ background: 'rgba(6,78,59,0.4)', border: '1px solid rgba(52,211,153,0.5)' }}>Seer unlocked</li>
+            <li className="rounded-lg px-3 py-2 text-slate-200" style={{ background: 'rgba(30,41,59,0.6)', border: '1px solid rgba(148,163,184,0.45)' }}>Bodyguard is resting and will recover for Level 2</li>
+            <li className="rounded-lg px-3 py-2 text-violet-200" style={{ background: 'rgba(76,29,149,0.35)', border: '1px solid rgba(167,139,250,0.5)' }}>Rare Card Unlocked: Medusa</li>
+          </ul>
         </Panel>
       )}
-      {room.adv === 1 && room.w !== 'village' && <p className="text-center text-sm font-semibold text-amber-200">Level 1 not cleared. Play again and find the Werewolf!</p>}
+      {room.adv === 1 && room.w !== 'village' && (
+        <Panel className="text-center" role="status" style={{ border: '1px solid rgba(239,68,68,0.7)', background: 'linear-gradient(160deg, rgba(127,29,29,0.5), rgba(21,26,36,0.95))' }}>
+          <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-red-300">Level 1 failed</div>
+          <h2 className="font-display mt-1 text-2xl font-black text-red-100">Defeat</h2>
+          <p className="mt-2 text-sm leading-snug text-red-50">The Werewolf got to the village first. Watch who you protect and find Charlie in time.</p>
+          {onRetry && <Btn className="mt-4" onClick={onRetry}>Retry Level 1</Btn>}
+        </Panel>
+      )}
       <Panel className="text-center" style={{ border: `1px solid ${W.color}`, background: W.bg }}>
         <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-300">Game over</div>
         <h2 className="font-display mt-1 text-3xl font-black" style={{ color: W.title }}>{W.name}</h2>
@@ -6493,7 +6521,7 @@ function MpHostPanel({ room, players, write, director }) {
 }
 
 /* ---------- the room (everything after joining) ---------- */
-function MpRoom({ session, onExit, onPhase }) {
+function MpRoom({ session, onExit, onPhase, onRetry }) {
   const { code, pid } = session;
   const { room, err, refresh } = useRoom(code);
   const [cardsStep, setCardsStep] = useState(false);
@@ -6505,6 +6533,7 @@ function MpRoom({ session, onExit, onPhase }) {
   const [busy, setBusy] = useState(false);
   const [wErr, setWErr] = useState('');
   const players = useMemo(() => roomPlayers(room), [room]);
+  ADV1 = !!room && room.adv === 1;
   const soloAi = !!room && room.ai === 1 && players.filter((p) => p.bot !== 1).length === 1; // one human against bots (Adventure / Custom AI): the card flips itself and there is no ready wait. Rooms with 2+ people keep tap-to-reveal and the ready count.
   const mx = (room && room.mx) || MP_MAX;
   const me = players.find((p) => p.id === pid);
@@ -6639,7 +6668,7 @@ function MpRoom({ session, onExit, onPhase }) {
     if (ph === 'reveal') body = <MpReveal me={me} ready={me.d === 1} readyCount={players.filter((p) => p.d === 1).length} total={players.length} onReady={() => write({ [`pl/${pid}/d`]: 1 })} onLeave={() => setConfirmLeave(true)} instant={soloAi} prologue={soloAi && room.adv === 1 ? { done: l1Pro, finish: () => setL1Pro(true) } : null} />;
     else if (ph === 'night') body = <MpNight key={`n${room.k}`} me={me} players={players} room={room} write={write} immersive={!isHost || hostPlays} onLeave={() => setConfirmLeave(true)} />;
     else if (ph === 'day') body = <MpDay key={`d${room.k}`} me={me} players={players} room={room} write={write} onTimeUp={isHost && hostPlays ? () => { if (room.vd === 1) return; const t = mpTally(players); write(mpVotePatch(players, t.tie ? '' : t.top, { tie: t.tie, skip: t.skip, none: t.voted === 0 })); } : undefined} />;
-    else body = <MpOver room={room} players={players} meId={pid} />;
+    else body = <MpOver room={room} players={players} meId={pid} onRetry={onRetry} />;
     if (hostPlays && ph !== 'lobby') body = <div className="flex flex-1 flex-col gap-4">{body}{ph === 'over' && <><Btn variant="secondary" disabled={busy} onClick={leave}>Exit to Home</Btn><MpHostPanel room={room} players={players} write={write} director={director} /></>}</div>;
   } else {
     body = <MpMod room={room} players={players} me={me} write={write} director={director} />;
@@ -6709,7 +6738,7 @@ function MpRoom({ session, onExit, onPhase }) {
 // Adventure progress lives on this device only.
 const loadAdv = () => { try { const v = JSON.parse(localStorage.getItem('adventureProgress') || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } };
 const saveAdv = (o) => { try { localStorage.setItem('adventureProgress', JSON.stringify(o)); } catch (e) { /* storage unavailable */ } };
-const ADV_L1_DECK = { werewolf: 1, seer: 1, bodyguard: 1, villager: 1 };
+const ADV_L1_DECK = { werewolf: 1, bodyguard: 1, villager: 2 }; // Pooh (Bodyguard), Charlie (Werewolf), Stacy and Jenna (Villagers)
 const AI_NAMES = ['Darren', 'Jenna', 'Charlie', 'James', 'Ava', 'Stacy', 'Mira', 'Bram', 'Ivy', 'Corvin', 'Sable', 'Thorn', 'Wren', 'Dax', 'Lysa', 'Odin', 'Pia', 'Rook', 'Nyx', 'Hale', 'Juno', 'Kade', 'Vera', 'Finn'];
 
 // The six house names come first (in random order), then the rest at random; never a name already in the room.
@@ -6760,7 +6789,8 @@ function aiNightWrites(b, role, ns, ctx, M) {
   if (b.sd === k) return { [`pl/${b.id}/nd`]: 1 }; // sedated: sleeps through it
   if (role === 'werewolf') { // prefers non-wolves, and anyone who claimed to be the Seer
     const c = others.filter((p) => !aiPack(p));
-    const scripted = room.adv === 1 && k === 1 ? c.find((p) => p.n === 'Stacy') : null; // Level 1, Night 1: Charlie goes for Stacy
+    const byN = (n) => c.find((p) => p.n === n); const pooh = c.find((p) => p.bot !== 1);
+    const scripted = room.adv === 1 ? (k === 1 ? byN('Stacy') : k === 2 ? pooh : (byN('Stacy') || pooh || byN('Jenna'))) : null; // Level 1: Night 1 Stacy, Night 2 the Bodyguard, then Stacy first, else the Bodyguard, else Jenna
     const t1 = scripted || aiTop(M, c, (p) => (M.claims[p.id] === 'seer' ? 3 : 0));
     const t2 = room.bm ? aiTop(M, c.filter((p) => !t1 || p.id !== t1.id)) : null;
     return wr((id) => done(id, t1 ? t1.id : '', { [`pl/${id}/t2`]: t2 ? t2.id : '' }));
@@ -6997,6 +7027,54 @@ function aiVoteChoice(b, ctx, M) {
   return t.id;
 }
 
+// Campaign Level 1, the day: Charlie, Stacy and Jenna follow short scripted lines and votes that depend only on who is still alive.
+const L1_DAY = {
+  d1skipC: 'Nobody died last night. Voting blind is too risky—I\'m skipping.',
+  d1skipS: 'Same here. One wrong vote and we kill a villager. I\'m skipping too.',
+  d1frameC: 'She hid crying under her blankets all night—she couldn\'t face what she did to Stacy!',
+  d1frameJ: 'That\'s a lie! Charlie is pointing fingers to hide something!',
+  d2silentC: 'Two nights and Jenna still refuses to speak up!',
+  d2silentS: 'He\'s right. That silence is suspicious. I\'m voting Jenna.',
+  d2scared: 'I\'m scared, not guilty! Charlie is steering every vote!',
+  d3accC: 'Stacy slipped out that first night. She\'s the wolf!',
+  d3accS: 'Charlie keeps pointing at everyone but himself. He\'s the wolf!'
+};
+function aiL1Day(ctx, M, go) {
+  const { room, players, write } = ctx;
+  const k = room.k || 1;
+  const by = (n) => players.find((p) => p.n === n && p.bot === 1);
+  const ch = by('Charlie'); const st = by('Stacy'); const je = by('Jenna');
+  const hum = players.find((p) => p.bot !== 1);
+  const up = (p) => !!p && p.a === 1;
+  if (!up(ch) || !hum) return;
+  const say = (b, m, a) => write({ ['dc/' + Date.now() + String(10 + Math.floor(Math.random() * 90))]: { i: b.id, m, a: a || '', c: '' } });
+  let lines = []; let votes = {};
+  if (k === 1 && up(st)) { // nobody died on Night 1: Charlie and Stacy both skip, Jenna follows Pooh, so Pooh decides
+    lines = [[ch, L1_DAY.d1skipC], [st, L1_DAY.d1skipS]];
+    votes = { [ch.id]: 'skip', [st.id]: 'skip', ...(up(je) ? { [je.id]: 'follow' } : {}) };
+  } else if (k === 1) { // Stacy died: Charlie frames Jenna, Jenna panics and votes Charlie
+    lines = [[ch, L1_DAY.d1frameC, je && je.id]]; if (up(je)) lines.push([je, L1_DAY.d1frameJ, ch.id]);
+    votes = { ...(up(je) ? { [ch.id]: je.id, [je.id]: ch.id } : { [ch.id]: 'skip' }) };
+  } else if (up(je)) { // Day 2+: Jenna is still silent, so Charlie (and Stacy, if alive) turn on her
+    lines = [[ch, L1_DAY.d2silentC, je.id]]; if (up(st)) lines.push([st, L1_DAY.d2silentS, je.id]); lines.push([je, L1_DAY.d2scared, ch.id]);
+    votes = { [ch.id]: je.id, ...(up(st) ? { [st.id]: je.id } : {}), [je.id]: ch.id };
+  } else if (up(st)) { // only Pooh, Charlie and Stacy remain: they accuse each other and Pooh decides
+    lines = [[ch, L1_DAY.d3accC, st.id], [st, L1_DAY.d3accS, ch.id]];
+    votes = { [ch.id]: st.id, [st.id]: ch.id };
+  }
+  lines.forEach(([b, m, a], i) => { if (b && go('l1d' + k + ':' + i, 1800 + i * 3200, 2600 + i * 3200)) say(b, m, a); });
+  const humanDone = !!hum.v || hum.a !== 1;
+  if (!humanDone) return;
+  Object.keys(votes).forEach((id) => {
+    const b = players.find((p) => p.id === id);
+    if (!b || b.a !== 1 || b.v) return;
+    if (!go('l1v' + k + id, 1500, 4500)) return;
+    let v = votes[id];
+    if (v === 'follow') v = hum.v && hum.v !== b.id ? hum.v : 'skip';
+    write({ [`pl/${id}/v`]: v });
+  });
+}
+
 function aiTick(ctx, M) {
   const { room, players, write } = ctx;
   if (!room || !room.pl) return;
@@ -7056,6 +7134,7 @@ function aiTick(ctx, M) {
     write({ [`pl/${t.id}/a`]: 0, [`pl/${b.id}/hs`]: 1, [`an/x/${ts}`]: `${b.n} fired a last shot and took ${t.n} down.`, ...(pt ? { [`pl/${pt.id}/a`]: 0, [`an/x/${ts}h`]: `${pt.n} died of heartbreak.` } : {}) });
   });
   if (room.vd === 1) return;
+  if (room.adv === 1) { aiL1Day(ctx, M, go); return; } // Level 1: scripted day
   // Read the new discussion: accusations raise suspicion, claims are remembered, accused bots answer back.
   Object.entries(room.dc || {}).sort((x, y) => (x[0] < y[0] ? -1 : 1)).forEach(([key, m]) => {
     if (!m || M.proc[key]) return;
@@ -7782,7 +7861,7 @@ function AiScreen({ onBack, onPhase }) {
     catch (e) { Mp.local = false; setErr('Could not start the match. Try again.'); }
     setBusy(false);
   };
-  if (view === 'room' && session) return <MpRoom session={session} onExit={exitRoom} onPhase={onPhase} />;
+  if (view === 'room' && session) return <MpRoom key={session.code} session={session} onExit={exitRoom} onPhase={onPhase} onRetry={session.ai ? () => playLevel1() : undefined} />;
   const playLevel1 = () => { // fixed training match: no deck builder, the human is the Bodyguard
     setGameMode('classic');
     const c = { n: 4, deck: { ...emptyDeck(), ...ADV_L1_DECK }, adv: 1 };

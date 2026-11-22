@@ -7776,7 +7776,7 @@ const MapPainted = React.memo(function MapPainted({ tab, src, tiles, w, h, clear
               {lit && <span className="map-pin-ring" />}{n === 2 && l2 === 2 && <span className="map-pin-burst" />}
               <span data-node={n}>{n}</span>
               {(!lit || (n === 2 && l2 === 2)) && <svg className={`map-pin-lock ${n === 2 && l2 === 2 ? 'lockbreak' : ''}`} width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}
-              {lit && cleared && <span className="map-pin-star">&#9733;</span>}
+              {n === 1 && lit && cleared && <span className="map-pin-star">&#9733;</span>}
             </div>
             {lit && hint && <span className="guide-arrow" aria-hidden="true"><svg width="40" height="28" viewBox="0 0 40 28"><path d="M2 9 H20 V2 L38 14 L20 26 V19 H2 Z" fill="#EF4444" stroke="#7F1D1D" strokeWidth="2" strokeLinejoin="round" /></svg></span>}
             {lit && <div data-node={n} className="map-pin-label">{n === 1 ? <>House #1 &mdash; Harbor Cottage</> : 'Level 2 \u2014 Unlocked'}</div>}

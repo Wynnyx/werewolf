@@ -1824,7 +1824,7 @@ const TH_PAIRS = [
   ['World Map Art Style', 'สไตล์ภาพแผนที่ผจญภัย'], ['Storybook Hand-Painted', 'ภาพวาดนิทานดาร์กแฟนตาซี'], ['Storybook Hand-Painted HD', 'ภาพวาดนิทานดาร์กแฟนตาซี HD'], ['Storybook Ultra HD', 'ภาพวาดนิทาน อัลตร้า HD'], ['Artwork for the Adventure Classic world map. Change it any time.', 'ภาพพื้นหลังของแผนที่คลาสสิกในโหมดผจญภัย เปลี่ยนได้ทุกเมื่อ'],
   ['LEVEL 1 — The First Howl', 'ด่าน 1 — เสียงหอนแรก'], ['Harbor Cottage', 'กระท่อมท่าเรือ'], ['Your Role: Bodyguard', 'บทบาทของคุณ: บอดี้การ์ด'], ['Play Level 1', 'เล่นด่าน 1'], ['Unlocked', 'ปลดล็อกแล้ว'], ['Cleared ★', 'ผ่านแล้ว ★'], ['House #1', 'บ้านหลังที่ 1'], ['Back to map', 'กลับไปแผนที่'],
   ['Tip: As Bodyguard, protect someone each night. Guess who the Werewolf will attack!', 'เคล็ดลับ: ในฐานะบอดี้การ์ด ให้ปกป้องใครสักคนทุกคืน ลองเดาว่ามนุษย์หมาป่าจะโจมตีใคร!'], ['Tip: Read the Village Chat, work out who the Werewolf is, and vote together!', 'เคล็ดลับ: อ่านแชตหมู่บ้าน หาว่าใครคือมนุษย์หมาป่า แล้วโหวตไปด้วยกัน!'],
-  ['Accept', 'ตกลง'], ['Message from the Bodyguard', 'ข้อความจากบอดี้การ์ด'], ['Chat with the Bodyguard', 'แชทกับบอดี้การ์ด'], ['Close chat', 'ปิดแชท'], ['● Online', '● ออนไลน์'],
+  ['Accept', 'ตกลง'], ['Village Chat', 'แชทหมู่บ้าน'], ['Message from the Bodyguard', 'ข้อความจากบอดี้การ์ด'], ['Chat with the Bodyguard', 'แชทกับบอดี้การ์ด'], ['Close chat', 'ปิดแชท'], ['● Online', '● ออนไลน์'],
   ['Something tells me a Werewolf is sleeping in this house.', 'ฉันรู้สึกว่ามีมนุษย์หมาป่าหลับอยู่ในบ้านหลังนี้'], ['One of them has been hiding among us, slaughtering our villagers. Someone\'s already dead.', 'มันแฝงตัวอยู่ในหมู่พวกเราและฆ่าชาวบ้านไป มีคนตายไปแล้ว'], ['We can\'t let anyone else get hurt. Let\'s check it out.', 'เราปล่อยให้ใครต้องเจ็บอีกไม่ได้ ไปดูกันเถอะ'],
   ['Leave match', 'ออกจากแมตช์'], ['You will leave this match against the bots. Your progress in this match will be lost.', 'คุณจะออกจากแมตช์กับบอท ความคืบหน้าในแมตช์นี้จะหายไป'],
   ['Level {#} — Locked (Coming Soon)', 'ด่าน {1} — ล็อกอยู่ (เร็ว ๆ นี้)'],
@@ -3396,7 +3396,7 @@ function DayStage({ children }) {
 }
 // Local discussion timer: tap to start or pause, add a minute, reset.
 // Starts by itself. At 0:00 it rings a bell and calls onEnd (which opens the vote). startAt (ms) syncs devices to one clock.
-function DayTimer({ minutes = 3, startAt = 0, onEnd, disabled = false }) {
+function DayTimer({ minutes = 3, startAt = 0, onEnd, disabled = false, extra = null }) {
   const [left, setLeft] = useState(() => (startAt ? Math.max(0, minutes * 60 - Math.floor((Date.now() - startAt) / 1000)) : minutes * 60));
   const [on, setOn] = useState(!disabled);
   const prev = useRef(left);
@@ -3413,7 +3413,8 @@ function DayTimer({ minutes = 3, startAt = 0, onEnd, disabled = false }) {
   }, [left]);
   const mm = String(Math.floor(left / 60)).padStart(1, '0'), ss = String(left % 60).padStart(2, '0');
   return (
-    <Panel className="text-center">
+    <Panel className="relative text-center">
+      {extra && <div className="absolute right-3 top-3">{extra}</div>}
       <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-300">Discussion</div>
       <div className={`font-display mt-1 text-5xl font-black tabular-nums ${left === 0 ? 'hint-pulse text-red-300' : 'text-slate-50'}`} role="timer" aria-live="off">{mm}:{ss}</div>
       {left === 0 && <p className="mt-1 text-sm font-semibold text-red-200">Time is up. Time to vote.</p>}
@@ -6064,7 +6065,6 @@ function MpDay({ me, players, room, write, onTimeUp }) {
       )}
       <div className="mt-8 flex items-center justify-between gap-3">
         <div className="font-display text-lg font-bold tracking-wide text-slate-100">{voting && me.a === 1 ? 'Trial Voting' : 'Day Discussion'}</div>
-        {room.ai === 1 && <ChatButton unread={unread} onClick={() => setChatOpen(true)} />}
       </div>
       {hunterShot && (
         <Panel style={{ border: '1px solid rgba(245,158,11,0.6)' }}>
@@ -6075,7 +6075,9 @@ function MpDay({ me, players, room, write, onTimeUp }) {
         </Panel>
       )}
       {!(voting && me.a === 1) && <AnnounceCard room={room} players={players} />}
-      <DayTimer startAt={fxKey ? Number(fxKey) : 0} onEnd={() => { if (me.a === 1) setVoting(true); if (onTimeUp) onTimeUp(); }} />{/* stays mounted on both pages so Pause and +1 min carry over */}
+      {room.adv === 1 // Campaign Level 1: one player against bots, so there is no discussion timer, just the chat
+        ? <Panel className="flex items-center justify-between gap-3"><div className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-300">Village Chat</div><ChatButton unread={unread} onClick={() => setChatOpen(true)} /></Panel>
+        : <DayTimer startAt={fxKey ? Number(fxKey) : 0} onEnd={() => { if (me.a === 1) setVoting(true); if (onTimeUp) onTimeUp(); }} extra={room.ai === 1 ? <ChatButton unread={unread} onClick={() => setChatOpen(true)} /> : null} />}{/* stays mounted on both pages so Pause and +1 min carry over */}
       {!(voting && me.a === 1) ? (
         <>
           {me.a !== 1

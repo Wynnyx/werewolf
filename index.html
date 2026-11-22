@@ -6329,7 +6329,7 @@ function Level1Prologue({ onDone, onLeave }) {
     const t2 = setTimeout(() => { setTyping(false); setN(n + 1); Sfx.msg(); }, 2400 + Math.min(400, L1_LINES[n].t.length * 4));
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [n]);
-  useEffect(() => { if (endRef.current && endRef.current.scrollIntoView) endRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [n, typing]);
+  useEffect(() => { const go = () => { if (endRef.current && endRef.current.scrollIntoView) endRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' }); }; go(); const t = setTimeout(go, 380); return () => clearTimeout(t); }, [n, typing]); // second pass once the button space has opened
   const skip = () => { if (n < total && !leaving) { setTyping(false); setN(n + 1); Sfx.msg(); } }; // tap anywhere: show the next line right away
   const skipAll = (e) => { e.stopPropagation(); if (n < total && !leaving) { setTyping(false); setN(total); Sfx.msg(); } }; // reveal every remaining line at once
   const go = (e) => { e.stopPropagation(); if (leaving) return; setLeaving(true); setTimeout(onDone, 500); };
@@ -6357,6 +6357,7 @@ function Level1Prologue({ onDone, onLeave }) {
         <div className="flex min-h-full flex-col justify-end gap-3">
           {L1_LINES.slice(0, n).map((L, i) => bubble(L, i))}
           {typing && cur && row(cur, n, <div className={`${cur.s === 'r' ? 'guide-bub' : 'guide-bub-l'} guide-dots rounded-[20px] px-3.5 py-2.5`} style={L1_BUB} aria-hidden="true"><span /><span /><span /></div>, 'typing')}
+          <div aria-hidden="true" style={{ height: n >= total ? 84 : 0, transition: 'height 300ms ease' }} />{/* room for the button, so the last thought is never hidden under it */}
           <div ref={endRef} />
         </div>
       </div>

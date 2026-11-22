@@ -7470,6 +7470,7 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
   const [chat, setChat] = useState(false); // the Bodyguard's chat panel
   const [unread, setUnread] = useState(true); // red dot on his avatar until the chat is opened
   const [heard, setHeard] = useState(() => !!loadAdv().guideL1); // has read the Level 1 chat (the arrow points at Level 1 from then on)
+  const [read, setRead] = useState(false); // read the chat during this visit: the arrow moves from the Bodyguard to Level 1 (every visit, until Level 1 is cleared)
   const [cstep, setCstep] = useState(0); // 0 typing, 1 first message, 2 both messages
   const ctimers = useRef([]);
   const lockR = useRef(false);
@@ -7505,11 +7506,11 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
   const openChat = () => {
     ctimers.current.forEach(clearTimeout); ctimers.current = [];
     setChat(true); setUnread(false);
-    if (heard) { setCstep(GUIDE_MSGS.length); return; }
+    if (heard) { setCstep(GUIDE_MSGS.length); setRead(true); return; }
     setCstep(0);
-    GUIDE_MSGS.forEach((_, i) => ctimers.current.push(setTimeout(() => { setCstep(i + 1); Sfx.chime(); if (i === GUIDE_MSGS.length - 1) { setHeard(true); saveAdv({ ...loadAdv(), guideL1: 1 }); } }, 800 + i * 1700)));
+    GUIDE_MSGS.forEach((_, i) => ctimers.current.push(setTimeout(() => { setCstep(i + 1); Sfx.chime(); if (i === GUIDE_MSGS.length - 1) { setRead(true); setHeard(true); saveAdv({ ...loadAdv(), guideL1: 1 }); } }, 800 + i * 1700)));
   };
-  const closeChat = () => { ctimers.current.forEach(clearTimeout); ctimers.current = []; setChat(false); if (cstep >= GUIDE_MSGS.length) { setHeard(true); saveAdv({ ...loadAdv(), guideL1: 1 }); } };
+  const closeChat = () => { ctimers.current.forEach(clearTimeout); ctimers.current = []; setChat(false); if (cstep >= GUIDE_MSGS.length) { setRead(true); setHeard(true); saveAdv({ ...loadAdv(), guideL1: 1 }); } };
   useEffect(() => () => ctimers.current.forEach(clearTimeout), []);
   const goL1 = () => { // zoom the camera into House #1, then open the first-person scene
     if (lockR.current) return; lockR.current = true; setSel(1); setToast(0); setChat(false); setZoomIn(true);
@@ -7572,7 +7573,7 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
       {!artReady && <div aria-hidden="true" className="map-shimmer absolute inset-0" />}
       <div ref={vp} className="absolute inset-0 select-none" style={{ touchAction: 'none', cursor: 'grab' }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={(e) => { if (e.pointerType === 'mouse' && ptrs.current.has(e.pointerId)) up(e); }}>
         <div ref={world} style={{ width: dim.w, height: dim.h, transformOrigin: '0 0', willChange: 'transform', visibility: artReady ? 'visible' : 'hidden' }}>
-          {pa ? <MapPainted tab={tab} src={pa.src} tiles={pa.tiles} w={pa.w} h={pa.h} cleared={cleared} selected={sel} hint={heard && !cleared && (!chat || cstep >= GUIDE_MSGS.length)} /> : <MapWorld tab={tab} cleared={cleared} selected={sel} art={{}} />}
+          {pa ? <MapPainted tab={tab} src={pa.src} tiles={pa.tiles} w={pa.w} h={pa.h} cleared={cleared} selected={sel} hint={read && !cleared && (!chat || cstep >= GUIDE_MSGS.length)} /> : <MapWorld tab={tab} cleared={cleared} selected={sel} art={{}} />}
         </div>
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10" style={{ background: 'linear-gradient(180deg, rgba(6,12,24,0.94) 55%, rgba(6,12,24,0))', paddingTop: 'max(8px, env(safe-area-inset-top))', paddingBottom: 22 }}>
@@ -7598,7 +7599,7 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
       {tab === 'classic' && !zoomIn && (
         <button type="button" onClick={chat ? closeChat : openChat} aria-label="Message from the Bodyguard" className="absolute z-30 flex items-center justify-center" style={{ right: 12, top: 'calc(max(8px, env(safe-area-inset-top)) + 150px)', width: 54, height: 66, borderRadius: '50%', padding: 0, background: '#0a0e18', border: '2px solid #FDE68A', boxShadow: '0 0 16px rgba(251,191,36,0.45), 0 6px 16px rgba(0,0,0,0.6)' }}>
           <span className="block h-full w-full overflow-hidden" style={{ borderRadius: '50%' }}><img src="images/guide-bodyguard.webp" alt="" draggable={false} className="h-full w-full select-none" style={{ objectFit: 'cover' }} /></span>
-          {!heard && !chat && <span className="guide-arrow gy" aria-hidden="true"><svg width="40" height="28" viewBox="0 0 40 28"><path d="M2 9 H20 V2 L38 14 L20 26 V19 H2 Z" fill="#EF4444" stroke="#7F1D1D" strokeWidth="2" strokeLinejoin="round" /></svg></span>}
+          {!read && !cleared && !chat && <span className="guide-arrow gy" aria-hidden="true"><svg width="40" height="28" viewBox="0 0 40 28"><path d="M2 9 H20 V2 L38 14 L20 26 V19 H2 Z" fill="#EF4444" stroke="#7F1D1D" strokeWidth="2" strokeLinejoin="round" /></svg></span>}
           {unread && <span className="guide-dot absolute" style={{ right: -2, top: 2, width: 15, height: 15, borderRadius: 9999, background: '#EF4444', border: '2px solid #0a0e18' }} />}
         </button>
       )}

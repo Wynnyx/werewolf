@@ -3392,6 +3392,9 @@ function DayArt() {
     </>
   );
 }
+function RevealBackdrop() { // the card-reveal page sits on the moonlit night sky
+  return <div className="pointer-events-none fixed inset-0" style={{ zIndex: 0, background: '#05060d' }} aria-hidden="true"><img src="images/reveal-bg.webp" alt="" draggable={false} className="h-full w-full select-none" style={{ objectFit: 'cover' }} /></div>;
+}
 function DayBackdrop() {
   return <div className="pointer-events-none fixed inset-0" style={{ zIndex: 0, background: '#0A0A12' }} aria-hidden="true"><DayArt /></div>;
 }
@@ -6150,6 +6153,15 @@ function Level1Prologue({ onDone, onLeave }) {
   const [typing, setTyping] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const endRef = useRef(null);
+  const [splats, setSplats] = useState([]);
+  const stimers = useRef([]);
+  useEffect(() => () => stimers.current.forEach(clearTimeout), []);
+  const spawn = (e) => { // a tap anywhere splashes blood, like the home screen (Settings > Tap Blood Effects)
+    if (!getSettings().blood || L1_REDUCED()) return;
+    const sp = makeBurst(e.clientX, e.clientY);
+    setSplats((a) => [...a.slice(-15), sp]);
+    stimers.current.push(setTimeout(() => setSplats((a) => a.filter((x) => x.id !== sp.id)), 2600));
+  };
   useEffect(() => {
     if (n >= total) { setTyping(false); return undefined; }
     const lead = n === 0 ? 900 : 800; const t1 = setTimeout(() => setTyping(true), lead); // ~2.4-2.8 s per message in all: a beat, then the typing dots, then the bubble
@@ -6171,7 +6183,7 @@ function Level1Prologue({ onDone, onLeave }) {
     </div>, i);
   const cur = n < total ? L1_LINES[n] : null;
   return (
-    <div role="dialog" aria-label="Harbor Cottage, before Night 1" className="fixed inset-0 z-40 overflow-hidden" style={{ background: '#05060d' }} onClick={skip}>
+    <div role="dialog" aria-label="Harbor Cottage, before Night 1" className="fixed inset-0 z-40 overflow-hidden" style={{ background: '#05060d' }} onPointerDown={spawn} onClick={skip}>
       <img src={IMG} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 h-full w-full select-none" style={{ objectFit: 'cover', filter: 'blur(26px) brightness(0.4)', transform: 'scale(1.15)' }} />
       <div className="absolute inset-y-0 left-1/2 w-full -translate-x-1/2" style={{ maxWidth: 'calc(100dvh * 9 / 16)' }}>
         <img src={IMG} alt="" draggable={false} className="h-full w-full select-none" style={{ objectFit: 'cover', objectPosition: '50% 42%' }} />
@@ -6192,6 +6204,7 @@ function Level1Prologue({ onDone, onLeave }) {
           <button type="button" data-ui-sound="primary" onClick={go} className="guide-bub flex min-h-[48px] items-center gap-2 rounded-full px-6 text-[15px] font-bold text-white" style={{ background: 'linear-gradient(180deg, #3B82F6, #1D4ED8)', border: '1px solid rgba(191,219,254,0.7)', boxShadow: '0 6px 18px rgba(2,6,23,0.6), 0 0 16px rgba(59,130,246,0.45)' }}>{'🛡️ Choose Who to Protect'}</button>
         </div>
       )}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[25]">{splats.map((sp) => <DotBurst key={sp.id} b={sp} />)}</div>
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-30" style={{ background: '#03040a', opacity: leaving ? 1 : 0, transition: 'opacity 480ms ease-in-out' }} />
     </div>
   );
@@ -6635,6 +6648,7 @@ function MpRoom({ session, onExit, onPhase }) {
   return (
     <>
     {ph === 'day' && <DayBackdrop />}
+    {ph === 'reveal' && <RevealBackdrop />}
     {showPlayer && me && room.adv === 1 && room.k === 1 && ((ph === 'night' && room.ns === 'i') || ph === 'day') && <AdvTip key={ph} text={ph === 'night' ? "Tip: Remember everyone's alibi before the lantern went out..." : 'Tip: Read the Village Chat, work out who the Werewolf is, and vote together!'} />}
     {showPlayer && me && ph === 'day' && <VoteResultGate room={room} code={code} />}
     {showPlayer && me && ph === 'day' && <ElimGate me={me} room={room} code={code} />}

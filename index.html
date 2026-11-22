@@ -1832,6 +1832,7 @@ const TH_PAIRS = [
   ["I watched Stacy go outside from the window... there's something off about her.", 'ฉันเห็นสเตซี่เดินออกไปข้างนอกจากหน้าต่าง... เธอดูแปลก ๆ'],
   ["Come on, what's wrong with you? I really just needed to go, I can't exactly help that.", 'เอาจริงดิ เป็นอะไรของนาย? ฉันแค่ปวดจริง ๆ ห้ามกันไม่ได้นี่'],
   ["Convenient timing right before dark. Nobody else needed to step outside.", 'จังหวะสะดวกจังก่อนมืดพอดี ไม่เห็นมีใครต้องออกไปข้างนอกเลย'],
+  ["Come on, I just ate dinner.", 'เอาน่า ฉันเพิ่งกินข้าวเย็นเสร็จเองนะ'],
   ["If anything, are we sure about Jenna? She wouldn't say a single word when I asked her.", 'ถ้าจะสงสัยใคร แน่ใจเหรอว่าเจนนาไม่มีพิรุธ? ตอนฉันถามเธอไม่ยอมพูดสักคำ'],
   ["The last lantern dies out. Everyone is pointing fingers\u2014I have to choose who to protect tonight.", 'ตะเกียงดวงสุดท้ายดับลง ทุกคนต่างชี้นิ้วใส่กัน\u2014ฉันต้องเลือกว่าคืนนี้จะปกป้องใคร'],
   ['Skip', 'ข้าม'],
@@ -4804,7 +4805,7 @@ function mpLobbyPatch(room) {
 }
 function mpNightPatch(room) {
   const patch = { ph: 'night', k: (room.k || 0) + 1, ns: 'i', nk: 1, cm: null, sp: null, vd: null, vr: null, dc: null, bn: nextBgIdx('night', room.bn) };
-  patch.bm = patch.k >= 2 && Math.random() < 0.2 ? 1 : 0; // Blood Moon: 20% from Night 2 on, shared with every phone through the room
+  patch.bm = room.adv !== 1 && patch.k >= 2 && Math.random() < 0.2 ? 1 : 0; // Blood Moon: 20% from Night 2 on (never in Campaign Level 1), shared with every phone through the room
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
     patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0; patch[b + 'v'] = ''; patch[b + 's'] = 0; patch[b + 'x'] = 0; patch[b + 'sa'] = ''; patch[b + 'rd'] = 0; patch[b + 'la'] = 0; patch[b + 't2'] = ''; patch[b + 'sn'] = 0; patch[b + 'jt'] = 0; patch[b + 'wst'] = ''; // dusk: the stone wears off
@@ -5820,7 +5821,7 @@ function useNightDirector({ room, players, write }) {
       };
       try {
         const base = mpNightPatch(room0);
-        if (opts && opts.again) { base.k = room0.k || 1; base.bm = base.k >= 2 && Math.random() < 0.2 ? 1 : 0; }
+        if (opts && opts.again) { base.k = room0.k || 1; base.bm = room0.adv !== 1 && base.k >= 2 && Math.random() < 0.2 ? 1 : 0; }
         setDir({ on: true, label: 'Night begins' });
         await write(base); if (!live()) return; // base opens on the intro screen: "Night Two Begins..." (plus the Blood Moon banner when it rises)
         await wait(base.bm ? 5200 : 4200); if (!live()) return;
@@ -5865,7 +5866,7 @@ function useNightDirector({ room, players, write }) {
     const step = async (ns, label) => { nk += 1; setDir({ on: true, label }); await write({ ns, nk, cm: null, sp: null }); }; // each turn starts with a clean team chat
     try {
       const base = mpNightPatch(room0);
-      if (opts && opts.again) { base.k = room0.k || 1; base.bm = base.k >= 2 && Math.random() < 0.2 ? 1 : 0; }
+      if (opts && opts.again) { base.k = room0.k || 1; base.bm = room0.adv !== 1 && base.k >= 2 && Math.random() < 0.2 ? 1 : 0; }
       setDir({ on: true, label: 'Night begins' });
       await write(base);
       await Narrator.say('Night begins. Everyone, close your eyes.'); if (!live()) return;
@@ -6149,6 +6150,7 @@ const L1_LINES = [
   { s: 'l', w: 'charlie', t: "I watched Stacy go outside from the window... there's something off about her." },
   { s: 'l', w: 'stacy', t: "Come on, what's wrong with you? I really just needed to go, I can't exactly help that." },
   { s: 'l', w: 'charlie', t: "Convenient timing right before dark. Nobody else needed to step outside." },
+  { s: 'l', w: 'stacy', t: "Come on, I just ate dinner." },
   { s: 'l', w: 'stacy', t: "If anything, are we sure about Jenna? She wouldn't say a single word when I asked her." },
   { s: 'r', w: 'bodyguard', t: "The last lantern dies out. Everyone is pointing fingers—I have to choose who to protect tonight." }
 ];

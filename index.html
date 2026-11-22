@@ -6208,9 +6208,8 @@ function DayTalk({ me, players, room, write, canSpeak, instant, onDone, onVote }
   const adv = room.adv === 1;
   const nm1 = (n) => (players.find((p) => p.n === n && p.bot === 1) || {}).id;
   const scr = adv && room.k === 1 && ['Charlie', 'Stacy', 'Jenna'].every((n) => players.some((p) => p.n === n && p.bot === 1 && p.a === 1)); // Day 1, Stacy survived: the scripted debate
-  const [choice, setChoice] = useState(room.l1c || '');
   const who = (w) => (w === 'me' ? me.id : nm1({ ch: 'Charlie', st: 'Stacy', je: 'Jenna' }[w]));
-  const sMsgs = !scr ? [] : [...L1_D1_OPEN.map((e) => e), ...(choice && L1_D1_OPT[choice] ? L1_D1_OPT[choice][2] : [])].map((e, i) => ['s' + String(i).padStart(2, '0'), { i: who(e[0]), m: e[1] }]);
+  const sMsgs = !scr ? [] : L1_D1_OPEN.map((e, i) => ['s' + String(i).padStart(2, '0'), { i: who(e[0]), m: e[1] }]);
   const msgs = scr ? sMsgs : Object.entries(room.dc || {}).filter((e) => e[1] && e[1].m).sort((a, b) => (a[0] < b[0] ? -1 : 1));
   const plan = adv && players.some((p) => p.n === 'Charlie' && p.a === 1) ? l1DayPlan(players, room.k || 1).lines : null; // Level 1 is scripted, so we know how many lines are still to come
   const guarded = me.r === 'bodyguard' && me.lp ? players.find((x) => x.id === me.lp) : null; // the Bodyguard's own thought about last night
@@ -6245,12 +6244,10 @@ function DayTalk({ me, players, room, write, canSpeak, instant, onDone, onVote }
     const t = setTimeout(() => setIdle(true), plan ? 900 : 7000); // the bubbles have gone quiet
     return () => clearTimeout(t);
   }, [n, msgs.length, skipped, idle, theirs, th]);
-  const openDone = scr && n >= L1_D1_OPEN.length;
-  const finished = scr ? !!choice && n >= msgs.length : idle || skipped;
+  const finished = scr ? n >= msgs.length : idle || skipped;
   useEffect(() => { if (finished) onDone(); }, [finished]);
   useEffect(() => { if (endRef.current && endRef.current.scrollIntoView) endRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [n, typing, waiting, finished, silent]);
   const nameOf = (id) => { const p = players.find((x) => x.id === id); return p ? p.n : '?'; };
-  const pick = (k) => { setChoice(k); setSkipped(false); setTyping(false); write({ l1c: k }); };
   const say = (text, accuse) => { setUsed(true); setAsk(false); if (text) write({ ['dc/' + Date.now() + String(10 + Math.floor(Math.random() * 90))]: { i: me.id, m: text, a: accuse || '', c: '' } }); else setSilent(true); };
   const row = (mine, name, body, key) => (mine
     ? <div key={key} className="flex items-end justify-end gap-2">{body}<DayAv name={name} mine adv={adv} /></div>
@@ -6278,11 +6275,6 @@ function DayTalk({ me, players, room, write, canSpeak, instant, onDone, onVote }
         {showDots && row(false, dotsFor, <div className="guide-bub-l guide-dots rounded-[20px] px-3.5 py-2.5" style={L1_BUB} aria-hidden="true"><span /><span /><span /></div>, 'typing')}
         <div ref={endRef} />
       </div>
-      {scr && openDone && !choice && (
-        <div className="sticky flex flex-col items-end gap-2 pb-1 pt-1" style={{ bottom: 'max(14px, env(safe-area-inset-bottom))' }}>
-          <div className="grid w-full grid-cols-2 gap-2">{Object.values(L1_D1_OPT).map((o) => <button key={o[0]} type="button" className={pillCls} style={pillSt} onClick={() => pick(o[0])}>{o[1]}</button>)}</div>
-        </div>
-      )}
       {finished && (
         <div className="sticky flex flex-col items-end gap-2 pb-1 pt-1" style={{ bottom: 'max(14px, env(safe-area-inset-bottom))' }}>
           {!scr && canSpeak && !used && (ask
@@ -7198,16 +7190,14 @@ const L1_DAY = {
   d3accS: 'Charlie keeps pointing at everyone but himself. He\'s the wolf!'
 };
 const L1_D1_OPEN = [['ch', "Wait\u2014nobody died? Then whoever tried to attack froze up. Look at Jenna, she's been hiding under her blankets the whole time."],['st', "Honestly... Charlie might have a point. Why else wouldn't she say a single word all night?"],['je', "(sniffling) I didn't do anything! I was terrified\u2014please, I'm not a werewolf!"],['st', "...Hold on. Look at her\u2014maybe it really wasn't her."],['ch', "Yeah, maybe you're right... no point rushing into a mistake yet."]];
-const L1_D1_OPT = {jenna: ['jenna', "I'm voting Jenna", [['me', "Sorry, Jenna\u2014we can't take chances. I'm voting Jenna."],['ch', "Agreed. Better safe than sorry\u2014I'm voting Jenna too."],['st', "If both of you are sure... alright, I'll follow the majority and vote Jenna."]]],charlie: ['charlie', "I'm voting Charlie", [['me', "Wait a second\u2014Charlie's been pushing blame since last night. I'm voting Charlie."],['ch', "Me?! I didn't touch anyone\u2014you're guessing with zero proof!"],['st', "Hold on, Pooh\u2014Charlie has a point, we don't have real proof yet. I'm not voting him today."]]],stacy: ['stacy', "I'm voting Stacy", [['me', "Stacy was the one who snuck outside before dark. I'm voting Stacy."],['ch', "Finally someone sees it! I'm voting Stacy too."],['st', "Are you serious?! You're falling for his bluff\u2014I'm innocent!"]]],skip: ['skip', "I'm skipping", [['me', "Nobody died last night. Voting blind is too risky\u2014I'm skipping."],['ch', "Smart move. I'm skipping too."],['st', "Same here\u2014let's wait until we actually know something. Skip."]]]};
-function l1DayPlan(players, k, choice) { // Campaign Level 1: who says what today, and how the bots vote (shared by the bots and the dialogue screen)
+function l1DayPlan(players, k) { // Campaign Level 1: who says what today, and how the bots vote (shared by the bots and the dialogue screen)
   const by = (n) => players.find((p) => p.n === n && p.bot === 1);
   const ch = by('Charlie'); const st = by('Stacy'); const je = by('Jenna');
   const up = (p) => !!p && p.a === 1;
   let lines = []; let votes = {};
   if (k === 1 && up(st)) { // nobody died on Night 1: Charlie and Stacy both skip, Jenna follows Pooh, so Pooh decides
-    // the debate itself is played by the dialogue screen; the player's statement (room.l1c) decides how Charlie and Stacy vote
-    const jv = up(je) ? { [je.id]: 'follow' } : {};
-    votes = choice === 'jenna' && up(je) ? { [ch.id]: je.id, [st.id]: je.id, ...jv } : choice === 'stacy' ? { [ch.id]: st.id, [st.id]: ch.id, ...jv } : { [ch.id]: 'skip', [st.id]: 'skip', ...jv };
+    // the debate itself is played by the dialogue screen; nobody died, so Charlie and Stacy skip and Jenna follows Pooh
+    votes = { [ch.id]: 'skip', [st.id]: 'skip', ...(up(je) ? { [je.id]: 'follow' } : {}) };
   } else if (k === 1) { // Stacy died: Charlie frames Jenna, Jenna panics and votes Charlie
     lines = [[ch, L1_DAY.d1frameC, je && je.id]]; if (up(je)) lines.push([je, L1_DAY.d1frameJ, ch.id]);
     votes = { ...(up(je) ? { [ch.id]: je.id, [je.id]: ch.id } : { [ch.id]: 'skip' }) };
@@ -7229,7 +7219,7 @@ function aiL1Day(ctx, M, go) {
   const up = (p) => !!p && p.a === 1;
   if (!up(ch) || !hum) return;
   const say = (b, m, a) => write({ ['dc/' + Date.now() + String(10 + Math.floor(Math.random() * 90))]: { i: b.id, m, a: a || '', c: '' } });
-  const { lines, votes } = l1DayPlan(players, k, room.l1c);
+  const { lines, votes } = l1DayPlan(players, k);
   lines.forEach(([b, m, a], i) => { if (b && go('l1d' + k + ':' + i, 1800 + i * 3200, 2600 + i * 3200)) say(b, m, a); });
   const humanDone = !!hum.v || hum.a !== 1;
   if (!humanDone) return;

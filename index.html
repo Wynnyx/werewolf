@@ -5671,7 +5671,7 @@ function useNightDirector({ room, players, write }) {
         await wait(base.bm ? 5200 : 4200); if (!live()) return;
         await stepO('w:1', 'Night: everyone acts'); if (!live()) return; // then everyone's night screen opens at once
         const w1 = roles.filter((r) => r !== 'shadow' && r !== 'infected' && r !== 'cured');
-        { // Wave 1: everyone at once. The Witch joins the moment the Werewolves have chosen and gets her own 30 seconds.
+        { // Wave 1: everyone at once. The Witch joins the moment the Werewolves have chosen and gets her own 45 seconds.
           const idleOthers = () => latest.current.players.filter((p) => p.a === 1 && ((w1.includes(p.r) && p.r !== 'witch' && p.nd !== 1) || p.jt === 1 || p.cj === 1));
           const idleWitch = () => latest.current.players.filter((p) => p.a === 1 && p.r === 'witch' && p.nd !== 1);
           const skipAll = async (list) => { const o = {}; list.forEach((p) => { if (p.jt === 1) o[`pl/${p.id}/jt`] = 2; else if (p.cj === 1) o[`pl/${p.id}/cj`] = 2; else o[`pl/${p.id}/nd`] = 1; }); if (Object.keys(o).length) await write(o); };
@@ -6176,7 +6176,7 @@ function mpWaveLeft(players, room) {
   if (ns === 'v:seer') return a.filter((p) => p.r === 'seer' && p.rd !== 1);
   return [];
 }
-const MP_WAVE_SECS = 30;
+const MP_WAVE_SECS = 45;
 function useWaveClock(room) {
   const [t0, setT0] = useState(Date.now());
   const [, tick] = useState(0);
@@ -6486,6 +6486,7 @@ function aiTop(M, cands, bonus) { // the most suspected candidate, with a little
 }
 
 // What one bot submits for its night turn, in the same short fields a phone writes.
+const aiPack = (p) => p.r === 'werewolf' || p.r === 'shadow'; // the wolf team: a Shadow Figure is never a target for the pack
 function aiNightWrites(b, role, ns, ctx, M) {
   const { room, players } = ctx;
   const k = room.k || 1;
@@ -6500,7 +6501,7 @@ function aiNightWrites(b, role, ns, ctx, M) {
   if (role === 'cured') return { [`pl/${b.id}/cj`]: 2 };
   if (b.sd === k) return { [`pl/${b.id}/nd`]: 1 }; // sedated: sleeps through it
   if (role === 'werewolf') { // prefers non-wolves, and anyone who claimed to be the Seer
-    const c = others.filter((p) => p.r !== 'werewolf');
+    const c = others.filter((p) => !aiPack(p));
     const t1 = aiTop(M, c, (p) => (M.claims[p.id] === 'seer' ? 3 : 0));
     const t2 = room.bm ? aiTop(M, c.filter((p) => !t1 || p.id !== t1.id)) : null;
     return wr((id) => done(id, t1 ? t1.id : '', { [`pl/${id}/t2`]: t2 ? t2.id : '' }));
@@ -6612,14 +6613,14 @@ function aiReply(b, m, ctx, M) {
   const low = String(m.m || '').toLowerCase();
   const acc = m.a ? players.find((p) => p.id === m.a && p.a === 1) : null;
   if (m.c && ROLES_DATA[m.c]) { // the human claimed a role
-    M.sus[m.i] = (M.sus[m.i] || 0) + (b.r === 'werewolf' ? 0.8 : 0.2);
+    M.sus[m.i] = (M.sus[m.i] || 0) + (aiPack(b) ? 0.8 : 0.2);
     if (m.c === 'seer' && b.r === 'seer') return { m: AI_L.seerClash(hn) };
-    if (m.c === 'seer' && b.r === 'werewolf') return { m: AI_L.wolfVsSeer(hn), a: m.i };
-    if (b.r === 'werewolf' && Math.random() < 0.4) return { m: AI_L.doubt(hn) };
+    if (m.c === 'seer' && aiPack(b)) return { m: AI_L.wolfVsSeer(hn), a: m.i };
+    if (aiPack(b) && Math.random() < 0.4) return { m: AI_L.doubt(hn) };
     return { m: AI_L.claimAck(hn, aiRoleTxt(m.c)) };
   }
   if (acc && acc.id !== b.id) { // the human pointed at somebody else
-    if (b.r === 'werewolf' && acc.r === 'werewolf') return { m: AI_L.wolfDefend(acc.n) };
+    if (aiPack(b) && aiPack(acc)) return { m: AI_L.wolfDefend(acc.n) };
     if (Math.random() < 0.5) { M.sus[acc.id] = (M.sus[acc.id] || 0) + 0.6; return { m: AI_L.agree(acc.n) }; }
     return { m: AI_L.askWhy(hn) };
   }
@@ -6639,15 +6640,15 @@ function aiSpeak(b, ctx, M) {
     const wolf = others.find((p) => seen[p.id] === true);
     if (wolf) return { m: AI_L.seerClaim(wolf.n), a: wolf.id, c: 'seer' };
   }
-  if (b.r === 'werewolf') {
-    const innocents = others.filter((p) => p.r !== 'werewolf');
+  if (aiPack(b)) {
+    const innocents = others.filter((p) => !aiPack(p));
     const seerInDeck = !room.dk || (room.dk.seer || 0) > 0;
     if (!M.fake && seerInDeck && innocents.length && !others.some((p) => M.claims[p.id] === 'seer') && Math.random() < 0.3) { // a wolf now and then fakes a Seer to frame someone
       M.fake = 1;
       const t = aiTop(M, innocents) || aiPick(innocents);
       return { m: AI_L.seerFake(t.n), a: t.id, c: 'seer' };
     }
-    const claim = others.find((p) => M.claims[p.id] === 'seer' && p.r !== 'werewolf');
+    const claim = others.find((p) => M.claims[p.id] === 'seer' && !aiPack(p));
     if (claim && Math.random() < 0.6) return { m: AI_L.wolfVsSeer(claim.n), a: claim.id };
     const t = aiTop(M, innocents);
     if (t && Math.random() < 0.35) return { m: AI_L.wolfAccuse(t.n), a: t.id };
@@ -6666,7 +6667,7 @@ function aiVoteChoice(b, ctx, M) {
   const human = players.find((p) => p.bot !== 1 && p.a === 1);
   const humanBonus = (p) => (human && human.v === p.id ? 0.7 : 0);
   if (b.r === 'seer') { const seen = M.seen[b.id] || {}; const w = others.find((p) => seen[p.id] === true); if (w) return w.id; }
-  if (b.r === 'werewolf') { const t = aiTop(M, others.filter((p) => p.r !== 'werewolf'), (p) => (M.claims[p.id] === 'seer' ? 2 : 0) + humanBonus(p)); return t && Math.random() > 0.08 ? t.id : 'skip'; }
+  if (aiPack(b)) { const t = aiTop(M, others.filter((p) => !aiPack(p)), (p) => (M.claims[p.id] === 'seer' ? 2 : 0) + humanBonus(p)); return t && Math.random() > 0.08 ? t.id : 'skip'; }
   const t = aiTop(M, others, humanBonus);
   if (!t) return 'skip';
   if (aiSus(M, t.id) <= 0 && Math.random() < ((ctx.room.k || 1) <= 1 ? 0.4 : 0.15)) return 'skip'; // nobody looks guilty yet, so the bot may skip

@@ -1835,7 +1835,7 @@ const TH_PAIRS = [
   ["Come on, I just ate dinner.", 'เอาน่า ฉันเพิ่งกินข้าวเย็นเสร็จเองนะ'],
   ["If anything, are we sure about Jenna? She wouldn't say a single word when I asked her.", 'ถ้าจะสงสัยใคร แน่ใจเหรอว่าเจนนาไม่มีพิรุธ? ตอนฉันถามเธอไม่ยอมพูดสักคำ'],
   ["The last lantern dies out. Everyone is pointing fingers\u2014I have to choose who to protect tonight.", 'ตะเกียงดวงสุดท้ายดับลง ทุกคนต่างชี้นิ้วใส่กัน\u2014ฉันต้องเลือกว่าคืนนี้จะปกป้องใคร'],
-  ['Skip', 'ข้าม'],
+  ['Skip', 'ข้าม'], ['🗳️ Cast Your Vote', '🗳️ ลงคะแนนโหวต'], ['Agree to Skip', 'เห็นด้วย ข้ามไปก่อน'], ['Stay Silent', 'เงียบไว้'], ['Question Someone', 'ซักถามใครสักคน'], ['You stay silent.', 'คุณเลือกที่จะเงียบ'], ["Let's skip the vote and wait for more clues.", 'ข้ามการโหวตก่อน แล้วรอเบาะแสเพิ่มเถอะ'], ['{}, what are you hiding? Explain yourself.', '{1} เธอปิดบังอะไรอยู่? อธิบายมาซะ'], ['Back', 'กลับ'], ['Day Discussion', 'การอภิปรายตอนกลางวัน'],
   ['(yourself)', '(ตัวคุณเอง)'],
   ["Nobody died last night. Voting blind is too risky\u2014I'm skipping.", 'เมื่อคืนไม่มีใครตาย โหวตมั่ว ๆ เสี่ยงเกินไป\u2014ฉันขอข้าม'],
   ["Same here. One wrong vote and we kill a villager. I'm skipping too.", 'ฉันก็เหมือนกัน โหวตผิดครั้งเดียวเราก็ฆ่าชาวบ้านเอง ฉันข้ามด้วย'],
@@ -6080,6 +6080,10 @@ function MpDay({ me, players, room, write, onTimeUp }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [seenN, setSeenN] = useState(0);
   useEffect(() => { setVoting(false); }, [room.k]);
+  const solo = room.ai === 1 && me.a === 1 && players.filter((p) => p.bot !== 1).length === 1; // Adventure / Solo AI: Morning News -> visual-novel discussion -> vote, one screen each
+  const [step, setStep] = useState(() => (room.vd === 1 || me.v ? 'vote' : 'news'));
+  useEffect(() => { if (solo && room.vd === 1) setStep('vote'); }, [solo, room.vd]);
+  const vnKey = `${room.ts}:${room.dl || 0}:${room.k}`;
   const incoming = Object.values(room.dc || {}).filter((m) => m && m.i !== me.id && !m.q).length;
   useEffect(() => { if (chatOpen) setSeenN(incoming); }, [chatOpen, incoming]);
   const unread = !chatOpen && incoming > seenN;
@@ -6090,6 +6094,43 @@ function MpDay({ me, players, room, write, onTimeUp }) {
     const ts = String(Date.now());
     write({ [`pl/${t.id}/a`]: 0, [`pl/${me.id}/hs`]: 1, [`an/x/${ts}`]: `${me.n} fired a last shot and took ${t.n} down.`, ...(pt ? { [`pl/${pt.id}/a`]: 0, [`an/x/${ts}h`]: `${pt.n} died of heartbreak.` } : {}) });
   };
+  if (solo) {
+    const note = me.x === 1 ? <Panel className="text-center text-sm font-semibold text-teal-100" style={{ border: '1px solid rgba(45,212,191,0.7)', background: 'rgba(13,148,136,0.25)' }} role="alert">You have been turned to stone by Medusa until dusk &mdash; you cannot speak or vote today.</Panel>
+      : me.s === 1 ? <Panel className="text-center text-sm font-semibold text-violet-100" style={{ border: '1px solid rgba(167,139,250,0.7)', background: 'rgba(109,40,217,0.25)' }} role="alert">You have been silenced by the Spellcaster &mdash; you cannot speak or vote today.</Panel>
+      : me.sn === 1 ? <Panel className="text-center text-sm font-semibold text-sky-100" style={{ border: '1px solid rgba(96,165,250,0.7)', background: 'rgba(37,99,235,0.25)' }} role="alert">The Sniper shot you &mdash; your vote is disabled for today.</Panel>
+      : <p className="text-center text-xs text-slate-400">You are alive. Discuss and find the werewolves.</p>;
+    const timer = room.adv === 1 ? null : <DayTimer startAt={fxKey ? Number(fxKey) : 0} onEnd={() => { setStep('vote'); if (onTimeUp) onTimeUp(); }} />;
+    return (
+      <div className={`flex flex-1 flex-col gap-4 ${fx ? 'dawn-shake' : ''}`}>
+        {me.lv && players.some((x) => x.id === me.lv) && <LoverBadge name={players.find((x) => x.id === me.lv).n} />}
+        {fx && (
+          <div className="pointer-events-none fixed inset-0 z-40 flex items-start justify-center overflow-hidden" aria-hidden="true">
+            <div className="dawn-flash absolute inset-0" />
+            <MoonIcon width="120" height="120" className="moon-fade mt-24 text-slate-100" />
+          </div>
+        )}
+        {step === 'news' && (
+          <>
+            <div className="mt-8 flex flex-1 flex-col justify-center gap-4">
+              <AnnounceCard room={room} players={players} />
+              {note}
+              <StatusBadges players={players} meId={me.id} marks={mpZMarks(players, me)} />
+            </div>
+            <div className="pt-2"><Btn onClick={() => setStep('talk')}>Accept</Btn></div>
+          </>
+        )}
+        {step === 'talk' && <><div className="mt-8" />{timer}<DayTalk key={vnKey} me={me} players={players} room={room} write={write} canSpeak={me.s !== 1 && me.x !== 1} instant={VN_DONE.key === vnKey} onDone={() => { VN_DONE.key = vnKey; }} onVote={() => setStep('vote')} /></>}
+        {step === 'vote' && (
+          <>
+            <div className="mt-8 flex items-center justify-between gap-3"><div className="font-display text-lg font-bold tracking-wide text-slate-100">Trial Voting</div></div>
+            {timer}
+            <MpVote me={me} players={players} room={room} write={write} />
+            <div className="mt-auto pt-4"><Btn variant="ghost" onClick={() => setStep('talk')}>Back to Discussion</Btn></div>
+          </>
+        )}
+      </div>
+    );
+  }
   return (
     <div className={`flex flex-1 flex-col gap-4 ${fx ? 'dawn-shake' : ''}`}>
       {me.lv && me.a === 1 && players.some((x) => x.id === me.lv) && <LoverBadge name={players.find((x) => x.id === me.lv).n} />}
@@ -6142,6 +6183,86 @@ function MpDay({ me, players, room, write, onTimeUp }) {
   );
 }
 
+// Adventure / Solo AI day discussion: the same visual-novel look as the cottage dialogue (portraits, dark-slate bubbles, typing dots, Skip).
+const VN_DONE = { key: '' };
+const DAY_PAL = ['#FDBA74', '#A5B4FC', '#86EFAC', '#F0ABFC', '#FDE047', '#7DD3FC'];
+function DayAv({ name, mine, adv }) {
+  const npc = L1_NPC[String(name || '').toLowerCase()];
+  if (mine && adv) return <L1Avatar w="bodyguard" />;
+  const c = npc ? npc.c : mine ? '#FDE68A' : DAY_PAL[String(name || '?').split('').reduce((a, ch) => a + ch.charCodeAt(0), 0) % DAY_PAL.length];
+  return <span className="flex shrink-0 items-center justify-center font-display text-lg font-black text-white" style={{ width: 40, height: 50, borderRadius: '50%', border: `2px solid ${c}`, background: npc ? npc.bg : 'linear-gradient(160deg, #334155, #1E293B)', boxShadow: '0 4px 12px rgba(0,0,0,0.55)' }}>{String(name || '?')[0]}</span>;
+}
+function DayTalk({ me, players, room, write, canSpeak, instant, onDone, onVote }) {
+  const adv = room.adv === 1;
+  const msgs = Object.entries(room.dc || {}).filter((e) => e[1] && e[1].m).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  const plan = adv && players.some((p) => p.n === 'Charlie' && p.a === 1) ? l1DayPlan(players, room.k || 1).lines : null; // Level 1 is scripted, so we know how many lines are still to come
+  const [n, setN] = useState(instant ? msgs.length : 0);
+  const [typing, setTyping] = useState(false);
+  const [skipped, setSkipped] = useState(!!instant);
+  const [idle, setIdle] = useState(!!instant);
+  const [silent, setSilent] = useState(false);
+  const [used, setUsed] = useState(false);
+  const [ask, setAsk] = useState(false);
+  const endRef = useRef(null);
+  const theirs = msgs.slice(0, n).filter((e) => e[1].i !== me.id).length;
+  const waiting = !skipped && n >= msgs.length && plan && theirs < plan.length ? plan[theirs][0] : null;
+  useEffect(() => {
+    if (skipped) { if (n < msgs.length) setN(msgs.length); return undefined; }
+    if (n < msgs.length) {
+      if (msgs[n][1].i === me.id) { setN(n + 1); return undefined; }
+      const t1 = setTimeout(() => setTyping(true), 600);
+      const t2 = setTimeout(() => { setTyping(false); setN(n + 1); Sfx.msg(); }, 1900 + Math.min(500, String(msgs[n][1].m).length * 5));
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
+    setTyping(false); return undefined;
+  }, [n, msgs.length, skipped]);
+  useEffect(() => {
+    if (idle || skipped || n < msgs.length || (plan && theirs < plan.length)) return undefined;
+    const t = setTimeout(() => setIdle(true), plan ? 900 : 7000); // the bubbles have gone quiet
+    return () => clearTimeout(t);
+  }, [n, msgs.length, skipped, idle, theirs]);
+  const finished = idle || skipped;
+  useEffect(() => { if (finished) onDone(); }, [finished]);
+  useEffect(() => { if (endRef.current && endRef.current.scrollIntoView) endRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [n, typing, waiting, finished, silent]);
+  const nameOf = (id) => { const p = players.find((x) => x.id === id); return p ? p.n : '?'; };
+  const say = (text, accuse) => { setUsed(true); setAsk(false); if (text) write({ ['dc/' + Date.now() + String(10 + Math.floor(Math.random() * 90))]: { i: me.id, m: text, a: accuse || '', c: '' } }); else setSilent(true); };
+  const row = (mine, name, body, key) => (mine
+    ? <div key={key} className="flex items-end justify-end gap-2">{body}<DayAv name={name} mine adv={adv} /></div>
+    : <div key={key} className="flex items-end gap-2"><DayAv name={name} />{body}</div>);
+  const bub = (mine, name, text, key) => row(mine, name,
+    <div className={`max-w-[78%] ${mine ? 'text-right' : ''}`}>
+      {!mine && <div className="mb-1 ml-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: (L1_NPC[String(name).toLowerCase()] || {}).c || '#CBD5E1' }}>{name}</div>}
+      <div className={`${mine ? 'guide-bub' : 'guide-bub-l'} inline-block rounded-[22px] px-4 py-2.5 text-left text-[14px] leading-snug text-white ${mine ? 'italic' : 'font-semibold'}`} style={L1_BUB}><p>{text}</p></div>
+    </div>, key);
+  const dotsFor = n < msgs.length ? nameOf(msgs[n][1].i) : waiting ? waiting.n : '';
+  const showDots = !skipped && ((typing && n < msgs.length) || !!waiting);
+  const others = players.filter((p) => p.a === 1 && p.id !== me.id);
+  const pillCls = 'guide-bub rounded-full px-4 py-2 text-[13px] font-bold text-slate-100';
+  const pillSt = { background: 'rgba(30,41,59,0.92)', border: '1px solid rgba(148,163,184,0.55)', boxShadow: '0 4px 14px rgba(2,6,23,0.55)' };
+  return (
+    <div className="relative flex flex-1 flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="font-display text-lg font-bold tracking-wide text-slate-100">Day Discussion</div>
+        {!finished && <button type="button" onClick={() => { setTyping(false); setSkipped(true); Sfx.msg(); }} className="flex h-10 items-center rounded-full px-4 text-[13px] font-bold uppercase tracking-wider text-slate-200" style={{ background: 'rgba(12,16,26,0.7)', border: '1px solid rgba(148,163,184,0.5)' }}>Skip</button>}
+      </div>
+      <div className="flex min-h-[46vh] flex-1 flex-col justify-end gap-3 rounded-2xl px-1 py-3" style={{ background: 'linear-gradient(180deg, rgba(5,7,12,0.55), rgba(5,7,12,0.7))' }}>
+        {msgs.slice(0, n).map((e) => bub(e[1].i === me.id, nameOf(e[1].i), e[1].m, e[0]))}
+        {silent && bub(true, me.n, 'You stay silent.', 'silent')}
+        {showDots && row(false, dotsFor, <div className="guide-bub-l guide-dots rounded-[20px] px-3.5 py-2.5" style={L1_BUB} aria-hidden="true"><span /><span /><span /></div>, 'typing')}
+        <div ref={endRef} />
+      </div>
+      {finished && (
+        <div className="sticky flex flex-col items-end gap-2 pb-1 pt-1" style={{ bottom: 'max(14px, env(safe-area-inset-bottom))' }}>
+          {canSpeak && !used && (ask
+            ? <div className="flex flex-wrap justify-end gap-2">{others.map((p) => <button key={p.id} type="button" className={pillCls} style={pillSt} onClick={() => say(`${p.n}, what are you hiding? Explain yourself.`, p.id)}>{p.n}</button>)}<button type="button" className={pillCls} style={pillSt} onClick={() => setAsk(false)}>Back</button></div>
+            : <div className="flex flex-wrap justify-end gap-2"><button type="button" className={pillCls} style={pillSt} onClick={() => say("Let's skip the vote and wait for more clues.")}>Agree to Skip</button><button type="button" className={pillCls} style={pillSt} onClick={() => say('')}>Stay Silent</button><button type="button" className={pillCls} style={pillSt} onClick={() => setAsk(true)}>Question Someone</button></div>)}
+          <button type="button" data-ui-sound="primary" onClick={onVote} className="guide-bub flex min-h-[48px] items-center gap-2 rounded-full px-6 text-[15px] font-bold text-white" style={{ background: 'linear-gradient(180deg, #3B82F6, #1D4ED8)', border: '1px solid rgba(191,219,254,0.7)', boxShadow: '0 6px 18px rgba(2,6,23,0.6), 0 0 20px rgba(59,130,246,0.45)' }}>🗳️ Cast Your Vote</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Campaign Level 1: the cottage dialogue that plays right after "I'm Ready" and before Night 1.
 const L1_LINES = [
   { s: 'r', w: 'bodyguard', t: "We barred the cottage doors, yet I can't shake the feeling the beast is already inside..." },
@@ -6155,7 +6276,7 @@ const L1_LINES = [
   { s: 'r', w: 'bodyguard', t: "The last lantern dies out. Everyone is pointing fingers—I have to choose who to protect tonight." }
 ];
 const L1_TAGS = { Stacy: 'Slipped out to the bathroom earlier', Jenna: 'Hid under the blankets, silent', Charlie: 'Watched from the window' };
-const L1_NPC = { charlie: { n: 'Charlie', c: '#5EEAD4', bg: 'linear-gradient(160deg, #0F766E, #134E4A)' }, stacy: { n: 'Stacy', c: '#F9A8D4', bg: 'linear-gradient(160deg, #BE185D, #831843)' } };
+const L1_NPC = { charlie: { n: 'Charlie', c: '#5EEAD4', bg: 'linear-gradient(160deg, #0F766E, #134E4A)' }, stacy: { n: 'Stacy', c: '#F9A8D4', bg: 'linear-gradient(160deg, #BE185D, #831843)' }, jenna: { n: 'Jenna', c: '#FDBA74', bg: 'linear-gradient(160deg, #C2410C, #7C2D12)' } };
 const L1_BUB = { background: 'linear-gradient(160deg, #46587A, #2B3B58)', border: '1px solid rgba(148,163,184,0.5)', boxShadow: '0 8px 22px rgba(2,6,23,0.6)' };
 function L1Avatar({ w, big = false }) {
   const npc = L1_NPC[w]; const sz = big ? { width: 58, height: 72 } : { width: 40, height: 50 };
@@ -7041,15 +7162,10 @@ const L1_DAY = {
   d3accC: 'Stacy slipped out that first night. She\'s the wolf!',
   d3accS: 'Charlie keeps pointing at everyone but himself. He\'s the wolf!'
 };
-function aiL1Day(ctx, M, go) {
-  const { room, players, write } = ctx;
-  const k = room.k || 1;
+function l1DayPlan(players, k) { // Campaign Level 1: who says what today, and how the bots vote (shared by the bots and the dialogue screen)
   const by = (n) => players.find((p) => p.n === n && p.bot === 1);
   const ch = by('Charlie'); const st = by('Stacy'); const je = by('Jenna');
-  const hum = players.find((p) => p.bot !== 1);
   const up = (p) => !!p && p.a === 1;
-  if (!up(ch) || !hum) return;
-  const say = (b, m, a) => write({ ['dc/' + Date.now() + String(10 + Math.floor(Math.random() * 90))]: { i: b.id, m, a: a || '', c: '' } });
   let lines = []; let votes = {};
   if (k === 1 && up(st)) { // nobody died on Night 1: Charlie and Stacy both skip, Jenna follows Pooh, so Pooh decides
     lines = [[ch, L1_DAY.d1skipC], [st, L1_DAY.d1skipS]];
@@ -7064,6 +7180,18 @@ function aiL1Day(ctx, M, go) {
     lines = [[ch, L1_DAY.d3accC, st.id], [st, L1_DAY.d3accS, ch.id]];
     votes = { [ch.id]: st.id, [st.id]: ch.id };
   }
+  return { lines, votes };
+}
+function aiL1Day(ctx, M, go) {
+  const { room, players, write } = ctx;
+  const k = room.k || 1;
+  const by = (n) => players.find((p) => p.n === n && p.bot === 1);
+  const ch = by('Charlie'); const st = by('Stacy'); const je = by('Jenna');
+  const hum = players.find((p) => p.bot !== 1);
+  const up = (p) => !!p && p.a === 1;
+  if (!up(ch) || !hum) return;
+  const say = (b, m, a) => write({ ['dc/' + Date.now() + String(10 + Math.floor(Math.random() * 90))]: { i: b.id, m, a: a || '', c: '' } });
+  const { lines, votes } = l1DayPlan(players, k);
   lines.forEach(([b, m, a], i) => { if (b && go('l1d' + k + ':' + i, 1800 + i * 3200, 2600 + i * 3200)) say(b, m, a); });
   const humanDone = !!hum.v || hum.a !== 1;
   if (!humanDone) return;

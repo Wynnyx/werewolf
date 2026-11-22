@@ -3665,7 +3665,7 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
     return (
       <div className="flex flex-1 flex-col">
         <ActHeader role={role} prompt={solo ? 'Zombie, choose who to infect.' : undefined} sub={solo ? 'The bite turns them the following night.' : 'Agree silently. One bite per night for the whole horde.'} />
-        <PickList players={opts(alive.filter((p) => !(solo || hideSelf) || !actor || p.id !== actor.id))} team={alive.filter((p) => p.role === 'zombie' || p.role === 'infector').map((p) => p.id)} teamLabel="Zombie team" TeamIcon={ZombieIcon} value={val} onChange={choose} />
+        <PickList players={opts(alive.filter((p) => !(solo || hideSelf) || !actor || p.id !== actor.id))} team={alive.filter((p) => p.role === 'zombie' || p.role === 'infector').map((p) => p.id)} teamLabel="Zombie team" TeamIcon={ZombieIcon} marks={ppZMarks(players, actor)} value={val} onChange={choose} />
         <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ zombie: pick })}>{pick === null ? 'Select a target' : 'Confirm Infection'}</Btn>
       </div>
     );
@@ -3676,7 +3676,7 @@ function NightActPP({ role, players, actor, choices, onDone, deferSeer, seerOver
     return (
       <div className="flex flex-1 flex-col">
         <ActHeader role={role} prompt={solo ? 'Infected, choose who to bite.' : undefined} sub={solo ? 'The victim stays human tonight and turns the night after.' : 'Agree silently. One slow bite per night for all of you.'} />
-        <PickList players={opts(alive.filter((p) => !(solo || hideSelf) || !actor || p.id !== actor.id))} team={alive.filter((p) => p.role === 'zombie' || p.role === 'infector').map((p) => p.id)} teamLabel="Zombie team" TeamIcon={ZombieIcon} value={val} onChange={choose} />
+        <PickList players={opts(alive.filter((p) => !(solo || hideSelf) || !actor || p.id !== actor.id))} team={alive.filter((p) => p.role === 'zombie' || p.role === 'infector').map((p) => p.id)} teamLabel="Zombie team" TeamIcon={ZombieIcon} marks={ppZMarks(players, actor)} value={val} onChange={choose} />
         <Btn className="mt-5" disabled={pick === null} onClick={() => onDone({ infector: pick })}>{pick === null ? 'Select a target' : 'Confirm Bite'}</Btn>
       </div>
     );
@@ -4666,7 +4666,7 @@ function mpDealPatch(room, deck) {
   const cards = [];
   ROLE_IDS.forEach((id) => { for (let i = 0; i < (deck[id] || 0); i++) cards.push(id); });
   const mix = shuffle(cards);
-  const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0, bm: 0, st: 'in_game', vr: null, dc: null, dl: (room.dl || 0) + 1, bn: nextBgIdx('night', room.bn) }; // dl: a new deal, so bots forget the last match
+  const patch = { ph: 'reveal', lk: 0, w: '', an: null, k: 0, bm: 0, st: 'in_game', vr: null, dc: null, vd: null, dl: (room.dl || 0) + 1, bn: nextBgIdx('night', room.bn) }; // dl: a new deal, so bots forget the last match
   players.forEach((p, i) => {
     const b = `pl/${p.id}/`;
     Object.assign(patch, { [b + 'r']: mix[i], [b + 'a']: 1, [b + 'd']: 0, [b + 't']: '', [b + 'nd']: 0, [b + 'ws']: 0, [b + 'wsu']: 0, [b + 'wpu']: 0, [b + 'lp']: '', [b + 'hs']: 0, [b + 's']: 0, [b + 'v']: '', [b + 'lv']: '', [b + 't2']: '', [b + 'la']: 0, [b + 'bt']: 0, [b + 'jt']: 0, [b + 'cu']: 0, [b + 'cj']: 0, [b + 'sd']: 0, [b + 'sn']: 0, [b + 'fr']: '', [b + 'pdc']: 0, [b + 'pdi']: 0, [b + 'pdl']: '', [b + 'ic']: 0 });
@@ -4677,7 +4677,7 @@ function mpLobbyPatch(room) {
   const patch = { ph: 'lobby', lk: 0, w: '', an: null, k: 0, ns: null, nk: null, vd: null, vr: null, cm: null, sp: null, bm: null, dc: null, st: 'waiting' };
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
-    ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'x', 'sa', 'rd', 'lf', 'v', 'lv', 't2', 'la', 'bt', 'jt', 'sn', 'fr', 'cu', 'cj', 'sd', 'pdc', 'pdi', 'pdl', 'ic'].forEach((f) => { patch[b + f] = null; });
+    ['r', 't', 'nd', 'ws', 'wsu', 'wpu', 'lp', 'hs', 's', 'x', 'sa', 'rd', 'lf', 'v', 'lv', 't2', 'la', 'bt', 'jt', 'sn', 'fr', 'cu', 'cj', 'sd', 'pdc', 'pdi', 'pdl', 'ic', 'wst'].forEach((f) => { patch[b + f] = null; });
     patch[b + 'a'] = 1; patch[b + 'd'] = 0;
   });
   return patch;
@@ -4687,7 +4687,7 @@ function mpNightPatch(room) {
   patch.bm = patch.k >= 2 && Math.random() < 0.2 ? 1 : 0; // Blood Moon: 20% from Night 2 on, shared with every phone through the room
   roomPlayers(room).forEach((p) => {
     const b = `pl/${p.id}/`;
-    patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0; patch[b + 'v'] = ''; patch[b + 's'] = 0; patch[b + 'x'] = 0; patch[b + 'sa'] = ''; patch[b + 'rd'] = 0; patch[b + 'la'] = 0; patch[b + 't2'] = ''; patch[b + 'sn'] = 0; patch[b + 'jt'] = 0; // dusk: the stone wears off
+    patch[b + 't'] = ''; patch[b + 'nd'] = 0; patch[b + 'ws'] = 0; patch[b + 'v'] = ''; patch[b + 's'] = 0; patch[b + 'x'] = 0; patch[b + 'sa'] = ''; patch[b + 'rd'] = 0; patch[b + 'la'] = 0; patch[b + 't2'] = ''; patch[b + 'sn'] = 0; patch[b + 'jt'] = 0; patch[b + 'wst'] = ''; // dusk: the stone wears off
     if (p.a === 1 && p.ic) { if (p.ic <= 1) { patch[b + 'r'] = 'zombie'; patch[b + 'fr'] = p.r; patch[b + 'jt'] = 1; patch[b + 'bt'] = 0; patch[b + 'ic'] = 0; } else patch[b + 'ic'] = p.ic - 1; } // slow bite: 2 -> 1 -> turns
     else if (p.a === 1 && p.bt && p.bt < patch.k) { patch[b + 'r'] = 'zombie'; patch[b + 'fr'] = p.r; patch[b + 'jt'] = 1; patch[b + 'bt'] = 0; } // bitten last night: turns now
     patch[b + 'cj'] = p.a === 1 && p.cu && p.cu === patch.k - 1 ? 1 : 0; // cured last night: wakes alone to learn it
@@ -4713,7 +4713,7 @@ function mpChoices(ps) {
   return {
     medusa: mpStoneTarget(ps) || null, werewolf: victim, werewolf2: victim2, seer: pick('seer'), bodyguard: pick('bodyguard'),
     witchSave: !!(witch && witch.ws >= 1 && !witch.wsu && victim),
-    witchSaveTo: witch && witch.ws >= 1 && victim2 ? (witch.ws === 2 ? victim2 : victim) : null,
+    witchSaveTo: witch && witch.ws >= 1 && victim2 ? (witch.ws === 2 || (witch.wst && String(witch.wst) === String(victim2)) ? victim2 : victim) : null, // wst: the exact player id she tapped Save on
     witchPoison: witch && witch.t && !witch.wpu && byId[witch.t] ? witch.t : null,
     spellcaster: pick('spellcaster'), sniper: pick('sniper'), doctor: pick('doctor'), zombie: pick('zombie'), infector: pick('infector'),
     plaguedoctor: pick('plaguedoctor'),
@@ -5263,7 +5263,24 @@ function BloodMoonBanner({ className = '' }) {
   );
 }
 
-function PickList({ players, value, onChange, disabled = [], locked, team = [], teamLabel = 'Werewolf team', TeamIcon = WolfIcon, badges = [] }) {
+// Zombie faction vision: only the Zombie team (Zombie, Infected, Plague Doctor) sees who is incubating or already turned.
+const ZTEAM_VIEW = ['zombie', 'infector', 'plaguedoctor'];
+function ZMark({ t }) {
+  return <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-100" style={{ background: 'rgba(13,148,136,0.4)', border: '1px solid rgba(45,212,191,0.75)' }}>{t}</span>;
+}
+function mpZMarks(players, me) {
+  const out = {};
+  if (!me || !ZTEAM_VIEW.includes(me.r)) return out;
+  players.forEach((p) => { if (p.a !== 1 || p.id === me.id) return; if (p.r === 'zombie') out[p.id] = 'ZOMBIE'; else if ((p.bt || p.ic) && p.r !== 'infector') out[p.id] = 'INCUBATING'; });
+  return out;
+}
+function ppZMarks(players, actor) {
+  const out = {};
+  if (!actor || !ZTEAM_VIEW.includes(actor.role)) return out;
+  players.forEach((p) => { if (!p.alive || p.id === actor.id) return; if (p.role === 'zombie') out[p.id] = 'ZOMBIE'; else if ((p.bitten || p.incub) && p.role !== 'infector') out[p.id] = 'INCUBATING'; });
+  return out;
+}
+function PickList({ players, value, onChange, disabled = [], locked, team = [], teamLabel = 'Werewolf team', TeamIcon = WolfIcon, badges = [], marks = {} }) {
   return (
     <ul className="flex flex-col gap-2" role="listbox">
       {players.map((p) => {
@@ -5277,7 +5294,7 @@ function PickList({ players, value, onChange, disabled = [], locked, team = [], 
               style={mate ? { background: 'rgba(127,29,29,0.25)', border: '1px solid rgba(239,68,68,0.55)', color: '#FCA5A5' }
                 : { background: sel ? 'rgba(109,40,217,0.4)' : 'var(--card-2)', border: `${sel ? 2 : 1}px solid ${sel ? '#C4B5FD' : 'var(--line)'}`, boxShadow: sel ? '0 0 18px -4px rgba(167,139,250,0.7)' : 'none', color: '#E6EAF2' }}>
               {mate ? <><span>{p.n}</span><span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider"><TeamIcon width="18" height="18" aria-hidden="true" />{teamLabel}</span></>
-                : <><span className="flex items-center gap-2">{p.n}{badges.includes(p.id) && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-200" style={{ background: 'rgba(127,29,29,0.5)', border: '1px solid rgba(239,68,68,0.75)' }}>Werewolf</span>}</span>{sel && <span aria-hidden="true" className="text-lg">✓</span>}</>}
+                : <><span className="flex items-center gap-2">{p.n}{badges.includes(p.id) && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-200" style={{ background: 'rgba(127,29,29,0.5)', border: '1px solid rgba(239,68,68,0.75)' }}>Werewolf</span>}{marks[p.id] && <ZMark t={marks[p.id]} />}</span>{sel && <span aria-hidden="true" className="text-lg">✓</span>}</>}
             </button>
           </li>
         );
@@ -5457,7 +5474,7 @@ function MpNightManual({ me, players, room, write }) {
     return (
       <div className="flex flex-1 flex-col">
         {header(role === 'infector' ? 'Bite a player' : 'Infect a player', role === 'infector' ? 'The victim stays human tonight and turns the night after.' : 'The bite turns them the following night.')}
-        <PickList players={alive.filter((p) => p.id !== me.id).map((p) => ({ id: p.id, n: p.n }))} team={fz} teamLabel="Zombie team" TeamIcon={ZombieIcon} value={done ? me.t : pick} onChange={setPick} locked={done} />
+        <PickList players={alive.filter((p) => p.id !== me.id).map((p) => ({ id: p.id, n: p.n }))} team={fz} teamLabel="Zombie team" TeamIcon={ZombieIcon} marks={mpZMarks(players, me)} value={done ? me.t : pick} onChange={setPick} locked={done} />
         {done ? lockedNote : <Btn className="mt-4" disabled={!pick} onClick={() => lock()}>Confirm Bite</Btn>}
       </div>
     );
@@ -5609,7 +5626,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
       else if (role === 'cupid') write({ [`pl/${me.id}/t`]: c.cupid[0], [`pl/${me.id}/t2`]: c.cupid[1], [`pl/${me.id}/nd`]: 1, [`pl/${c.cupid[0]}/lv`]: c.cupid[1], [`pl/${c.cupid[1]}/lv`]: c.cupid[0] });
       else if (role === 'shadow') write({ [`pl/${me.id}/t`]: c.shadow ? c.shadow.to : '', [`pl/${me.id}/sa`]: c.shadow ? c.shadow.key : '', [`pl/${me.id}/nd`]: 1 });
       else if (role === 'werewolf') write(gp((g) => ({ [`pl/${g.id}/t`]: c.werewolf || '', [`pl/${g.id}/t2`]: c.werewolf2 || '', [`pl/${g.id}/nd`]: 1 })));
-      else if (role === 'witch') { const vs = mpWolfVictims(players); write(gp((g) => ({ [`pl/${g.id}/t`]: c.witchPoison === null || c.witchPoison === undefined ? '' : c.witchPoison, [`pl/${g.id}/ws`]: c.witchSave ? (vs[1] && c.witchSaveTo === vs[1] ? 2 : 1) : 0, [`pl/${g.id}/nd`]: 1 }))); } // ws 2 = healing the second Blood Moon victim
+      else if (role === 'witch') { const vs = mpWolfVictims(players); write(gp((g) => ({ [`pl/${g.id}/t`]: c.witchPoison === null || c.witchPoison === undefined ? '' : c.witchPoison, [`pl/${g.id}/ws`]: c.witchSave ? (vs[1] && c.witchSaveTo === vs[1] ? 2 : 1) : 0, [`pl/${g.id}/wst`]: c.witchSave ? (c.witchSaveTo || vs[0] || '') : '', [`pl/${g.id}/nd`]: 1 }))); } // ws 2 = healing the second Blood Moon victim
       else if (role === 'plaguedoctor') write(gp((g) => ({ [`pl/${g.id}/t`]: c.plaguedoctor || '', [`pl/${g.id}/ws`]: c.plagueAct === 'cure' ? 1 : c.plagueAct === 'infect' ? 2 : 0, [`pl/${g.id}/nd`]: 1 })));
       else if (role === 'sniper') write(gp((g) => ({ [`pl/${g.id}/t`]: c.sniper || '', [`pl/${g.id}/ws`]: c.sniperShot ? 1 : 0, [`pl/${g.id}/nd`]: 1 }))); // ws doubles as the Sniper's "shot taken" flag
       else write(gp((g) => ({ [`pl/${g.id}/t`]: c[role] || '', [`pl/${g.id}/nd`]: 1 })));
@@ -5825,11 +5842,14 @@ function MpVote({ me, players, room, write }) {
   );
 }
 
+// Lines under an.x belong to THIS day only: a vote or last shot that happened after this dawn (small tolerance for phone clocks).
+const anFresh = (an, key) => !an || !an.t || parseInt(key, 10) >= an.t - 20000;
+const vrFresh = (room) => !room.vr || !room.an || !room.an.t || Number(room.vr.ts) >= room.an.t - 20000;
 function AnnounceCard({ room, players }) {
   const an = room.an;
   if (!an) return null;
   const lines = Object.values(an.l || {});
-  const extra = Object.entries(an.x || {}).sort((a, b) => a[0].localeCompare(b[0])).map((e) => e[1]);
+  const extra = Object.entries(an.x || {}).filter((e) => anFresh(an, e[0])).sort((a, b) => a[0].localeCompare(b[0])).map((e) => e[1]);
   const si = an.si && players.find((p) => p.id === an.si);
   const st = an.st && players.find((p) => p.id === an.st);
   return (
@@ -5850,13 +5870,13 @@ function AnnounceCard({ room, players }) {
   );
 }
 
-function StatusBadges({ players, meId }) {
+function StatusBadges({ players, meId, marks = {} }) {
   return (
     <div className="flex flex-wrap gap-2">
       {players.map((p) => (
         <span key={p.id} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold"
           style={p.a === 1 ? { background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.4)', color: '#A7F3D0' } : { background: 'rgba(100,116,139,0.12)', border: '1px solid rgba(100,116,139,0.35)', color: '#94A3B8', textDecoration: 'line-through' }}>
-          {p.n}{p.id === meId ? ' (you)' : ''}{p.s === 1 && p.a === 1 ? ' 🤐' : ''}{p.x === 1 && p.a === 1 ? ' 🗿 STONED' : ''}{p.sn === 1 && p.a === 1 ? ' 🎯 NO VOTE' : ''}
+          {p.n}{p.id === meId ? ' (you)' : ''}{p.s === 1 && p.a === 1 ? ' 🤐' : ''}{p.x === 1 && p.a === 1 ? ' 🗿 STONED' : ''}{p.sn === 1 && p.a === 1 ? ' 🎯 NO VOTE' : ''}{marks[p.id] && p.a === 1 ? ` · ${marks[p.id]}` : ''}
         </span>
       ))}
     </div>
@@ -5869,9 +5889,9 @@ function ElimGate({ me, room, code }) {
   const key = `${code}:${me.id}:${room.dl || 0}`;
   const [, bump] = useState(0);
   if (me.a !== 0 || !me.r || !ROLES_DATA[me.r] || ELIM_SEEN.key === key) return null;
-  if (room.vd === 1 && room.vr && VR_SEEN.key !== `${code}:${room.dl || 0}:${room.k}`) return null; // the vote result comes first
+  if (room.vd === 1 && room.vr && vrFresh(room) && VR_SEEN.key !== `${code}:${room.dl || 0}:${room.k}`) return null; // the vote result comes first
   const lines = Object.values((room.an && room.an.l) || {});
-  const xs = Object.values((room.an && room.an.x) || {});
+  const xs = Object.entries((room.an && room.an.x) || {}).filter((e) => anFresh(room.an, e[0])).map((e) => e[1]);
   const has = (t) => lines.concat(xs).some((l) => String(l).indexOf(t) >= 0);
   const cz = room.an && room.an.cz ? room.an.cz[me.id] : '';
   const why = cz === 'p' ? 'The Witch poisoned you in the night.'
@@ -5900,7 +5920,7 @@ function VoteResultGate({ room, code }) {
   const [, bump] = useState(0);
   const vr = room.vr;
   const key = `${code}:${room.dl || 0}:${room.k}`;
-  if (room.vd !== 1 || !vr || VR_SEEN.key === key) return null;
+  if (room.vd !== 1 || !vr || !vrFresh(room) || VR_SEEN.key === key) return null; // never a vote result from an earlier day or game
   const r = vr.r && ROLES_DATA[vr.r] ? ROLES_DATA[vr.r] : null;
   const msg = vr.t === 'out' ? `${vr.n} was voted out.` : vr.t === 'skip' ? 'The village chose to skip the vote.' : vr.t === 'tie' ? 'The vote was tied.' : 'Time ran out and no votes were cast.';
   return (
@@ -5973,7 +5993,7 @@ function MpDay({ me, players, room, write, onTimeUp }) {
               : <Panel className="text-center text-sm text-slate-300">You are alive. Discuss and find the werewolves.</Panel>}
           <div>
             <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Players</div>
-            <StatusBadges players={players} meId={me.id} />
+            <StatusBadges players={players} meId={me.id} marks={mpZMarks(players, me)} />
           </div>
           {me.a === 1 && <div className="mt-auto pt-4"><Btn onClick={() => setVoting(true)}>Choose Your Vote</Btn></div>}
         </>

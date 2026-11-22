@@ -67,6 +67,16 @@
   .map-badge { animation: mapLantern 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
   .map-bob { animation: mapBob 3.4s ease-in-out infinite; } @keyframes mapBob { 0%, 100% { translate: 0 0; } 50% { translate: 0 6px; } }
   .map-fade { transition: opacity 0.9s ease; }
+  .map-pin { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; transform: scale(var(--ps, 1)); transform-origin: 50% 50%; display: flex; align-items: center; justify-content: center; }
+  .map-pin-dot { position: relative; width: 34px; height: 34px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; color: #E2E8F0; background: rgba(10,14,24,0.84); border: 2px solid rgba(148,163,184,0.85); box-shadow: 0 3px 12px rgba(0,0,0,0.65); }
+  .map-pin-dot.sel { border-color: #E2E8F0; box-shadow: 0 0 0 4px rgba(226,232,240,0.28), 0 3px 12px rgba(0,0,0,0.65); }
+  .map-pin-dot.lit { background: linear-gradient(160deg, #FDE68A, #F59E0B); border-color: #FFFBEB; color: #2b1a05; box-shadow: 0 0 22px 6px rgba(251,191,36,0.75), 0 3px 12px rgba(0,0,0,0.6); }
+  .map-pin-ring { position: absolute; inset: -4px; border-radius: 9999px; border: 2px solid rgba(253,230,138,0.9); animation: mapPinRing 2s ease-out infinite; pointer-events: none; }
+  @keyframes mapPinRing { 0% { transform: scale(0.9); opacity: 0.95; } 100% { transform: scale(2.1); opacity: 0; } }
+  .map-pin-lock { position: absolute; right: -7px; top: -7px; background: #0f141d; border: 1px solid #64748B; border-radius: 9999px; padding: 2px; }
+  .map-pin-star { position: absolute; right: -9px; top: -12px; font-size: 17px; color: #FDE68A; }
+  .map-pin-label { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 12px; font-weight: 700; color: #FDE68A; background: rgba(10,10,16,0.88); border: 1px solid rgba(251,191,36,0.7); border-radius: 9999px; padding: 3px 10px; }
+  @media (prefers-reduced-motion: reduce) { .map-pin-ring { animation: none; } }
   @media (prefers-reduced-motion: reduce) { .map-wave, .map-foam, .map-mist, .map-flake, .map-flame, .map-lantern, .map-badge, .map-bob { animation: none; } .map-flake { display: none; } }
   /* Automated night */
   @keyframes dawnShake { 0%,100% { transform: translate(0,0); } 10% { transform: translate(-9px,4px); } 20% { transform: translate(8px,-5px); } 30% { transform: translate(-7px,-3px); } 40% { transform: translate(6px,5px); } 50% { transform: translate(-5px,2px); } 60% { transform: translate(4px,-3px); } 80% { transform: translate(-2px,1px); } }
@@ -7320,33 +7330,77 @@ const MapWorld = React.memo(function MapWorld({ tab, cleared, selected, art }) {
   );
 });
 
+// Painted-map mode: level pins sit on the artwork's own landmarks, given as % of the image (x, y).
+const MAP_PINS = [[43, 82], [63, 75], [53, 77], [46, 73.5], [36, 76.5], [33, 63], [14, 52], [25, 42], [11, 29], [57, 62], [66, 57], [62, 48], [52, 40], [62.5, 34], [76, 38], [79, 47], [80, 59], [66, 28], [63.5, 18], [56, 13]];
+const MapPainted = React.memo(function MapPainted({ tab, src, w, h, cleared, selected }) {
+  const pts = MAP_PINS.map(([x, y]) => [Math.round((x * w) / 100), Math.round((y * h) / 100)]);
+  const trail = mapSmooth(pts);
+  const ob = tab === 'outbreak';
+  return (
+    <div style={{ position: 'relative', width: w, height: h }}>
+      <img src={src} alt="" draggable={false} width={w} height={h} style={{ display: 'block', width: w, height: h, userSelect: 'none', WebkitUserDrag: 'none', pointerEvents: 'none' }} />
+      <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+        <path d={trail} fill="none" stroke={ob ? '#34D399' : '#FDE68A'} strokeWidth="14" strokeOpacity="0.2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={trail} fill="none" stroke={ob ? '#A7F3D0' : '#FFF3C4'} strokeWidth="4.5" strokeOpacity="0.9" strokeDasharray="12 11" strokeLinecap="round" strokeLinejoin="round" className="map-foam" />
+      </svg>
+      <div className="map-fade" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: '#10b981', mixBlendMode: 'soft-light', opacity: ob ? 0.3 : 0 }} />
+      {MAP_PINS.map(([x, y], i) => {
+        const n = i + 1; const lit = tab === 'classic' && n === 1; const sel = selected === n;
+        return (
+          <div key={n} data-node={n} role="button" tabIndex={0} aria-label={lit ? `Level 1, House number 1, Harbor Cottage${cleared ? ', cleared' : ', unlocked'}` : `Level ${n}, locked, coming soon`} className="map-pin" style={{ left: `${x}%`, top: `${y}%`, cursor: 'pointer', outline: 'none' }}>
+            <div data-node={n} className={`map-pin-dot ${lit ? 'lit' : ''} ${sel ? 'sel' : ''}`}>
+              {lit && <span className="map-pin-ring" />}
+              <span data-node={n}>{n}</span>
+              {!lit && <svg className="map-pin-lock" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}
+              {lit && cleared && <span className="map-pin-star">&#9733;</span>}
+            </div>
+            {lit && <div data-node={n} className="map-pin-label">House #1 &mdash; Harbor Cottage</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+});
+
 function AdvHub({ onBack, onCustom, onPlay1 }) {
   const [tab, setTab] = useState('classic');
   const [sel, setSel] = useState(null);
   const [toast, setToast] = useState(0);
-  const [art, setArt] = useState({});
+  const [art, setArt] = useState({}); // painted maps found in /images: { classic: { w, h }, outbreak: { w, h } }
+  const [artReady, setArtReady] = useState(false);
   const cleared = !!loadAdv().classicLevel1Cleared;
   const vp = useRef(null), world = useRef(null), cam = useRef({ x: 0, y: 0, k: 0.5 });
   const ptrs = useRef(new Map()), g = useRef({ moved: 0, target: null, dist: 0, mx: 0, my: 0 });
-  const KMIN = 0.45, KMAX = 2.2;
-  useEffect(() => { // painted maps dropped into the site root replace the vector art automatically
-    ['classic', 'outbreak'].forEach((t) => { const im = new Image(); im.onload = () => setArt((a) => ({ ...a, [t]: true })); im.src = `/${t}-island-map.png`; });
+  const KMAX = 2.2;
+  const pa = art[tab] || null; // the painted map for this tab, if its file exists
+  const dim = pa ? { w: pa.w, h: pa.h } : { w: MAP_W, h: MAP_H };
+  const dimR = useRef(dim); dimR.current = dim;
+  const paR = useRef(null); paR.current = pa;
+  const kmin = () => { const { w, h } = size(); const d = dimR.current; return paR.current ? Math.max(0.15, Math.min(w / d.w, h / d.h) * 0.92) : 0.45; };
+  useEffect(() => { // painted maps (images/classic-island-map.png, images/outbreak-island-map.png) replace the vector art automatically
+    let left = 2; const done = () => { left -= 1; if (left <= 0) setArtReady(true); };
+    ['classic', 'outbreak'].forEach((t) => { const im = new Image(); im.onload = () => { setArt((a) => ({ ...a, [t]: { w: im.naturalWidth, h: im.naturalHeight } })); done(); }; im.onerror = done; im.src = `images/${t}-island-map.png`; });
+    const t = setTimeout(() => setArtReady(true), 3000); return () => clearTimeout(t);
   }, []);
   useEffect(() => { if (!toast) return undefined; const t = setTimeout(() => setToast(0), 2400); return () => clearTimeout(t); }, [toast]);
   const size = () => { const el = vp.current; return { w: el ? el.clientWidth : 390, h: el ? el.clientHeight : 800 }; };
-  const clampCam = (c, slack) => { const { w, h } = size(); const ww = MAP_W * c.k, hh = MAP_H * c.k; return { k: c.k, x: ww <= w ? (w - ww) / 2 : Math.min(slack, Math.max(w - ww - slack, c.x)), y: hh <= h ? (h - hh) / 2 : Math.min(slack, Math.max(h - hh - slack, c.y)) }; };
-  const apply = (c, ms) => { cam.current = c; const el = world.current; if (!el) return; el.style.transition = ms ? `transform ${ms}ms cubic-bezier(.2,.8,.2,1)` : 'none'; el.style.transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.k})`; };
-  const zoomAt = (px, py, nk, ms, slack = 0) => { const c = cam.current; const k = Math.min(KMAX, Math.max(KMIN, nk)); apply(clampCam({ k, x: px - ((px - c.x) * k) / c.k, y: py - ((py - c.y) * k) / c.k }, slack), ms); };
-  const focus = (n, k, ms) => { const { w, h } = size(); const o = MAP_NODES[n - 1]; apply(clampCam({ k, x: w / 2 - o.x * k, y: h * 0.58 - o.y * k }, 0), ms); };
-  const homeK = () => Math.min(1.3, Math.max(0.6, size().w / 520));
-  useEffect(() => { // open on the whole archipelago, then glide to the harbor
-    apply(clampCam({ k: KMIN, x: 0, y: 0 }, 0), 0);
+  const clampCam = (c, slack) => { const { w, h } = size(); const ww = dimR.current.w * c.k, hh = dimR.current.h * c.k; return { k: c.k, x: ww <= w ? (w - ww) / 2 : Math.min(slack, Math.max(w - ww - slack, c.x)), y: hh <= h ? (h - hh) / 2 : Math.min(slack, Math.max(h - hh - slack, c.y)) }; };
+  const apply = (c, ms) => { cam.current = c; const el = world.current; if (!el) return; el.style.setProperty('--ps', String((0.8 + 0.25 * c.k) / c.k)); el.style.transition = ms ? `transform ${ms}ms cubic-bezier(.2,.8,.2,1)` : 'none'; el.style.transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.k})`; };
+  const zoomAt = (px, py, nk, ms, slack = 0) => { const c = cam.current; const k = Math.min(KMAX, Math.max(kmin(), nk)); apply(clampCam({ k, x: px - ((px - c.x) * k) / c.k, y: py - ((py - c.y) * k) / c.k }, slack), ms); };
+  const focus = (n, k, ms) => { const { w, h } = size(); const o = pa ? { x: (MAP_PINS[n - 1][0] * dim.w) / 100, y: (MAP_PINS[n - 1][1] * dim.h) / 100 } : MAP_NODES[n - 1]; apply(clampCam({ k, x: w / 2 - o.x * k, y: h * 0.58 - o.y * k }, 0), ms); };
+  const homeK = () => (pa ? Math.min(KMAX, Math.max(kmin(), size().w / 600)) : Math.min(1.3, Math.max(0.6, size().w / 520)));
+  useEffect(() => { // open on the whole map, then glide to the harbor
+    if (!artReady) return undefined;
+    apply(clampCam({ k: kmin(), x: 0, y: 0 }, 0), 0);
     const t = setTimeout(() => focus(1, homeK(), 1300), 80);
+    return () => clearTimeout(t);
+  }, [artReady, tab, !!pa]);
+  useEffect(() => {
     const el = vp.current;
     const wheel = (e) => { e.preventDefault(); const r = el.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, cam.current.k * Math.exp(-e.deltaY * 0.0016), 0); };
     el.addEventListener('wheel', wheel, { passive: false });
     const rs = () => apply(clampCam(cam.current, 0), 0); window.addEventListener('resize', rs);
-    return () => { clearTimeout(t); el.removeEventListener('wheel', wheel); window.removeEventListener('resize', rs); };
+    return () => { el.removeEventListener('wheel', wheel); window.removeEventListener('resize', rs); };
   }, []);
   const rect = () => vp.current.getBoundingClientRect();
   const down = (e) => {
@@ -7364,7 +7418,7 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
       if (s.moved > 7) { const c = cam.current; apply(clampCam({ k: c.k, x: c.x + dx, y: c.y + dy }, 110), 0); }
     } else if (ptrs.current.size === 2) {
       p.x = nx; p.y = ny; const [a, b] = [...ptrs.current.values()]; const dist = Math.hypot(a.x - b.x, a.y - b.y); const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; const r = rect();
-      if (s.dist > 0) { const c = cam.current; const k = Math.min(KMAX, Math.max(KMIN, c.k * (dist / s.dist))); const px = mx - r.left, py = my - r.top; apply(clampCam({ k, x: px - ((px - c.x) * k) / c.k + (mx - s.mx), y: py - ((py - c.y) * k) / c.k + (my - s.my) }, 110), 0); }
+      if (s.dist > 0) { const c = cam.current; const k = Math.min(KMAX, Math.max(kmin(), c.k * (dist / s.dist))); const px = mx - r.left, py = my - r.top; apply(clampCam({ k, x: px - ((px - c.x) * k) / c.k + (mx - s.mx), y: py - ((py - c.y) * k) / c.k + (my - s.my) }, 110), 0); }
       s.dist = dist; s.mx = mx; s.my = my;
     }
   };
@@ -7387,8 +7441,8 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
   return (
     <div className="fixed inset-0 z-0 overflow-hidden" style={{ background: '#0a1a2e' }}>
       <div ref={vp} className="absolute inset-0 select-none" style={{ touchAction: 'none', cursor: 'grab' }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={(e) => { if (e.pointerType === 'mouse' && ptrs.current.has(e.pointerId)) up(e); }}>
-        <div ref={world} style={{ width: MAP_W, height: MAP_H, transformOrigin: '0 0', willChange: 'transform' }}>
-          <MapWorld tab={tab} cleared={cleared} selected={sel} art={art} />
+        <div ref={world} style={{ width: dim.w, height: dim.h, transformOrigin: '0 0', willChange: 'transform', visibility: artReady ? 'visible' : 'hidden' }}>
+          {pa ? <MapPainted tab={tab} src={`images/${tab}-island-map.png`} w={pa.w} h={pa.h} cleared={cleared} selected={sel} /> : <MapWorld tab={tab} cleared={cleared} selected={sel} art={{}} />}
         </div>
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10" style={{ background: 'linear-gradient(180deg, rgba(6,12,24,0.94) 55%, rgba(6,12,24,0))', paddingTop: 'max(8px, env(safe-area-inset-top))', paddingBottom: 22 }}>
@@ -7407,7 +7461,7 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
       <div className="absolute right-3 z-10 flex flex-col gap-2" style={{ bottom: showL1 ? 'calc(max(18px, env(safe-area-inset-bottom)) + 250px)' : 'max(20px, env(safe-area-inset-bottom))' }}>
         <button onClick={() => zoomBtn(1.3)} aria-label="Zoom in" className="flex h-11 w-11 items-center justify-center rounded-full text-xl font-bold" style={fab}>+</button>
         <button onClick={() => zoomBtn(1 / 1.3)} aria-label="Zoom out" className="flex h-11 w-11 items-center justify-center rounded-full text-xl font-bold" style={fab}>&minus;</button>
-        <button onClick={() => focus(1, homeK(), 700)} aria-label="Center on current level" title="Center on current level" className="flex h-11 w-11 items-center justify-center rounded-full" style={fab}>
+        <button onClick={() => focus(1, homeK(), 700)} aria-label="Reset view" title="Reset view" className="flex h-11 w-11 items-center justify-center rounded-full" style={fab}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg>
         </button>
       </div>

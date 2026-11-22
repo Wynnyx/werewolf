@@ -1813,6 +1813,7 @@ const TH_PAIRS = [
   ['World Map Art Style', 'สไตล์ภาพแผนที่ผจญภัย'], ['Storybook Hand-Painted', 'ภาพวาดนิทานดาร์กแฟนตาซี'], ['Storybook Hand-Painted HD', 'ภาพวาดนิทานดาร์กแฟนตาซี HD'], ['Storybook Ultra HD', 'ภาพวาดนิทาน อัลตร้า HD'], ['Artwork for the Adventure Classic world map. Change it any time.', 'ภาพพื้นหลังของแผนที่คลาสสิกในโหมดผจญภัย เปลี่ยนได้ทุกเมื่อ'],
   ['LEVEL 1 — The First Howl', 'ด่าน 1 — เสียงหอนแรก'], ['Harbor Cottage', 'กระท่อมท่าเรือ'], ['Your Role: Bodyguard (Training)', 'บทบาทของคุณ: บอดี้การ์ด (ฝึกหัด)'], ['Play Level 1', 'เล่นด่าน 1'], ['Unlocked', 'ปลดล็อกแล้ว'], ['Cleared ★', 'ผ่านแล้ว ★'], ['House #1', 'บ้านหลังที่ 1'], ['Back to map', 'กลับไปแผนที่'],
   ['Tip: As Bodyguard, protect someone each night. Guess who the Werewolf will attack!', 'เคล็ดลับ: ในฐานะบอดี้การ์ด ให้ปกป้องใครสักคนทุกคืน ลองเดาว่ามนุษย์หมาป่าจะโจมตีใคร!'], ['Tip: Read the Village Chat, work out who the Werewolf is, and vote together!', 'เคล็ดลับ: อ่านแชตหมู่บ้าน หาว่าใครคือมนุษย์หมาป่า แล้วโหวตไปด้วยกัน!'],
+  ['Leave match', 'ออกจากแมตช์'], ['You will leave this match against the bots. Your progress in this match will be lost.', 'คุณจะออกจากแมตช์กับบอท ความคืบหน้าในแมตช์นี้จะหายไป'],
   ['Level {#} — Locked (Coming Soon)', 'ด่าน {1} — ล็อกอยู่ (เร็ว ๆ นี้)'],
   ['Harbor Village', 'หมู่บ้านท่าเรือ'], ['The Underground Sinkhole', 'หลุมยุบใต้ดิน'], ['Roadless Dark Pine Forest', 'ป่าสนมืดไร้ทาง'], ['Cliff Cavern & Vampire Castle', 'ถ้ำผาและปราสาทแวมไพร์'], ['Frozen Alpine Summit', 'ยอดเขาน้ำแข็ง'],
   ['House #1 — Harbor Cottage', 'บ้านหลังที่ 1 — กระท่อมท่าเรือ'], ['Pier Watchpost', 'ป้อมเฝ้าท่าเทียบเรือ'], ['Harbor Square', 'จัตุรัสท่าเรือ'], ['Village Gate', 'ประตูหมู่บ้าน'],
@@ -6567,8 +6568,8 @@ function MpRoom({ session, onExit, onPhase }) {
         </div>
       )}
       {confirmLeave && (
-        <ConfirmExit confirmLabel={isHost ? 'Close room' : 'Leave room'}
-          body={isHost ? 'This closes the room for everyone. Players will be sent back out.' : 'You will leave this room. You can rejoin with the code only while the game has not started.'}
+        <ConfirmExit confirmLabel={room.ai === 1 ? 'Leave match' : isHost ? 'Close room' : 'Leave room'}
+          body={room.ai === 1 ? 'You will leave this match against the bots. Your progress in this match will be lost.' : isHost ? 'This closes the room for everyone. Players will be sent back out.' : 'You will leave this room. You can rejoin with the code only while the game has not started.'}
           onCancel={() => setConfirmLeave(false)} onConfirm={leave} />
       )}
     </Screen>

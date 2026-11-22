@@ -1822,7 +1822,7 @@ const TH_PAIRS = [
   ['Waiting for the other night roles to finish…', 'กำลังรอบทบาทกลางคืนอื่น ๆ ทำให้เสร็จ…'], ['Choose one action and a new target, or skip.', 'เลือกการกระทำหนึ่งอย่างและเป้าหมายใหม่ หรือข้าม'],
   ['Your vision is clouding. Waiting for the Shadow Figure…', 'นิมิตของคุณพร่ามัว กำลังรอร่างเงา…'], ['redirects an action → {}', 'เปลี่ยนเป้าหมายการกระทำ → {1}'], ['no redirect', 'ไม่เปลี่ยนเป้าหมาย'],
   ['World Map Art Style', 'สไตล์ภาพแผนที่ผจญภัย'], ['Storybook Hand-Painted', 'ภาพวาดนิทานดาร์กแฟนตาซี'], ['Storybook Hand-Painted HD', 'ภาพวาดนิทานดาร์กแฟนตาซี HD'], ['Storybook Ultra HD', 'ภาพวาดนิทาน อัลตร้า HD'], ['Artwork for the Adventure Classic world map. Change it any time.', 'ภาพพื้นหลังของแผนที่คลาสสิกในโหมดผจญภัย เปลี่ยนได้ทุกเมื่อ'],
-  ['LEVEL 1 — The First Howl', 'ด่าน 1 — เสียงหอนแรก'], ['Harbor Cottage', 'กระท่อมท่าเรือ'], ['Your Role: Bodyguard (Training)', 'บทบาทของคุณ: บอดี้การ์ด (ฝึกหัด)'], ['Play Level 1', 'เล่นด่าน 1'], ['Unlocked', 'ปลดล็อกแล้ว'], ['Cleared ★', 'ผ่านแล้ว ★'], ['House #1', 'บ้านหลังที่ 1'], ['Back to map', 'กลับไปแผนที่'],
+  ['LEVEL 1 — The First Howl', 'ด่าน 1 — เสียงหอนแรก'], ['Harbor Cottage', 'กระท่อมท่าเรือ'], ['Your Role: Bodyguard', 'บทบาทของคุณ: บอดี้การ์ด'], ['Play Level 1', 'เล่นด่าน 1'], ['Unlocked', 'ปลดล็อกแล้ว'], ['Cleared ★', 'ผ่านแล้ว ★'], ['House #1', 'บ้านหลังที่ 1'], ['Back to map', 'กลับไปแผนที่'],
   ['Tip: As Bodyguard, protect someone each night. Guess who the Werewolf will attack!', 'เคล็ดลับ: ในฐานะบอดี้การ์ด ให้ปกป้องใครสักคนทุกคืน ลองเดาว่ามนุษย์หมาป่าจะโจมตีใคร!'], ['Tip: Read the Village Chat, work out who the Werewolf is, and vote together!', 'เคล็ดลับ: อ่านแชตหมู่บ้าน หาว่าใครคือมนุษย์หมาป่า แล้วโหวตไปด้วยกัน!'],
   ['Accept', 'ตกลง'], ['Message from the Bodyguard', 'ข้อความจากบอดี้การ์ด'], ['Chat with the Bodyguard', 'แชทกับบอดี้การ์ด'], ['Close chat', 'ปิดแชท'], ['● Online', '● ออนไลน์'],
   ['Something tells me a Werewolf is sleeping in this house.', 'ฉันรู้สึกว่ามีมนุษย์หมาป่าหลับอยู่ในบ้านหลังนี้'], ['One of them has been hiding among us, slaughtering our villagers. Someone\'s already dead.', 'มันแฝงตัวอยู่ในหมู่พวกเราและฆ่าชาวบ้านไป มีคนตายไปแล้ว'], ['We can\'t let anyone else get hurt. Let\'s check it out.', 'เราปล่อยให้ใครต้องเจ็บอีกไม่ได้ ไปดูกันเถอะ'],
@@ -7436,7 +7436,6 @@ const L1_REDUCED = () => typeof window !== 'undefined' && !!window.matchMedia &&
 function Level1Scene({ cleared, onBack, onPlay }) {
   const [cta, setCta] = useState(false);
   useEffect(() => { const t = setTimeout(() => setCta(true), L1_REDUCED() ? 0 : 450); return () => clearTimeout(t); }, []);
-  const pill = (id) => { const r = ROLES_DATA[id]; return <span key={id} className="rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider" style={{ color: teamColor(r.team), background: 'rgba(8,10,18,0.72)', border: `1px solid ${teamColor(r.team)}88` }}>{r.name}</span>; };
   const IMG = 'images/level1-harbor-pov.webp';
   return (
     <div role="dialog" aria-label="Level 1 Harbor Cottage" className="l1-root fixed inset-0 z-30 overflow-hidden" style={{ background: '#05060d' }}>
@@ -7455,8 +7454,7 @@ function Level1Scene({ cleared, onBack, onPlay }) {
           <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-amber-300">{cleared ? 'Cleared ★' : 'Unlocked'} · House #1</div>
           <h2 className="font-display mt-1 text-2xl font-black leading-tight text-slate-50">LEVEL 1 &mdash; The First Howl</h2>
           <p className="text-sm text-slate-300">Harbor Cottage</p>
-          <div className="mt-3 flex flex-wrap gap-1.5">{['werewolf', 'seer', 'bodyguard', 'villager'].map(pill)}</div>
-          <p className="mt-3 text-sm font-semibold text-slate-100">Your Role: Bodyguard (Training)</p>
+          <p className="mt-3 text-sm font-semibold text-slate-100">Your Role: Bodyguard</p>
         </div>
         <div className="l1-cta mt-3" style={{ opacity: cta ? 1 : 0, transform: cta ? 'translateY(0)' : 'translateY(18px)', pointerEvents: cta ? 'auto' : 'none' }} aria-hidden={!cta}>
           <Btn onClick={onPlay} tabIndex={cta ? 0 : -1}>Play Level 1</Btn>

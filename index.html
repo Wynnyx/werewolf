@@ -5326,7 +5326,7 @@ function mpWolfVictims(players) { // Blood Moon: wolves also fill t2, and the to
   const byId = Object.fromEntries(players.map((p) => [p.id, p]));
   const wolves = players.filter((p) => p.a === 1 && p.r === 'werewolf');
   const tally = {};
-  wolves.forEach((p) => [p.t, p.t2].forEach((x) => { if (x && byId[x]) tally[x] = (tally[x] || 0) + 1; }));
+  wolves.forEach((p) => [p.t, p.t2].forEach((x) => { if (x && byId[x] && !(byId[x].a === 1 && (byId[x].r === 'werewolf' || byId[x].r === 'shadow'))) tally[x] = (tally[x] || 0) + 1; })); // the pack never hunts its own side
   const ids = Object.keys(tally).sort((x, y) => tally[y] - tally[x] || (byId[x].o || 0) - (byId[y].o || 0));
   return ids.slice(0, wolves.some((p) => p.t2 && byId[p.t2]) ? 2 : 1);
 }

@@ -4758,7 +4758,7 @@ function mpDealPatch(room, deck) {
     const h = players.find((p) => p.bot !== 1); const sp = players.find((p) => patch[`pl/${p.id}/r`] === 'bodyguard');
     if (h && sp && sp.id !== h.id) { patch[`pl/${sp.id}/r`] = patch[`pl/${h.id}/r`]; patch[`pl/${h.id}/r`] = 'bodyguard'; }
   }
-  if (room.ai === 1) players.filter((p) => p.bot === 1).forEach((p) => { patch[`pl/${p.id}/d`] = 1; }); // Solo AI: the bots are ready from the start, so the human's tap is the only one that counts
+  if (room.ai === 1 && players.filter((p) => p.bot !== 1).length === 1) players.filter((p) => p.bot === 1).forEach((p) => { patch[`pl/${p.id}/d`] = 1; }); // Solo AI: the bots are ready from the start, so the human's tap is the only one that counts
   return patch;
 }
 function mpLobbyPatch(room) {
@@ -6398,6 +6398,7 @@ function MpRoom({ session, onExit, onPhase }) {
   const [busy, setBusy] = useState(false);
   const [wErr, setWErr] = useState('');
   const players = useMemo(() => roomPlayers(room), [room]);
+  const soloAi = !!room && room.ai === 1 && players.filter((p) => p.bot !== 1).length === 1; // one human against bots (Adventure / Custom AI): the card flips itself and there is no ready wait. Rooms with 2+ people keep tap-to-reveal and the ready count.
   const mx = (room && room.mx) || MP_MAX;
   const me = players.find((p) => p.id === pid);
   const isHost = !!room && room.host === pid;
@@ -6432,7 +6433,7 @@ function MpRoom({ session, onExit, onPhase }) {
     if (!hostPlays || director.dir.on) return;
     const key = `${ph}:${room.k}:${room.vd}:${autoWinner}`;
     let t = 0;
-    if (ph === 'reveal' && allSeen) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, room.ai === 1 ? 250 : 1800);
+    if (ph === 'reveal' && allSeen) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, soloAi ? 250 : 1800);
     else if (ph === 'night') t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start({ again: true }); } }, 6000); // only if the director is not running (for example after a refresh)
     else if (ph === 'day' && autoWinner) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; write({ ph: 'over', w: autoWinner }); } }, hunterPending ? 20000 : 7000);
     else if (ph === 'day' && room.vd === 1) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, hunterPending ? 30000 : 12000); // time to read who was voted out
@@ -6527,7 +6528,7 @@ function MpRoom({ session, onExit, onPhase }) {
       </div>
     );
   } else if (showPlayer) {
-    if (ph === 'reveal') body = <MpReveal me={me} ready={me.d === 1} readyCount={players.filter((p) => p.d === 1).length} total={players.length} onReady={() => write({ [`pl/${pid}/d`]: 1 })} onLeave={() => setConfirmLeave(true)} instant={room.ai === 1} />;
+    if (ph === 'reveal') body = <MpReveal me={me} ready={me.d === 1} readyCount={players.filter((p) => p.d === 1).length} total={players.length} onReady={() => write({ [`pl/${pid}/d`]: 1 })} onLeave={() => setConfirmLeave(true)} instant={soloAi} />;
     else if (ph === 'night') body = <MpNight key={`n${room.k}`} me={me} players={players} room={room} write={write} immersive={!isHost || hostPlays} onLeave={() => setConfirmLeave(true)} />;
     else if (ph === 'day') body = <MpDay key={`d${room.k}`} me={me} players={players} room={room} write={write} onTimeUp={isHost && hostPlays ? () => { if (room.vd === 1) return; const t = mpTally(players); write(mpVotePatch(players, t.tie ? '' : t.top, { tie: t.tie, skip: t.skip, none: t.voted === 0 })); } : undefined} />;
     else body = <MpOver room={room} players={players} meId={pid} />;
@@ -6581,8 +6582,8 @@ function MpRoom({ session, onExit, onPhase }) {
         </div>
       )}
       {confirmLeave && (
-        <ConfirmExit confirmLabel={room.ai === 1 ? 'Leave match' : isHost ? 'Close room' : 'Leave room'}
-          body={room.ai === 1 ? 'You will leave this match against the bots. Your progress in this match will be lost.' : isHost ? 'This closes the room for everyone. Players will be sent back out.' : 'You will leave this room. You can rejoin with the code only while the game has not started.'}
+        <ConfirmExit confirmLabel={soloAi ? 'Leave match' : isHost ? 'Close room' : 'Leave room'}
+          body={soloAi ? 'You will leave this match against the bots. Your progress in this match will be lost.' : isHost ? 'This closes the room for everyone. Players will be sent back out.' : 'You will leave this room. You can rejoin with the code only while the game has not started.'}
           onCancel={() => setConfirmLeave(false)} onConfirm={leave} />
       )}
     </Screen>

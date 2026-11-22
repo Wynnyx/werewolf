@@ -1223,7 +1223,7 @@ function DotBurst({ b }) {
 /* ------------------------------------------------------------------ */
 const SET_KEY = 'nightfall.settings.v1';
 let settings = (() => {
-  try { const v = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); return { blood: !(v && v.blood === false), sound: !(v && v.sound === false), music: !(v && v.music === false), revealDead: !(v && v.revealDead === false), mapStyle: v && v.mapStyle === 'storybook' ? 'storybook' : 'cinematic', fbUrl: v && typeof v.fbUrl === 'string' ? v.fbUrl : '' }; }
+  try { const v = JSON.parse(localStorage.getItem(SET_KEY) || '{}'); return { blood: !(v && v.blood === false), sound: !(v && v.sound === false), music: !(v && v.music === false), revealDead: !(v && v.revealDead === false), mapStyle: v && (v.mapStyle === 'storybook' || v.mapStyle === 'animated') ? v.mapStyle : 'cinematic', fbUrl: v && typeof v.fbUrl === 'string' ? v.fbUrl : '' }; }
   catch (e) { return { blood: true, sound: true, music: true, revealDead: true, mapStyle: 'cinematic', fbUrl: '' }; }
 })();
 const setListeners = new Set();
@@ -1801,7 +1801,7 @@ const TH_PAIRS = [
   ['Redirect an action', 'เปลี่ยนเป้าหมายการกระทำ'], ['Your redirect is set.', 'ตั้งค่าการเปลี่ยนเป้าหมายแล้ว'], ['You left every action unchanged.', 'คุณไม่เปลี่ยนการกระทำใด ๆ'], ['You act last, once everyone else has chosen.', 'คุณลงมือเป็นคนสุดท้าย หลังจากทุกคนเลือกแล้ว'],
   ['Waiting for the other night roles to finish…', 'กำลังรอบทบาทกลางคืนอื่น ๆ ทำให้เสร็จ…'], ['Choose one action and a new target, or skip.', 'เลือกการกระทำหนึ่งอย่างและเป้าหมายใหม่ หรือข้าม'],
   ['Your vision is clouding. Waiting for the Shadow Figure…', 'นิมิตของคุณพร่ามัว กำลังรอร่างเงา…'], ['redirects an action → {}', 'เปลี่ยนเป้าหมายการกระทำ → {1}'], ['no redirect', 'ไม่เปลี่ยนเป้าหมาย'],
-  ['World Map Art Style', 'สไตล์ภาพแผนที่ผจญภัย'], ['Cinematic Dark Fantasy', 'ดาร์กแฟนตาซีสมจริง'], ['Storybook Hand-Painted', 'ภาพวาดนิทานดาร์กแฟนตาซี'], ['Artwork for the Adventure Classic world map. Change it any time.', 'ภาพพื้นหลังของแผนที่คลาสสิกในโหมดผจญภัย เปลี่ยนได้ทุกเมื่อ'],
+  ['World Map Art Style', 'สไตล์ภาพแผนที่ผจญภัย'], ['Cinematic Dark Fantasy', 'ดาร์กแฟนตาซีสมจริง'], ['Animated Dark Fantasy', 'ดาร์กแฟนตาซีเคลื่อนไหว'], ['Storybook Hand-Painted', 'ภาพวาดนิทานดาร์กแฟนตาซี'], ['Artwork for the Adventure Classic world map. Change it any time.', 'ภาพพื้นหลังของแผนที่คลาสสิกในโหมดผจญภัย เปลี่ยนได้ทุกเมื่อ'],
   ['Level {#} — Locked (Coming Soon)', 'ด่าน {1} — ล็อกอยู่ (เร็ว ๆ นี้)'],
   ['Harbor Village', 'หมู่บ้านท่าเรือ'], ['The Underground Sinkhole', 'หลุมยุบใต้ดิน'], ['Roadless Dark Pine Forest', 'ป่าสนมืดไร้ทาง'], ['Cliff Cavern & Vampire Castle', 'ถ้ำผาและปราสาทแวมไพร์'], ['Frozen Alpine Summit', 'ยอดเขาน้ำแข็ง'],
   ['House #1 — Harbor Cottage', 'บ้านหลังที่ 1 — กระท่อมท่าเรือ'], ['Pier Watchpost', 'ป้อมเฝ้าท่าเทียบเรือ'], ['Harbor Square', 'จัตุรัสท่าเรือ'], ['Village Gate', 'ประตูหมู่บ้าน'],
@@ -2286,10 +2286,10 @@ function SettingsModal({ onClose, gameCount, onClearGames }) {
             <div className="rounded-2xl p-4" style={rowStyle}>
               <div className="text-[15px] font-semibold" id="mapstyle-label">World Map Art Style</div>
               <p className="mt-0.5 text-xs leading-snug text-slate-400">Artwork for the Adventure Classic world map. Change it any time.</p>
-              <div role="radiogroup" aria-labelledby="mapstyle-label" className="mt-2.5 grid grid-cols-2 gap-2">
-                {[['cinematic', 'Cinematic Dark Fantasy'], ['storybook', 'Storybook Hand-Painted']].map(([k, label]) => (
+              <div role="radiogroup" aria-labelledby="mapstyle-label" className="mt-2.5 grid grid-cols-3 gap-1.5">
+                {[['cinematic', 'Cinematic Dark Fantasy'], ['storybook', 'Storybook Hand-Painted'], ['animated', 'Animated Dark Fantasy']].map(([k, label]) => (
                   <button key={k} role="radio" aria-checked={st.mapStyle === k} onClick={() => updateSettings({ mapStyle: k })}
-                    className="min-h-[48px] rounded-xl px-2 text-[13px] font-semibold leading-tight"
+                    className="min-h-[52px] rounded-xl px-1.5 text-xs font-semibold leading-tight"
                     style={{ background: st.mapStyle === k ? '#B91C1C' : 'var(--card)', border: `1px solid ${st.mapStyle === k ? '#F87171' : 'rgba(203,213,225,0.3)'}`, color: st.mapStyle === k ? '#fff' : '#CBD5E1' }}>{label}</button>
                 ))}
               </div>
@@ -7352,11 +7352,13 @@ const MapWorld = React.memo(function MapWorld({ tab, cleared, selected, art }) {
 
 // Painted-map mode: level pins sit on the artwork's own landmarks, given as % of the image (x, y).
 const MAP_PINS = [[42, 84], [33, 86], [50, 82], [48, 74], [26, 66], [20, 69], [24, 74], [38, 58], [45, 50], [50, 44], [61, 47], [78, 62], [79, 47], [84, 38], [88, 31], [74, 30], [64, 26], [68, 17], [54, 20], [46, 22]];
-const MAP_PIN_ADJ = { cinematic: { 20: [60, 10] } }; // the dark tunnel sits higher in the cinematic painting than in the storybook one
+const MAP_PIN_ADJ = { cinematic: { 20: [60, 10] }, animated: { 20: [60, 10] } }; // the dark tunnel sits higher in the cinematic painting than in the storybook one
 const MAP_ZONES = [[1, 4], [5, 7], [8, 11], [12, 16], [17, 20]]; // level ranges that share one landmark; each gets its own trail
 const mapBow = (a, b, sg, f) => { const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1; return [(a[0] + b[0]) / 2 - (dy / L) * L * f * sg, (a[1] + b[1]) / 2 + (dx / L) * L * f * sg]; };
 const mapZonePath = (pts) => pts.slice(1).map((q, i) => { const c = mapBow(pts[i], q, i % 2 ? -1 : 1, 0.16); return `${i ? '' : `M${pts[0][0]} ${pts[0][1]} `}Q${Math.round(c[0])} ${Math.round(c[1])} ${q[0]} ${q[1]}`; }).join(' ');
-const MapPainted = React.memo(function MapPainted({ tab, src, w, h, cleared, selected, style }) {
+const MapPainted = React.memo(function MapPainted({ tab, src, video, w, h, cleared, selected, style }) {
+  const [vOk, setVOk] = useState(true);
+  const still = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const PINS = MAP_PINS.map((q, i) => (MAP_PIN_ADJ[style] && MAP_PIN_ADJ[style][i + 1]) || q);
   const pts = PINS.map(([x, y]) => [Math.round((x * w) / 100), Math.round((y * h) / 100)]);
   const zones = MAP_ZONES.map(([a, b]) => mapZonePath(pts.slice(a - 1, b)));
@@ -7365,6 +7367,7 @@ const MapPainted = React.memo(function MapPainted({ tab, src, w, h, cleared, sel
   return (
     <div style={{ position: 'relative', width: w, height: h }}>
       <img src={src} alt="" draggable={false} width={w} height={h} style={{ display: 'block', width: w, height: h, userSelect: 'none', WebkitUserDrag: 'none', pointerEvents: 'none' }} />
+      {video && vOk && !still && <video src={video} poster={src} autoPlay muted loop playsInline preload="auto" disablePictureInPicture aria-hidden="true" tabIndex={-1} onError={() => setVOk(false)} style={{ position: 'absolute', inset: 0, width: w, height: h, objectFit: 'cover', pointerEvents: 'none' }} />}
       <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         {links.map((d, i) => <path key={`l${i}`} d={d} fill="none" stroke={ob ? '#A7F3D0' : '#FFF3C4'} strokeWidth="6" strokeOpacity="0.5" strokeDasharray="0.1 20" strokeLinecap="round" />)}
         {zones.map((d, i) => <path key={`g${i}`} d={d} fill="none" stroke={ob ? '#34D399' : '#FDE68A'} strokeWidth="16" strokeOpacity="0.18" strokeLinecap="round" strokeLinejoin="round" />)}
@@ -7407,8 +7410,8 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
   const mapStyle = useSettings().mapStyle;
   useEffect(() => { // painted maps replace the vector art: Classic uses the chosen 4K style (.webp, then .png), Outbreak uses images/outbreak-island-map.png if present
     let left = 2; let live = true; const done = () => { left -= 1; if (left <= 0) setArtReady(true); };
-    const load = (t, list) => { const im = new Image(); const next = (i) => { if (!live) return; if (i >= list.length) { setArt((a) => { const { [t]: _x, ...r } = a; return r; }); done(); return; } im.onload = () => { if (!live) return; setArt((a) => ({ ...a, [t]: { w: im.naturalWidth, h: im.naturalHeight, src: list[i] } })); done(); }; im.onerror = () => next(i + 1); im.src = list[i]; }; next(0); };
-    load('classic', [`images/classic-map-${mapStyle}.webp`, `images/classic-map-${mapStyle}.png`]);
+    const load = (t, list, video) => { const im = new Image(); const next = (i) => { if (!live) return; if (i >= list.length) { setArt((a) => { const { [t]: _x, ...r } = a; return r; }); done(); return; } im.onload = () => { if (!live) return; setArt((a) => ({ ...a, [t]: { w: im.naturalWidth, h: im.naturalHeight, src: list[i], video } })); done(); }; im.onerror = () => next(i + 1); im.src = list[i]; }; next(0); };
+    load('classic', mapStyle === 'animated' ? ['images/classic-map-animated-poster.webp'] : [`images/classic-map-${mapStyle}.webp`, `images/classic-map-${mapStyle}.png`], mapStyle === 'animated' ? 'images/classic-map-animated.mp4' : null);
     load('outbreak', ['images/outbreak-island-map.png']);
     const t = setTimeout(() => setArtReady(true), 3000); return () => { live = false; clearTimeout(t); };
   }, [mapStyle]);
@@ -7472,7 +7475,7 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
     <div className="fixed inset-0 z-0 overflow-hidden" style={{ background: '#0a1a2e' }}>
       <div ref={vp} className="absolute inset-0 select-none" style={{ touchAction: 'none', cursor: 'grab' }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={(e) => { if (e.pointerType === 'mouse' && ptrs.current.has(e.pointerId)) up(e); }}>
         <div ref={world} style={{ width: dim.w, height: dim.h, transformOrigin: '0 0', willChange: 'transform', visibility: artReady ? 'visible' : 'hidden' }}>
-          {pa ? <MapPainted tab={tab} style={mapStyle} src={pa.src} w={pa.w} h={pa.h} cleared={cleared} selected={sel} /> : <MapWorld tab={tab} cleared={cleared} selected={sel} art={{}} />}
+          {pa ? <MapPainted tab={tab} style={mapStyle} src={pa.src} video={pa.video} w={pa.w} h={pa.h} cleared={cleared} selected={sel} /> : <MapWorld tab={tab} cleared={cleared} selected={sel} art={{}} />}
         </div>
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10" style={{ background: 'linear-gradient(180deg, rgba(6,12,24,0.94) 55%, rgba(6,12,24,0))', paddingTop: 'max(8px, env(safe-area-inset-top))', paddingBottom: 22 }}>

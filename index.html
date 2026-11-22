@@ -65,7 +65,7 @@
   @keyframes mapFlame { from { transform: scale(1, 0.85); opacity: 0.85; } to { transform: scale(0.9, 1.2); opacity: 1; } }
   .map-lantern { transform-box: fill-box; transform-origin: center; animation: mapLantern 2.6s ease-in-out infinite; } @keyframes mapLantern { 0%, 100% { transform: scale(0.9); opacity: 0.75; } 50% { transform: scale(1.1); opacity: 1; } }
   .map-badge { animation: mapLantern 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-  .map-bob { animation: mapBob 3.4s ease-in-out infinite; } @keyframes mapBob { 0%, 100% { transform: translate(96px, 2578px); } 50% { transform: translate(96px, 2583px); } }
+  .map-bob { animation: mapBob 3.4s ease-in-out infinite; } @keyframes mapBob { 0%, 100% { translate: 0 0; } 50% { translate: 0 6px; } }
   .map-fade { transition: opacity 0.9s ease; }
   @media (prefers-reduced-motion: reduce) { .map-wave, .map-foam, .map-mist, .map-flake, .map-flame, .map-lantern, .map-badge, .map-bob { animation: none; } .map-flake { display: none; } }
   /* Automated night */
@@ -7039,24 +7039,49 @@ function AiNameStep({ onBack, onStart, busy, err }) {
   );
 }
 
-/* ---------- Adventure: 2.5D cold-zone island trail map (layered SVG + CSS, fully offline) ---------- */
-const MAP_W = 400, MAP_H = 2700;
-const MAP_X = [200, 290, 150, 270, 130, 280, 150, 260, 120, 290, 170, 270, 140, 260, 180, 280, 140, 250, 170, 210];
-const MAP_NODES = MAP_X.map((x, i) => ({ n: i + 1, x, y: 2470 - i * 118 }));
-function mapSmooth(pts) {
-  let d = `M${pts[0][0]} ${pts[0][1]}`;
+/* ---------- Adventure: pan & pinch-to-zoom cold-zone archipelago (layered SVG + CSS, offline) ---------- */
+const MAP_W = 1600, MAP_H = 2400;
+const mapRand = (seed) => () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+const mapWave = (y, amp = 7, n = 24) => { let d = `M-80 ${y}`; for (let i = 0; i < n; i++) d += ` q20 ${-amp} 40 0 t40 0`; return d; };
+function mapJag(pts, rough, seed, depth = 3) { // midpoint displacement: turns a coarse outline into a jagged, rocky coastline
+  const r = mapRand(seed); let p = pts;
+  for (let d = 0; d < depth; d++) {
+    const out = [];
+    for (let i = 0; i < p.length; i++) {
+      const a = p[i], b = p[(i + 1) % p.length]; out.push(a);
+      const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, off = (r() - 0.5) * rough * (len / 60);
+      out.push([(a[0] + b[0]) / 2 - (dy / len) * off, (a[1] + b[1]) / 2 + (dx / len) * off]);
+    }
+    p = out;
+  }
+  return p.map((q) => [Math.round(q[0]), Math.round(q[1])]);
+}
+const mapPoly = (p) => 'M' + p.map((q) => q.join(' ')).join('L') + 'Z';
+const mapInside = (poly, x, y) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const a = poly[i], b = poly[j]; if ((a[1] > y) !== (b[1] > y) && x < ((b[0] - a[0]) * (y - a[1])) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
+function mapSmooth(pts, steps = 0) {
+  let d = `M${pts[0][0]} ${pts[0][1]}`; const samp = [pts[0]];
   for (let i = 0; i < pts.length - 1; i++) {
     const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
-    d += ` C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)} ${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)} ${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0]} ${p2[1]}`;
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ` C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0]} ${p2[1]}`;
+    for (let s = 1; s <= steps; s++) { const t = s / steps, u = 1 - t; samp.push([u * u * u * p1[0] + 3 * u * u * t * c1[0] + 3 * u * t * t * c2[0] + t * t * t * p2[0], u * u * u * p1[1] + 3 * u * u * t * c1[1] + 3 * u * t * t * c2[1] + t * t * t * p2[1]]); }
   }
-  return d;
+  return steps ? { d, samp } : d;
 }
-const MAP_LEFT = [[150, 30], [110, 250], [80, 500], [90, 800], [60, 1100], [80, 1400], [50, 1700], [70, 2000], [38, 2300], [60, 2560]];
-const MAP_RIGHT = [[345, 2560], [362, 2300], [330, 2000], [350, 1700], [335, 1400], [355, 1100], [325, 800], [345, 500], [320, 250], [250, 30]];
-const MAP_ISLAND = (() => { const r = mapSmooth(MAP_RIGHT); return mapSmooth(MAP_LEFT) + ` Q200 2615 ${MAP_RIGHT[0][0]} ${MAP_RIGHT[0][1]} ` + r.slice(r.indexOf('C')) + ' Z'; })();
-const MAP_TRAIL = mapSmooth([[200, 2580], ...MAP_NODES.map((o) => [o.x, o.y])]);
-const mapRand = (seed) => () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-const mapWave = (y, amp = 7) => { let d = `M-80 ${y}`; for (let i = 0; i < 8; i++) d += ` q20 ${-amp} 40 0 t40 0`; return d; };
+// 20 levels on a dramatic switchback: wide left-right hairpins climbing from the harbor to the frozen summit.
+const MAP_NODES = [[700, 2150], [960, 2050], [610, 1950], [940, 1850], [590, 1740], [950, 1640], [580, 1520], [960, 1420], [600, 1310], [970, 1200], [590, 1090], [980, 980], [610, 880], [950, 780], [640, 680], [970, 590], [700, 520], [980, 440], [800, 370], [900, 310]].map(([x, y], i) => ({ n: i + 1, x, y }));
+const MAP_MAIN = mapJag([[700, 2230], [560, 2200], [470, 2120], [430, 1980], [470, 1850], [400, 1720], [430, 1580], [380, 1440], [440, 1300], [400, 1160], [470, 1020], [450, 880], [520, 740], [560, 620], [640, 500], [720, 380], [860, 290], [1000, 250], [1120, 330], [1200, 450], [1260, 580], [1230, 720], [1290, 860], [1250, 1000], [1300, 1140], [1260, 1290], [1310, 1440], [1250, 1580], [1290, 1720], [1230, 1860], [1250, 2000], [1180, 2120], [1040, 2190], [880, 2240]], 34, 11);
+const MAP_ISLETS = [[190, 2000, 92], [150, 1650, 112], [210, 1300, 96], [170, 950, 100], [250, 640, 86], [1450, 1500, 102], [1480, 1900, 86], [1430, 1150, 82], [1400, 700, 72], [1110, 2330, 72], [320, 2310, 62], [1500, 2200, 54], [120, 430, 60]].map(([cx, cy, r], i) => {
+  const rr = mapRand(100 + i); const pts = Array.from({ length: 9 }, (_, a) => { const t = (a / 9) * Math.PI * 2; const q = r * (0.78 + rr() * 0.45); return [cx + Math.cos(t) * q, cy + Math.sin(t) * q * 1.1]; });
+  return { cx, cy, r, poly: mapJag(pts, 18, 200 + i, 2) };
+});
+const MAP_BRIDGES = [[440, 1990, 270, 2000], [412, 1680, 250, 1660], [440, 1310, 300, 1300], [470, 1020, 262, 960], [520, 740, 318, 640], [1262, 1500, 1352, 1500], [1240, 1900, 1396, 1900], [1272, 1150, 1352, 1150], [1250, 720, 1334, 700], [560, 2205, 360, 2300]];
+const MAP_TRAIL = mapSmooth([[700, 2290], ...MAP_NODES.map((o) => [o.x, o.y])], 12);
+const MAP_STREAMS = [[1990, 0], [1470, 1], [1030, 0]]; // cross the trail: wooden bridges stand where the trail meets them
+const MAP_BRIDGE_AT = [[790, 2000, -12], [770, 1470, -18], [785, 1035, -16]];
+const MAP_BIOME = (n) => (n <= 4 ? 'Coastal Villager Houses' : n <= 8 ? 'Deep Pine Forest' : n <= 12 ? 'Shadow Caverns' : n <= 16 ? 'Jagged Mountain Ridge' : 'Frozen Snow Summit');
+const MAP_KIND = (n) => (n <= 4 ? 'house' : n <= 8 ? 'lodge' : n <= 12 ? 'cave' : n <= 16 ? 'tower' : n === 17 ? 'snowhouse' : n === 18 ? 'spire' : n === 19 ? 'citadel' : 'summit');
+const MAP_NAME = (n) => (n === 1 ? 'House #1 — Harbor Cottage' : ['Coastal Cottage', 'Coastal Cottage', 'Coastal Cottage', 'Forest Lodge', 'Forest Lodge', 'Forest Lodge', 'Forest Lodge', 'Cavern Outpost', 'Cavern Outpost', 'Cavern Outpost', 'Cavern Outpost', 'Mountain Watchtower', 'Mountain Watchtower', 'Mountain Watchtower', 'Mountain Watchtower', 'Frozen Outpost', 'Ice Spire', 'Frozen Citadel', 'Summit Citadel'][n - 2]);
 
 function MapPine({ x, y, s = 1, snow }) {
   return (
@@ -7069,18 +7094,37 @@ function MapPine({ x, y, s = 1, snow }) {
     </g>
   );
 }
+function MapDead({ x, y, s = 1 }) {
+  return (
+    <g transform={`translate(${x} ${y}) scale(${s})`}>
+      <ellipse cx="0" cy="2" rx="8" ry="2.5" fill="rgba(0,0,0,0.35)" />
+      <path d="M0 2 L-1 -16 M-1 -10 L-10 -22 M-1 -15 L8 -28 M-5 -17 L-13 -14 M4 -22 L12 -20 M-1 -16 L-3 -32" stroke="#2b2724" strokeWidth="2.6" strokeLinecap="round" fill="none" />
+    </g>
+  );
+}
 function MapPeak({ x, y, s = 1, snow = true, c1 = '#8794a6', c2 = '#5b6677' }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${s})`}>
       <polygon points="-34,0 0,-62 8,0" fill={c1} /><polygon points="0,-62 36,0 8,0" fill={c2} />
-      {snow && <><polygon points="0,-62 -12,-38 -4,-42 3,-34 10,-42 14,-38" fill="#f4f9ff" /></>}
+      <polygon points="-34,0 -14,-30 -8,-8 -20,0" fill="rgba(255,255,255,0.1)" /><polygon points="8,0 22,-26 36,0" fill="rgba(0,0,0,0.18)" />
+      {snow && <polygon points="0,-62 -13,-38 -5,-43 2,-33 10,-43 15,-38" fill="#f4f9ff" />}
     </g>
   );
 }
-// One landmark per level. `lit` = unlocked: warm windows and torches; unlit ones are dark and cold.
-function MapLandmark({ kind, lit, cleared }) {
-  const wl = lit ? '#9a7048' : '#3c4350', wr = lit ? '#765232' : '#2c323d';
-  const win = lit ? '#FDE68A' : '#1b2029';
+function MapRibs({ x, y, s = 1, r = 0 }) {
+  return (
+    <g transform={`translate(${x} ${y}) rotate(${r}) scale(${s})`} fill="none" stroke="#d9d4c3" strokeLinecap="round">
+      <path d="M-56 0 Q0 -16 56 0" strokeWidth="5" />
+      {[-40, -26, -12, 2, 16, 30, 44].map((p, i) => <g key={p}><path d={`M${p} ${-6 + Math.abs(p) * 0.02} Q${p + 6} ${-40 + i * 2} ${p - 6} -52`} strokeWidth="3.6" /><path d={`M${p} ${-6 + Math.abs(p) * 0.02} Q${p + 8} 26 ${p - 4} 34`} strokeWidth="3" opacity="0.7" /></g>)}
+      <circle cx="-62" cy="2" r="9" fill="#d9d4c3" stroke="none" /><circle cx="-64" cy="0" r="2.4" fill="#1b1a17" stroke="none" />
+    </g>
+  );
+}
+// One landmark per level. `lit` = unlocked (warm windows / torches); `ob` = Outbreak palette (rotting, sickly green).
+function MapLandmark({ kind, lit, ob }) {
+  const wl = lit ? '#9a7048' : ob ? '#3d4b3f' : '#3c4350', wr = lit ? '#765232' : ob ? '#29352c' : '#2c323d';
+  const win = lit ? '#FDE68A' : ob ? '#2e6b52' : '#1b2029';
+  const roofL = lit ? '#b0463c' : ob ? '#3a4533' : '#4a3a40', roofR = lit ? '#80312b' : ob ? '#27301f' : '#33282d';
   if (kind === 'house' || kind === 'snowhouse') {
     const snow = kind === 'snowhouse';
     return (
@@ -7091,177 +7135,263 @@ function MapLandmark({ kind, lit, cleared }) {
         {lit && <circle cx="13" cy="-4" r="14" fill="url(#mapGlow)" />}
         <polygon points="-11,-4 -4,-1 -4,6 -11,3" fill={lit ? '#5b3a1f' : '#232830'} />
         <rect x="9" y="-34" width="6" height="12" fill={snow ? '#aab6c4' : lit ? '#6b4a3a' : '#2a2f38'} />
-        <polygon points="-25,-16 0,-3 0,-36" fill={snow ? '#eef5fb' : lit ? '#b0463c' : '#4a3a40'} /><polygon points="0,-3 25,-16 0,-36" fill={snow ? '#c9d8e6' : lit ? '#80312b' : '#33282d'} />
-        {snow && <polygon points="-25,-16 -18,-18 0,-9 18,-18 25,-16 0,-3" fill="#f7fbff" opacity="0.9" />}
+        <polygon points="-25,-16 0,-3 0,-36" fill={snow ? '#eef5fb' : roofL} /><polygon points="0,-3 25,-16 0,-36" fill={snow ? '#c9d8e6' : roofR} />
+        {ob && <path d="M-25 -16 L-14 -22 M6 -20 L18 -12" stroke="#10150f" strokeWidth="1.6" />}
       </g>
     );
   }
-  if (kind === 'sign') {
+  if (kind === 'lodge') {
     return (
       <g>
-        <MapPine x={-20} y={8} s={1.1} /><MapPine x={22} y={10} s={0.95} />
-        <ellipse cx="0" cy="12" rx="14" ry="4" fill="rgba(0,0,0,0.35)" />
-        <rect x="-2" y="-22" width="4" height="34" fill="#5a3f27" />
-        <polygon points="-16,-26 14,-26 20,-19 14,-12 -16,-12" fill={lit ? '#9a7048' : '#4a4036'} stroke="#2b1d12" strokeWidth="1" />
-        <rect x="-12" y="-23" width="22" height="2" fill="rgba(255,255,255,0.12)" />
+        <ellipse cx="0" cy="14" rx="34" ry="9" fill="rgba(0,0,0,0.38)" />
+        <MapPine x={-34} y={12} s={1.1} /><MapPine x={36} y={10} s={0.9} />
+        <polygon points="-30,2 0,16 0,-4 -30,-18" fill={ob ? '#3b3f30' : '#6b4a2c'} /><polygon points="0,16 30,2 30,-18 0,-4" fill={ob ? '#2a2d22' : '#523720'} />
+        <g stroke="rgba(0,0,0,0.3)" strokeWidth="1">{[-12, -6, 0, 6].map((p) => <line key={p} x1="0" y1={p + 12} x2="30" y2={p - 2} />)}</g>
+        <polygon points="-34,-14 0,2 0,-34" fill={ob ? '#3b4a30' : '#2c4a33'} /><polygon points="0,2 34,-14 0,-34" fill={ob ? '#27331f' : '#1d3524'} />
+        <rect x="11" y="-12" width="9" height="8" fill={win} transform="skewY(-28)" />
+        {lit && <circle cx="16" cy="-3" r="16" fill="url(#mapGlow)" />}
+        <rect x="12" y="-40" width="7" height="14" fill="#4b4b55" /><ellipse cx="16" cy="-46" rx="7" ry="4" fill="rgba(210,220,230,0.45)" />
       </g>
     );
   }
   if (kind === 'cave') {
     return (
       <g>
-        <ellipse cx="0" cy="14" rx="36" ry="9" fill="rgba(0,0,0,0.4)" />
-        <polygon points="-34,12 -28,-14 -10,-32 12,-28 30,-10 36,12" fill="#4a4a58" /><polygon points="12,-28 30,-10 36,12 8,12" fill="#34343f" />
-        <polygon points="-28,-14 -10,-32 -2,-18 -16,-6" fill="#6a6a7a" opacity="0.7" />
-        <path d="M-13 12 L-13 -5 Q0 -26 13 -5 L13 12 Z" fill="#07070c" />
-        {lit && <><circle cx="-19" cy="-4" r="13" fill="url(#mapGlow)" /><circle cx="19" cy="-4" r="13" fill="url(#mapGlow)" /></>}
-        <rect x="-21" y="-2" width="3" height="13" fill="#4a3322" /><rect x="18" y="-2" width="3" height="13" fill="#4a3322" />
-        <ellipse className={lit ? 'map-flame' : ''} cx="-19.5" cy="-5" rx="3" ry="5" fill={lit ? '#FDBA3B' : '#2a2a32'} /><ellipse className={lit ? 'map-flame f2' : ''} cx="19.5" cy="-5" rx="3" ry="5" fill={lit ? '#FDBA3B' : '#2a2a32'} />
+        <ellipse cx="0" cy="14" rx="40" ry="9" fill="rgba(0,0,0,0.4)" />
+        <polygon points="-38,12 -32,-14 -12,-34 14,-30 34,-10 40,12" fill={ob ? '#3b4540' : '#4a4a58'} /><polygon points="14,-30 34,-10 40,12 8,12" fill={ob ? '#27302c' : '#34343f'} />
+        <path d="M-14 12 L-14 -5 Q0 -28 14 -5 L14 12 Z" fill="#07070c" />
+        <rect x="-18" y="-9" width="36" height="3" fill="#5a3f27" /><rect x="-16" y="-8" width="3" height="20" fill="#5a3f27" /><rect x="13" y="-8" width="3" height="20" fill="#5a3f27" />
+        {lit && <><circle cx="-24" cy="-4" r="14" fill="url(#mapGlow)" /><circle cx="24" cy="-4" r="14" fill="url(#mapGlow)" /></>}
+        <rect x="-26" y="-2" width="3" height="13" fill="#4a3322" /><rect x="23" y="-2" width="3" height="13" fill="#4a3322" />
+        <ellipse className={lit ? 'map-flame' : ''} cx="-24.5" cy="-5" rx="3" ry="5" fill={lit ? '#FDBA3B' : '#2a2a32'} /><ellipse className={lit ? 'map-flame f2' : ''} cx="24.5" cy="-5" rx="3" ry="5" fill={lit ? '#FDBA3B' : '#2a2a32'} />
       </g>
     );
   }
-  if (kind === 'crag') {
+  if (kind === 'tower') {
     return (
       <g>
-        <ellipse cx="0" cy="13" rx="32" ry="8" fill="rgba(0,0,0,0.4)" />
-        <MapPeak x={-12} y={12} s={0.8} /><MapPeak x={14} y={12} s={1} snow={false} />
-        <polygon points="-30,12 -18,2 -6,12" fill="#6b7686" /><polygon points="-6,12 8,4 30,12" fill="#4a5362" />
-        {lit && <><rect x="-1" y="-60" width="2" height="22" fill="#cbd5e1" /><polygon points="1,-60 15,-55 1,-50" fill="#FBBF24" /></>}
+        <ellipse cx="0" cy="14" rx="34" ry="9" fill="rgba(0,0,0,0.42)" />
+        <polygon points="-34,12 -20,-2 -4,12" fill="#6b7686" /><polygon points="-4,12 12,0 34,12" fill="#4a5362" />
+        <polygon points="-12,4 0,10 0,-36 -12,-42" fill={ob ? '#566259' : '#8793a5'} /><polygon points="0,10 12,4 12,-42 0,-36" fill={ob ? '#3b453d' : '#5f6b7c'} />
+        <g stroke="rgba(0,0,0,0.25)" strokeWidth="1">{[-26, -14, -2].map((p) => <line key={p} x1="0" y1={p + 6} x2="12" y2={p} />)}</g>
+        <polygon points="-16,-40 0,-32 16,-40 0,-66" fill={ob ? '#3a4533' : '#a0453b'} /><polygon points="0,-32 16,-40 0,-66" fill={ob ? '#27301f' : '#7b312b'} />
+        <rect x="3" y="-30" width="5" height="8" fill={win} />
+        {lit && <circle cx="6" cy="-26" r="16" fill="url(#mapGlow)" />}
+        <rect x="-1" y="-84" width="2" height="20" fill="#cbd5e1" /><polygon points="1,-84 17,-78 1,-72" fill={lit ? '#FBBF24' : ob ? '#3f6b57' : '#64748b'} />
       </g>
     );
   }
-  // spire / big summit
+  if (kind === 'spire') {
+    return (
+      <g>
+        <ellipse cx="0" cy="13" rx="30" ry="8" fill="rgba(0,0,0,0.35)" />
+        <polygon points="-26,12 -14,-18 -6,12" fill="#bcd6ee" /><polygon points="-6,12 -2,-44 8,-14 14,12" fill="#dff0ff" /><polygon points="8,-14 20,-26 30,12 14,12" fill="#8fb4d6" />
+        <polygon points="-2,-44 3,-20 -6,-22" fill="#ffffff" opacity="0.9" />
+      </g>
+    );
+  }
   const big = kind === 'summit';
-  return (
-    <g transform={big ? 'scale(1.35)' : ''}>
-      <ellipse cx="0" cy="13" rx="30" ry="8" fill="rgba(0,0,0,0.35)" />
-      <polygon points="-26,12 -14,-18 -6,12" fill="#bcd6ee" /><polygon points="-6,12 -2,-44 8,-14 14,12" fill="#dff0ff" /><polygon points="8,-14 20,-26 30,12 14,12" fill="#8fb4d6" />
-      <polygon points="-2,-44 3,-20 -6,-22" fill="#ffffff" opacity="0.9" />
-      {lit && <circle cx="0" cy="-20" r="20" fill="url(#mapGlow)" />}
+  return ( // frozen citadel
+    <g transform={big ? 'scale(1.4)' : ''}>
+      <ellipse cx="0" cy="14" rx="40" ry="10" fill="rgba(0,0,0,0.4)" />
+      <polygon points="-36,12 -30,-12 -12,-10 -8,12" fill="#cfe0f0" /><polygon points="-30,-12 -21,-40 -12,-10" fill="#eaf4ff" />
+      <polygon points="36,12 30,-12 12,-10 8,12" fill="#9db8d2" /><polygon points="30,-12 21,-40 12,-10" fill="#c7dcf0" />
+      <polygon points="-16,12 0,18 16,12 16,-22 0,-16 -16,-22" fill="#b6cde3" /><polygon points="0,18 16,12 16,-22 0,-16" fill="#8aa6c0" />
+      <polygon points="-18,-22 0,-12 18,-22 0,-52" fill="#f5faff" /><polygon points="0,-12 18,-22 0,-52" fill="#d3e4f4" />
+      <rect x="-3" y="-4" width="6" height="9" fill="#3b5b78" /><rect x="-1" y="-70" width="2" height="18" fill="#cbd5e1" /><polygon points="1,-70 15,-65 1,-60" fill="#7dd3fc" />
+      {big && <circle cx="0" cy="-30" r="30" fill="url(#mapGlow)" opacity="0.7" />}
     </g>
   );
 }
-const MAP_KIND = (n) => (n <= 4 ? 'house' : n <= 8 ? 'sign' : n <= 12 ? 'cave' : n <= 16 ? 'crag' : n === 20 ? 'summit' : n === 18 ? 'spire' : 'snowhouse');
-const MAP_BIOME = (n) => (n <= 4 ? 'Coastal Villager Houses' : n <= 8 ? 'Deep Pine Forest' : n <= 12 ? 'Shadow Caverns' : n <= 16 ? 'Jagged Mountain Ridge' : 'Frozen Snow Summit');
 
-function AdvIslandMap({ tab, cleared, onNode, selected }) {
-  const trees = useMemo(() => {
-    const r = mapRand(7); const out = [];
-    for (let i = 0; i < 70; i++) {
-      const y = 1620 + r() * 450; const x = 70 + r() * 260;
-      if (MAP_NODES.some((o) => Math.abs(o.x - x) < 34 && Math.abs(o.y - y) < 40)) continue;
-      out.push({ x, y, s: 0.8 + r() * 0.7 });
+const MapWorld = React.memo(function MapWorld({ tab, cleared, selected, art }) {
+  const d = useMemo(() => {
+    const trail = MAP_TRAIL.samp; const r = mapRand(7);
+    const nearTrail = (x, y, m) => trail.some((p) => Math.abs(p[0] - x) < m && Math.abs(p[1] - y) < m) || MAP_NODES.some((o) => Math.abs(o.x - x) < 70 && Math.abs(o.y - y) < 70);
+    const dens = (y) => (y > 1800 ? 0.34 : y > 1380 ? 0.95 : y > 960 ? 0.22 : y > 560 ? 0.3 : 0.42);
+    const trees = [];
+    for (let i = 0; i < 1500 && trees.length < 280; i++) {
+      const x = 380 + r() * 940, y = 260 + r() * 1960;
+      if (r() > dens(y) || !mapInside(MAP_MAIN, x, y) || nearTrail(x, y, 30)) continue;
+      trees.push({ x, y, s: 1.1 + r() * 1.0, snow: y < 900 });
     }
-    for (let i = 0; i < 18; i++) { const y = 2150 + r() * 330; const x = 75 + r() * 250; if (!MAP_NODES.some((o) => Math.abs(o.x - x) < 40 && Math.abs(o.y - y) < 44)) out.push({ x, y, s: 0.6 + r() * 0.4 }); }
-    return out.sort((a, b) => a.y - b.y);
+    trees.sort((a, b) => a.y - b.y);
+    const rocks = []; for (let i = 0; i < 500 && rocks.length < 70; i++) { const x = 380 + r() * 940, y = 560 + r() * 900; if (mapInside(MAP_MAIN, x, y) && !nearTrail(x, y, 34)) rocks.push({ x, y, s: 0.9 + r() * 1.6 }); }
+    const isleTrees = []; MAP_ISLETS.forEach((o, k) => { for (let i = 0; i < 6; i++) { const a = r() * 6.28, q = r() * o.r * 0.55; isleTrees.push({ x: o.cx + Math.cos(a) * q, y: o.cy + Math.sin(a) * q, s: 0.9 + r() * 0.7, snow: k < 5 || k === 12 }); } });
+    const flakes = Array.from({ length: 56 }, () => ({ x: 560 + r() * 700, y: 120 + r() * 640, dur: 6 + r() * 7, dl: -r() * 12, s: 1.6 + r() * 2 }));
+    return { trees, rocks, isleTrees, flakes };
   }, []);
-  const snowTrees = useMemo(() => { const r = mapRand(21); const out = []; for (let i = 0; i < 16; i++) { const y = 80 + r() * 560; const x = 100 + r() * 200; if (!MAP_NODES.some((o) => Math.abs(o.x - x) < 36 && Math.abs(o.y - y) < 46)) out.push({ x, y, s: 0.7 + r() * 0.5 }); } return out.sort((a, b) => a.y - b.y); }, []);
-  const flakes = useMemo(() => { const r = mapRand(99); return Array.from({ length: 44 }, () => ({ x: 60 + r() * 290, y: r() * 720, d: 6 + r() * 7, dl: -r() * 12, s: 1 + r() * 1.6 })); }, []);
-  const rocks = useMemo(() => { const r = mapRand(5); const out = []; for (let i = 0; i < 14; i++) out.push({ x: 70 + r() * 260, y: 1150 + r() * 470, s: 0.6 + r() * 0.8 }); return out; }, []);
-  const outbreak = tab === 'outbreak';
+  const ob = tab === 'outbreak';
   const lvlLit = (n) => tab === 'classic' && n === 1;
+  const mainD = useMemo(() => mapPoly(MAP_MAIN), []);
+  const isleD = useMemo(() => MAP_ISLETS.map((o) => mapPoly(o.poly)), []);
+  const hasArt = !!art[tab];
   return (
-    <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} width="100%" role="group" aria-label="Adventure island map" style={{ display: 'block' }}>
+    <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} width={MAP_W} height={MAP_H} role="group" aria-label="Adventure archipelago map" style={{ display: 'block', touchAction: 'none' }}>
       <defs>
-        <linearGradient id="mapSea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0b1a2e" /><stop offset="0.7" stopColor="#0a2540" /><stop offset="1" stopColor="#0c3556" /></linearGradient>
-        <linearGradient id="mapLand" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={MAP_H}>
-          {[[0, '#f2f8ff'], [0.2, '#d6e4f2'], [0.26, '#8b97a8'], [0.38, '#5d6877'], [0.43, '#43434f'], [0.57, '#2d2d38'], [0.61, '#1f3a2b'], [0.74, '#16291f'], [0.78, '#2f5237'], [0.86, '#46683f'], [0.93, '#b9a97c'], [1, '#d8c999']].map(([o, c]) => <stop key={o} offset={o} stopColor={c} />)}
+        <linearGradient id="mapSeaC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#07162b" /><stop offset="0.6" stopColor="#0a2646" /><stop offset="1" stopColor="#0b3358" /></linearGradient>
+        <linearGradient id="mapSeaO" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#06161a" /><stop offset="0.6" stopColor="#0a2a2c" /><stop offset="1" stopColor="#0b3a38" /></linearGradient>
+        <linearGradient id="mapLandC" gradientUnits="userSpaceOnUse" x1="0" y1="250" x2="0" y2="2240">
+          {[[0, '#f2f8ff'], [0.16, '#d6e4f2'], [0.24, '#8b97a8'], [0.36, '#5d6877'], [0.4, '#43434f'], [0.56, '#2f3039'], [0.6, '#22402e'], [0.72, '#1a3324'], [0.79, '#3a6038'], [0.9, '#6a7a45'], [0.95, '#b9a97c'], [1, '#d8c999']].map(([o, c]) => <stop key={o} offset={o} stopColor={c} />)}
         </linearGradient>
-        <linearGradient id="mapTrail" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={MAP_H}><stop offset="0" stopColor="#b8c4d2" /><stop offset="0.3" stopColor="#8d95a1" /><stop offset="0.6" stopColor="#7a6a55" /><stop offset="1" stopColor="#8a6a45" /></linearGradient>
+        <linearGradient id="mapLandO" gradientUnits="userSpaceOnUse" x1="0" y1="250" x2="0" y2="2240">
+          {[[0, '#9fb2ae'], [0.16, '#7f958f'], [0.24, '#566a63'], [0.4, '#36423e'], [0.56, '#242c29'], [0.6, '#233328'], [0.76, '#1c271e'], [0.9, '#3b4630'], [1, '#6b6a4e']].map(([o, c]) => <stop key={o} offset={o} stopColor={c} />)}
+        </linearGradient>
+        <linearGradient id="mapTrail" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={MAP_H}><stop offset="0" stopColor="#c0cbd8" /><stop offset="0.35" stopColor="#8d95a1" /><stop offset="0.65" stopColor="#7e6c55" /><stop offset="1" stopColor="#957248" /></linearGradient>
         <radialGradient id="mapGlow"><stop offset="0" stopColor="#FDE68A" stopOpacity="0.95" /><stop offset="0.5" stopColor="#F59E0B" stopOpacity="0.35" /><stop offset="1" stopColor="#F59E0B" stopOpacity="0" /></radialGradient>
         <radialGradient id="mapMist"><stop offset="0" stopColor="#dbe7f3" stopOpacity="0.5" /><stop offset="1" stopColor="#dbe7f3" stopOpacity="0" /></radialGradient>
-        <radialGradient id="mapMistG"><stop offset="0" stopColor="#34D399" stopOpacity="0.55" /><stop offset="1" stopColor="#34D399" stopOpacity="0" /></radialGradient>
-        <clipPath id="mapClip"><path d={MAP_ISLAND} /></clipPath>
+        <radialGradient id="mapMistG"><stop offset="0" stopColor="#34D399" stopOpacity="0.6" /><stop offset="1" stopColor="#34D399" stopOpacity="0" /></radialGradient>
+        <clipPath id="mapClip"><path d={mainD} /></clipPath>
       </defs>
-      <rect width={MAP_W} height={MAP_H} fill="url(#mapSea)" />
-      {[120, 420, 760, 1100, 1480, 1860, 2200].map((y, i) => <g key={y} opacity="0.35"><path className={`map-wave ${i % 2 ? 'w2' : ''}`} d={mapWave(y, 5)} fill="none" stroke="#7fb3dc" strokeWidth="1.4" /></g>)}
-      {/* island: layered cliffs, then the land itself */}
-      <path d={MAP_ISLAND} transform="translate(5 9)" fill="rgba(0,0,0,0.45)" />
-      <path d={MAP_ISLAND} fill="#0d1620" stroke="#0d1620" strokeWidth="9" strokeLinejoin="round" />
-      <path d={MAP_ISLAND} fill="url(#mapLand)" />
-      <g clipPath="url(#mapClip)">
-        {/* sand + grass edge by the sea */}
-        <ellipse cx="200" cy="2575" rx="190" ry="46" fill="#d8c999" opacity="0.9" />
-        {rocks.map((o, i) => <g key={i} transform={`translate(${o.x} ${o.y}) scale(${o.s})`}><polygon points="-14,6 -9,-8 4,-12 14,-2 16,6" fill="#3b3b48" /><polygon points="4,-12 14,-2 16,6 2,6" fill="#2a2a35" /></g>)}
-        <MapPeak x={84} y={780} s={1.5} /><MapPeak x={326} y={900} s={1.7} /><MapPeak x={90} y={1060} s={1.3} /><MapPeak x={322} y={650} s={1.2} /><MapPeak x={110} y={470} s={1.2} c1="#c3d3e3" c2="#8fa6bd" /><MapPeak x={306} y={330} s={1.4} c1="#c3d3e3" c2="#8fa6bd" /><MapPeak x={120} y={170} s={1.3} c1="#d7e5f3" c2="#a8bdd2" />
-        {/* wooden bridge on the ridge */}
-        <g transform="translate(205 905) rotate(-14)"><rect x="-32" y="-5" width="64" height="10" fill="#5b3f27" /><g stroke="#2f2013" strokeWidth="1">{[-24, -16, -8, 0, 8, 16, 24].map((p) => <line key={p} x1={p} y1="-5" x2={p} y2="5" />)}</g><rect x="-32" y="-9" width="64" height="2" fill="#7a5636" /><rect x="-32" y="5" width="64" height="2" fill="#3b2817" /></g>
-        {trees.map((t, i) => <MapPine key={i} {...t} />)}
-        {snowTrees.map((t, i) => <MapPine key={'s' + i} {...t} snow />)}
-        {/* trail: dirt bed + cobblestones */}
-        <path d={MAP_TRAIL} fill="none" stroke="#1a1410" strokeOpacity="0.55" strokeWidth="19" strokeLinecap="round" strokeLinejoin="round" />
-        <path d={MAP_TRAIL} fill="none" stroke="url(#mapTrail)" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" />
-        <path d={MAP_TRAIL} fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="6" strokeDasharray="0.1 9" strokeLinecap="round" />
-        {/* drifting fog */}
-        {[[200, 1760, 1], [120, 1980, 2], [290, 2090, 3], [180, 1500, 2], [260, 1300, 1], [150, 880, 3]].map(([x, y, k], i) => <ellipse key={i} className={`map-mist m${k}`} cx={x} cy={y} rx="120" ry="34" fill="url(#mapMist)" />)}
-        <g className="map-fade" style={{ opacity: outbreak ? 1 : 0 }}>{[[170, 2300, 1], [250, 1900, 2], [140, 1600, 3], [240, 1200, 1], [180, 760, 2], [250, 400, 3]].map(([x, y, k], i) => <ellipse key={i} className={`map-mist m${k}`} cx={x} cy={y} rx="140" ry="40" fill="url(#mapMistG)" />)}</g>
+      <g style={{ opacity: hasArt ? 0 : 1 }}>
+        <rect width={MAP_W} height={MAP_H} fill="url(#mapSeaC)" />
+        <rect width={MAP_W} height={MAP_H} fill="url(#mapSeaO)" className="map-fade" style={{ opacity: ob ? 1 : 0 }} />
+        {Array.from({ length: 26 }, (_, i) => 50 + i * 92).map((y, i) => <path key={y} className={`map-wave ${i % 2 ? 'w2' : ''}`} d={mapWave(y + (i % 3) * 14, 6)} fill="none" stroke={ob ? '#4fb3a6' : '#7fb3dc'} strokeWidth="2" opacity="0.28" />)}
+        {/* turquoise shallows around every landmass */}
+        {[mainD, ...isleD].map((p, i) => <g key={i} fill="none" strokeLinejoin="round"><path d={p} stroke={ob ? '#0f766e' : '#14b8c4'} strokeWidth="120" opacity="0.14" /><path d={p} stroke={ob ? '#14796f' : '#22d3d8'} strokeWidth="76" opacity="0.2" /><path d={p} stroke={ob ? '#2a9a8a' : '#67e8f0'} strokeWidth="38" opacity="0.28" /></g>)}
+        {/* wooden bridges across the channels */}
+        {MAP_BRIDGES.map(([x1, y1, x2, y2], i) => { const a = Math.atan2(y2 - y1, x2 - x1) * 57.3, L = Math.hypot(x2 - x1, y2 - y1); return <g key={i} transform={`translate(${x1} ${y1}) rotate(${a})`}><rect x="0" y="-9" width={L} height="18" fill="#6a4a2b" /><g stroke="#2f2013" strokeWidth="1.6">{Array.from({ length: Math.floor(L / 9) }, (_, k) => <line key={k} x1={k * 9} y1="-9" x2={k * 9} y2="9" />)}</g><rect x="0" y="-12" width={L} height="3" fill="#8a6338" /><rect x="0" y="9" width={L} height="3" fill="#3a2716" /></g>; })}
+        {/* islets */}
+        {MAP_ISLETS.map((o, i) => <g key={i}><path d={isleD[i]} transform="translate(0 10)" fill={ob ? '#1d2623' : '#2a303a'} /><path d={isleD[i]} fill={ob ? '#37453a' : i < 5 || i === 12 ? '#9fb0c2' : '#4a6a3e'} stroke="#0e1722" strokeWidth="3" strokeLinejoin="round" /></g>)}
+        {/* main island: cliff wall, then the land */}
+        <path d={mainD} transform="translate(8 22)" fill="rgba(0,0,0,0.5)" />
+        <path d={mainD} transform="translate(0 14)" fill={ob ? '#1d2623' : '#2b323d'} stroke="#0d141c" strokeWidth="4" strokeLinejoin="round" />
+        <path d={mainD} fill="url(#mapLandC)" />
+        <path d={mainD} fill="url(#mapLandO)" className="map-fade" style={{ opacity: ob ? 1 : 0 }} />
+        <path d={mainD} fill="none" stroke="#0d141c" strokeWidth="5" strokeLinejoin="round" />
+        <g clipPath="url(#mapClip)">
+          <ellipse cx="700" cy="2250" rx="360" ry="80" fill={ob ? '#6b6a4e' : '#d8c999'} opacity="0.85" />
+          {d.rocks.map((o, i) => <g key={i} transform={`translate(${o.x} ${o.y}) scale(${o.s})`}><polygon points="-14,6 -9,-8 4,-12 14,-2 16,6" fill="#3b3b48" /><polygon points="4,-12 14,-2 16,6 2,6" fill="#2a2a35" /></g>)}
+          {/* ridges and peaks */}
+          {[[560, 760, 2.2, 0], [1190, 780, 2.5, 0], [470, 1000, 1.9, 0], [1250, 1020, 2, 0], [720, 640, 2.4, 0], [1100, 640, 2.2, 0], [640, 470, 2.6, 1], [1090, 400, 3.1, 1], [880, 320, 3.5, 1], [790, 440, 2.4, 1], [1010, 520, 2.2, 1], [560, 600, 2.1, 1]].map(([x, y, s, lt], i) => <MapPeak key={i} x={x} y={y} s={s} c1={lt ? '#c3d3e3' : '#8794a6'} c2={lt ? '#8fa6bd' : '#5b6677'} />)}
+          {/* streams, waterfalls */}
+          {MAP_STREAMS.map(([y, f], i) => <g key={i}><path d={`M380 ${y} Q520 ${y - 30 + f * 60} 650 ${y + 8} T930 ${y - 8} T1300 ${y + 12}`} fill="none" stroke="#0e3a52" strokeWidth="30" strokeLinecap="round" opacity="0.7" /><path d={`M380 ${y} Q520 ${y - 30 + f * 60} 650 ${y + 8} T930 ${y - 8} T1300 ${y + 12}`} fill="none" stroke={ob ? '#2e8f7c' : '#3ec9d6'} strokeWidth="20" strokeLinecap="round" /><path d={`M380 ${y} Q520 ${y - 30 + f * 60} 650 ${y + 8} T930 ${y - 8} T1300 ${y + 12}`} fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="3" strokeDasharray="14 12" className="map-foam" /></g>)}
+          {/* trees: pines, or dead twisted trunks in the Outbreak */}
+          <g className="map-fade" style={{ opacity: ob ? 0 : 1 }}>{d.trees.map((t, i) => <MapPine key={i} x={t.x} y={t.y} s={t.s} snow={t.snow} />)}</g>
+          <g className="map-fade" style={{ opacity: ob ? 1 : 0 }}>{d.trees.map((t, i) => <MapDead key={i} x={t.x} y={t.y} s={t.s * 1.25} />)}</g>
+          {/* trail */}
+          {!hasArt && <>
+            <path d={MAP_TRAIL.d} fill="none" stroke="#120d09" strokeOpacity="0.55" strokeWidth="44" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={MAP_TRAIL.d} fill="none" stroke="url(#mapTrail)" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={MAP_TRAIL.d} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="14" strokeDasharray="0.1 20" strokeLinecap="round" />
+          </>}
+          {MAP_BRIDGE_AT.map(([x, y, a], i) => <g key={i} transform={`translate(${x} ${y}) rotate(${a})`}><rect x="-62" y="-14" width="124" height="28" fill="#5b3f27" /><g stroke="#2f2013" strokeWidth="1.6">{Array.from({ length: 14 }, (_, k) => <line key={k} x1={-62 + k * 9} y1="-14" x2={-62 + k * 9} y2="14" />)}</g><rect x="-62" y="-19" width="124" height="4" fill="#8a6338" /><rect x="-62" y="14" width="124" height="4" fill="#3a2716" /></g>)}
+          {/* Outbreak: bleached ribcages jut from the frozen soil */}
+          <g className="map-fade" style={{ opacity: ob ? 1 : 0 }}>{[[560, 1840, 1.7, -8], [1120, 1640, 2.1, 10], [520, 1230, 1.9, 6], [1130, 1020, 2.2, -12], [610, 760, 1.8, 14], [1040, 560, 1.6, -6], [820, 1560, 1.4, 4]].map(([x, y, s, r], i) => <MapRibs key={i} x={x} y={y} s={s} r={r} />)}</g>
+          {/* drifting fog */}
+          {[[700, 1860, 1], [520, 1590, 2], [980, 1500, 3], [640, 1130, 2], [960, 900, 1], [760, 700, 3]].map(([x, y, k], i) => <ellipse key={i} className={`map-mist m${k}`} cx={x} cy={y} rx="320" ry="80" fill="url(#mapMist)" />)}
+          <g className="map-fade" style={{ opacity: ob ? 1 : 0 }}>{[[640, 2150, 1], [980, 1830, 2], [560, 1480, 3], [940, 1260, 1], [700, 880, 2], [920, 520, 3], [800, 2020, 3], [540, 1020, 1]].map(([x, y, k], i) => <ellipse key={i} className={`map-mist m${k}`} cx={x} cy={y} rx="380" ry="100" fill="url(#mapMistG)" />)}</g>
+        </g>
+        {d.isleTrees.map((t, i) => (ob ? <MapDead key={i} x={t.x} y={t.y} s={t.s * 1.2} /> : <MapPine key={i} x={t.x} y={t.y} s={t.s} snow={t.snow} />))}
+        <path d={mainD} fill="none" stroke="rgba(235,245,255,0.6)" strokeWidth="4" strokeDasharray="14 10" className="map-foam" />
+        {isleD.map((p, i) => <path key={i} d={p} fill="none" stroke="rgba(235,245,255,0.55)" strokeWidth="3" strokeDasharray="10 8" className="map-foam" />)}
+        {/* harbor: pier, ship, boats, a few cottages */}
+        <g transform="translate(560 2236)"><rect x="0" y="0" width="150" height="26" fill="#6a4a2b" /><g stroke="#2f2013" strokeWidth="1.6">{Array.from({ length: 16 }, (_, k) => <line key={k} x1={6 + k * 9} y1="0" x2={6 + k * 9} y2="26" />)}</g><rect x="120" y="26" width="26" height="110" fill="#6a4a2b" /><g stroke="#2f2013" strokeWidth="1.6">{Array.from({ length: 12 }, (_, k) => <line key={k} x1="120" y1={30 + k * 9} x2="146" y2={30 + k * 9} />)}</g>{[0, 60, 120].map((p) => <rect key={p} x={p} y="-10" width="4" height="12" fill="#2f2013" />)}</g>
+        <g transform="translate(790 2290)" className="map-bob"><path d="M0 0 L120 0 L100 30 L20 30 Z" fill="#7c3f2a" /><rect x="58" y="-80" width="4" height="80" fill="#3b2817" /><polygon points="62,-78 108,-8 62,-8" fill="#f4efe4" /><polygon points="58,-70 20,-8 58,-8" fill="#e9dfc9" /></g>
+        <g transform="translate(980 2290)" className="map-bob"><path d="M0 0 L50 0 L42 14 L8 14 Z" fill="#7c3f2a" /></g>
+        <g transform="translate(520 2300)"><path d="M0 0 L46 0 L38 14 L8 14 Z" fill="#6b4630" /></g>
+        {[[520, 2150, 0.9], [810, 2190, 0.85], [1030, 2140, 0.9], [470, 2060, 0.8], [1090, 2050, 0.85]].map(([x, y, s], i) => <g key={i} transform={`translate(${x} ${y}) scale(${s * 1.5})`}><MapLandmark kind="house" lit={!ob} ob={ob} /></g>)}
       </g>
-      {/* shoreline surf */}
-      <path d={MAP_ISLAND} fill="none" stroke="rgba(235,245,255,0.55)" strokeWidth="3" strokeDasharray="10 8" className="map-foam" />
-      {[2600, 2630, 2660, 2690].map((y, i) => <g key={y} opacity={0.75 - i * 0.12}><path className={`map-wave ${i % 2 ? 'w2' : ''}`} d={mapWave(y, 8)} fill="none" stroke="#9fd0f5" strokeWidth="2" /></g>)}
-      {/* pier + boat by House #1 */}
-      <g transform="translate(112 2556)"><rect x="0" y="0" width="64" height="9" fill="#6a4a2b" /><g stroke="#2f2013" strokeWidth="1">{[8, 16, 24, 32, 40, 48, 56].map((p) => <line key={p} x1={p} y1="0" x2={p} y2="9" />)}</g><rect x="58" y="-2" width="3" height="16" fill="#3b2817" /></g>
-      <g transform="translate(96 2578)" className="map-bob"><path d="M0 0 L38 0 L32 10 L6 10 Z" fill="#7c3f2a" /><rect x="18" y="-22" width="2" height="22" fill="#d9d2c3" /><polygon points="20,-22 34,-4 20,-4" fill="#f4efe4" /></g>
-      {/* level nodes */}
+      {hasArt && <image href={`/${tab}-island-map.png`} x="0" y="0" width={MAP_W} height={MAP_H} preserveAspectRatio="xMidYMid slice" />}
+      {/* level landmarks */}
       {MAP_NODES.map((o) => {
-        const lit = lvlLit(o.n);
-        const sel = selected === o.n;
-        const kind = MAP_KIND(o.n);
+        const lit = lvlLit(o.n); const kind = MAP_KIND(o.n); const sel = selected === o.n;
         return (
-          <g key={o.n} transform={`translate(${o.x} ${o.y})`} role="button" tabIndex={0} aria-label={lit ? `Level ${o.n}, House number 1, Harbor Cottage${cleared ? ', cleared' : ', unlocked'}` : `Level ${o.n}, locked, coming soon`}
-            onClick={() => onNode(o.n)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNode(o.n); } }} style={{ cursor: 'pointer', outline: 'none' }}>
-            {lit && <circle className="map-lantern" cx="0" cy="-8" r="46" fill="url(#mapGlow)" />}
-            {sel && <ellipse cx="0" cy="12" rx="38" ry="14" fill="none" stroke={lit ? '#FBBF24' : '#94A3B8'} strokeWidth="2.5" strokeDasharray="6 4" />}
-            <MapLandmark kind={kind} lit={lit} />
-            {/* badge */}
-            <g transform={`translate(0 ${kind === 'crag' || kind === 'summit' ? -78 : -52})`}>
-              <circle r="12.5" fill={lit ? (cleared ? '#F59E0B' : '#FBBF24') : '#1b2230'} stroke={lit ? '#FEF3C7' : '#64748B'} strokeWidth="2" className={lit ? 'map-badge' : ''} />
-              <text textAnchor="middle" y="4.5" fontSize="13" fontWeight="800" fill={lit ? '#2b1a05' : '#CBD5E1'} fontFamily="inherit">{o.n}</text>
-              {!lit && <g transform="translate(10 -12)"><circle r="6.5" fill="#0f141d" stroke="#64748B" strokeWidth="1.2" /><rect x="-3" y="-0.5" width="6" height="4.5" rx="1" fill="#94A3B8" /><path d="M-2 -0.5 V-2.2 a2 2 0 0 1 4 0 V-0.5" fill="none" stroke="#94A3B8" strokeWidth="1.1" /></g>}
-              {lit && cleared && <text x="12" y="-8" fontSize="14" fill="#FDE68A">&#9733;</text>}
+          <g key={o.n} transform={`translate(${o.x} ${o.y})`} data-node={o.n} role="button" tabIndex={0} aria-label={lit ? `Level ${o.n}, House number 1, Harbor Cottage${cleared ? ', cleared' : ', unlocked'}` : `Level ${o.n}, ${MAP_NAME(o.n)}, locked, coming soon`} style={{ cursor: 'pointer', outline: 'none' }}>
+            <circle r="64" cy="-10" fill="transparent" data-node={o.n} />
+            {lit && <circle className="map-lantern" cx="0" cy="-14" r="92" fill="url(#mapGlow)" />}
+            {sel && <ellipse cx="0" cy="22" rx="68" ry="24" fill="none" stroke={lit ? '#FBBF24' : '#94A3B8'} strokeWidth="4" strokeDasharray="10 7" />}
+            <g transform="scale(1.7)"><MapLandmark kind={kind} lit={lit} ob={ob} /></g>
+            <g transform={`translate(0 ${kind === 'tower' || kind === 'summit' || kind === 'citadel' ? -150 : -100})`}>
+              <circle r="22" fill={lit ? (cleared ? '#F59E0B' : '#FBBF24') : '#1b2230'} stroke={lit ? '#FEF3C7' : '#64748B'} strokeWidth="3.5" className={lit ? 'map-badge' : ''} />
+              <text textAnchor="middle" y="8" fontSize="24" fontWeight="800" fill={lit ? '#2b1a05' : '#CBD5E1'} fontFamily="inherit">{o.n}</text>
+              {!lit && <g transform="translate(19 -20) scale(1.7)"><circle r="6.5" fill="#0f141d" stroke="#64748B" strokeWidth="1.2" /><rect x="-3" y="-0.5" width="6" height="4.5" rx="1" fill="#94A3B8" /><path d="M-2 -0.5 V-2.2 a2 2 0 0 1 4 0 V-0.5" fill="none" stroke="#94A3B8" strokeWidth="1.1" /></g>}
+              {lit && cleared && <text x="22" y="-14" fontSize="26" fill="#FDE68A">&#9733;</text>}
             </g>
-            {lit && <g transform="translate(0 30)"><rect x="-52" y="-9" width="104" height="18" rx="9" fill="rgba(10,10,16,0.82)" stroke="rgba(251,191,36,0.7)" /><text textAnchor="middle" y="4" fontSize="9.5" fontWeight="700" fill="#FDE68A" fontFamily="inherit">House #1 &mdash; Harbor Cottage</text></g>}
+            {lit && <g transform="translate(0 58)"><rect x="-126" y="-15" width="252" height="30" rx="15" fill="rgba(10,10,16,0.85)" stroke="rgba(251,191,36,0.75)" strokeWidth="1.5" /><text textAnchor="middle" y="6" fontSize="17" fontWeight="700" fill="#FDE68A" fontFamily="inherit">House #1 &mdash; Harbor Cottage</text></g>}
           </g>
         );
       })}
-      {/* snow */}
-      {flakes.map((f, i) => <circle key={i} className="map-flake" cx={f.x} cy={f.y} r={f.s} fill="#fff" style={{ animationDuration: `${f.d}s`, animationDelay: `${f.dl}s` }} />)}
-      {/* lighting tint: cold moonlight for Classic, eerie emerald for Outbreak */}
-      <rect width={MAP_W} height={MAP_H} fill="#3b6dff" className="map-fade" style={{ opacity: outbreak ? 0 : 0.2, pointerEvents: 'none', mixBlendMode: 'soft-light' }} />
-      <rect width={MAP_W} height={MAP_H} fill="#10b981" className="map-fade" style={{ opacity: outbreak ? 0.34 : 0, pointerEvents: 'none', mixBlendMode: 'soft-light' }} />
-      <rect width={MAP_W} height={MAP_H} fill="#052e24" className="map-fade" style={{ opacity: outbreak ? 0.22 : 0, pointerEvents: 'none' }} />
-      <rect width={MAP_W} height={MAP_H} fill="#0a1230" className="map-fade" style={{ opacity: outbreak ? 0 : 0.18, pointerEvents: 'none' }} />
+      {d.flakes.map((f, i) => <circle key={i} className="map-flake" cx={f.x} cy={f.y} r={f.s} fill="#fff" style={{ animationDuration: `${f.dur}s`, animationDelay: `${f.dl}s` }} />)}
+      <rect width={MAP_W} height={MAP_H} fill="#3b6dff" className="map-fade" style={{ opacity: ob ? 0 : 0.16, pointerEvents: 'none', mixBlendMode: 'soft-light' }} />
+      <rect width={MAP_W} height={MAP_H} fill="#10b981" className="map-fade" style={{ opacity: ob ? 0.3 : 0, pointerEvents: 'none', mixBlendMode: 'soft-light' }} />
+      <rect width={MAP_W} height={MAP_H} fill="#052e24" className="map-fade" style={{ opacity: ob ? 0.2 : 0, pointerEvents: 'none' }} />
     </svg>
   );
-}
+});
 
 function AdvHub({ onBack, onCustom, onPlay1 }) {
   const [tab, setTab] = useState('classic');
   const [sel, setSel] = useState(null);
   const [toast, setToast] = useState(0);
+  const [art, setArt] = useState({});
   const cleared = !!loadAdv().classicLevel1Cleared;
-  const scroller = useRef(null);
-  useEffect(() => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight; }, []); // open at the shore, House #1
+  const vp = useRef(null), world = useRef(null), cam = useRef({ x: 0, y: 0, k: 0.5 });
+  const ptrs = useRef(new Map()), g = useRef({ moved: 0, target: null, dist: 0, mx: 0, my: 0 });
+  const KMIN = 0.45, KMAX = 2.2;
+  useEffect(() => { // painted maps dropped into the site root replace the vector art automatically
+    ['classic', 'outbreak'].forEach((t) => { const im = new Image(); im.onload = () => setArt((a) => ({ ...a, [t]: true })); im.src = `/${t}-island-map.png`; });
+  }, []);
   useEffect(() => { if (!toast) return undefined; const t = setTimeout(() => setToast(0), 2400); return () => clearTimeout(t); }, [toast]);
-  const open = (n) => {
-    setSel(n);
-    if (tab === 'classic' && n === 1) setToast(0); else setToast(n);
+  const size = () => { const el = vp.current; return { w: el ? el.clientWidth : 390, h: el ? el.clientHeight : 800 }; };
+  const clampCam = (c, slack) => { const { w, h } = size(); const ww = MAP_W * c.k, hh = MAP_H * c.k; return { k: c.k, x: ww <= w ? (w - ww) / 2 : Math.min(slack, Math.max(w - ww - slack, c.x)), y: hh <= h ? (h - hh) / 2 : Math.min(slack, Math.max(h - hh - slack, c.y)) }; };
+  const apply = (c, ms) => { cam.current = c; const el = world.current; if (!el) return; el.style.transition = ms ? `transform ${ms}ms cubic-bezier(.2,.8,.2,1)` : 'none'; el.style.transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.k})`; };
+  const zoomAt = (px, py, nk, ms, slack = 0) => { const c = cam.current; const k = Math.min(KMAX, Math.max(KMIN, nk)); apply(clampCam({ k, x: px - ((px - c.x) * k) / c.k, y: py - ((py - c.y) * k) / c.k }, slack), ms); };
+  const focus = (n, k, ms) => { const { w, h } = size(); const o = MAP_NODES[n - 1]; apply(clampCam({ k, x: w / 2 - o.x * k, y: h * 0.58 - o.y * k }, 0), ms); };
+  const homeK = () => Math.min(1.3, Math.max(0.6, size().w / 520));
+  useEffect(() => { // open on the whole archipelago, then glide to the harbor
+    apply(clampCam({ k: KMIN, x: 0, y: 0 }, 0), 0);
+    const t = setTimeout(() => focus(1, homeK(), 1300), 80);
+    const el = vp.current;
+    const wheel = (e) => { e.preventDefault(); const r = el.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, cam.current.k * Math.exp(-e.deltaY * 0.0016), 0); };
+    el.addEventListener('wheel', wheel, { passive: false });
+    const rs = () => apply(clampCam(cam.current, 0), 0); window.addEventListener('resize', rs);
+    return () => { clearTimeout(t); el.removeEventListener('wheel', wheel); window.removeEventListener('resize', rs); };
+  }, []);
+  const rect = () => vp.current.getBoundingClientRect();
+  const down = (e) => {
+    ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const s = g.current;
+    if (ptrs.current.size === 1) { s.moved = 0; s.target = e.target; } else { s.moved = 99; }
+    if (ptrs.current.size === 2) { const [a, b] = [...ptrs.current.values()]; s.dist = Math.hypot(a.x - b.x, a.y - b.y); s.mx = (a.x + b.x) / 2; s.my = (a.y + b.y) / 2; }
+    apply(cam.current, 0);
   };
+  const move = (e) => {
+    const p = ptrs.current.get(e.pointerId); if (!p) return; const s = g.current;
+    const nx = e.clientX, ny = e.clientY;
+    if (ptrs.current.size === 1) {
+      const dx = nx - p.x, dy = ny - p.y; s.moved += Math.abs(dx) + Math.abs(dy); p.x = nx; p.y = ny;
+      if (s.moved > 7) { const c = cam.current; apply(clampCam({ k: c.k, x: c.x + dx, y: c.y + dy }, 110), 0); }
+    } else if (ptrs.current.size === 2) {
+      p.x = nx; p.y = ny; const [a, b] = [...ptrs.current.values()]; const dist = Math.hypot(a.x - b.x, a.y - b.y); const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; const r = rect();
+      if (s.dist > 0) { const c = cam.current; const k = Math.min(KMAX, Math.max(KMIN, c.k * (dist / s.dist))); const px = mx - r.left, py = my - r.top; apply(clampCam({ k, x: px - ((px - c.x) * k) / c.k + (mx - s.mx), y: py - ((py - c.y) * k) / c.k + (my - s.my) }, 110), 0); }
+      s.dist = dist; s.mx = mx; s.my = my;
+    }
+  };
+  const up = (e) => {
+    const s = g.current; const had = ptrs.current.has(e.pointerId); ptrs.current.delete(e.pointerId);
+    if (!had) return;
+    if (ptrs.current.size === 0) {
+      apply(clampCam(cam.current, 0), 260); // rubber band back inside the map
+      if (s.moved < 8 && s.target && s.target.closest) { const nd = s.target.closest('[data-node]'); if (nd) { const n = Number(nd.getAttribute('data-node')); setSel(n); setToast(tab === 'classic' && n === 1 ? 0 : n); } }
+    } else if (ptrs.current.size === 1) { s.dist = 0; }
+  };
+  const zoomBtn = (f) => { const { w, h } = size(); zoomAt(w / 2, h / 2, cam.current.k * f, 240); };
   const pill = (id) => { const r = ROLES_DATA[id]; return <span key={id} className="rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider" style={{ color: teamColor(r.team), background: teamColor(r.team) + '1A', border: `1px solid ${teamColor(r.team)}55` }}>{r.name}</span>; };
   const tabBtn = (id, label) => (
     <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => { setTab(id); setSel(null); setToast(0); }} className="min-h-[40px] flex-1 rounded-full text-sm font-bold uppercase tracking-wider transition"
       style={{ background: tab === id ? (id === 'outbreak' ? 'rgba(5,150,105,0.55)' : 'rgba(79,70,229,0.55)') : 'rgba(21,26,36,0.85)', border: `1px solid ${tab === id ? (id === 'outbreak' ? '#6EE7B7' : '#A5B4FC') : 'var(--line)'}`, color: tab === id ? '#F8FAFC' : '#94A3B8' }}>{label}</button>
   );
+  const fab = { background: 'rgba(12,16,26,0.88)', border: '1px solid rgba(167,139,250,0.55)', color: '#EDE9FE', boxShadow: '0 6px 18px rgba(0,0,0,0.55)' };
   const showL1 = tab === 'classic' && sel === 1;
   return (
-    <div className="fixed inset-0 z-0 flex flex-col" style={{ background: '#0a1a2e' }}>
-      <div ref={scroller} className="absolute inset-0 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <div className="mx-auto w-full" style={{ maxWidth: 640, paddingTop: 116 }}>
-          <AdvIslandMap tab={tab} cleared={cleared} selected={sel} onNode={open} />
+    <div className="fixed inset-0 z-0 overflow-hidden" style={{ background: '#0a1a2e' }}>
+      <div ref={vp} className="absolute inset-0 select-none" style={{ touchAction: 'none', cursor: 'grab' }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={(e) => { if (e.pointerType === 'mouse' && ptrs.current.has(e.pointerId)) up(e); }}>
+        <div ref={world} style={{ width: MAP_W, height: MAP_H, transformOrigin: '0 0', willChange: 'transform' }}>
+          <MapWorld tab={tab} cleared={cleared} selected={sel} art={art} />
         </div>
-        <div style={{ height: 280, background: 'linear-gradient(180deg, #0c3556, #081c33)' }} aria-hidden="true" />
       </div>
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10" style={{ background: 'linear-gradient(180deg, rgba(6,12,24,0.96) 55%, rgba(6,12,24,0))', paddingTop: 'max(8px, env(safe-area-inset-top))', paddingBottom: 22 }}>
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10" style={{ background: 'linear-gradient(180deg, rgba(6,12,24,0.94) 55%, rgba(6,12,24,0))', paddingTop: 'max(8px, env(safe-area-inset-top))', paddingBottom: 22 }}>
         <div className="pointer-events-auto mx-auto flex w-full max-w-xl items-center gap-1 px-3">
           <button onClick={onBack} aria-label="Back to start" className="flex h-11 w-11 items-center justify-center rounded-full text-slate-200 hover:bg-white/10">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5 L8 12 L15 19" /></svg>
@@ -7274,11 +7404,18 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
         </div>
         <div role="tablist" className="pointer-events-auto mx-auto mt-2 flex w-full max-w-xl gap-2 px-4">{tabBtn('classic', 'Classic')}{tabBtn('outbreak', 'Outbreak')}</div>
       </div>
+      <div className="absolute right-3 z-10 flex flex-col gap-2" style={{ bottom: showL1 ? 'calc(max(18px, env(safe-area-inset-bottom)) + 250px)' : 'max(20px, env(safe-area-inset-bottom))' }}>
+        <button onClick={() => zoomBtn(1.3)} aria-label="Zoom in" className="flex h-11 w-11 items-center justify-center rounded-full text-xl font-bold" style={fab}>+</button>
+        <button onClick={() => zoomBtn(1 / 1.3)} aria-label="Zoom out" className="flex h-11 w-11 items-center justify-center rounded-full text-xl font-bold" style={fab}>&minus;</button>
+        <button onClick={() => focus(1, homeK(), 700)} aria-label="Center on current level" title="Center on current level" className="flex h-11 w-11 items-center justify-center rounded-full" style={fab}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg>
+        </button>
+      </div>
       {toast > 0 && (
         <div role="status" className="screen-in pointer-events-none absolute inset-x-0 z-20 flex justify-center px-6" style={{ bottom: 'max(24px, env(safe-area-inset-bottom))' }}>
           <div className="rounded-2xl px-5 py-3 text-center" style={{ background: 'rgba(10,12,20,0.94)', border: '1px solid rgba(148,163,184,0.5)', boxShadow: '0 10px 30px rgba(0,0,0,0.6)' }}>
             <div className="font-display text-base font-bold text-slate-100">Level {toast} &mdash; Locked (Coming Soon)</div>
-            <div className="text-xs text-slate-400">{MAP_BIOME(toast)}</div>
+            <div className="text-xs text-slate-400">{MAP_NAME(toast)} &middot; {MAP_BIOME(toast)}</div>
           </div>
         </div>
       )}

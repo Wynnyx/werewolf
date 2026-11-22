@@ -83,6 +83,10 @@
   .map-pin-ring { position: absolute; inset: -4px; border-radius: 9999px; border: 2px solid rgba(253,230,138,0.9); animation: mapPinRing 2s ease-out infinite; pointer-events: none; }
   @keyframes mapPinRing { 0% { transform: scale(0.9); opacity: 0.95; } 100% { transform: scale(2.1); opacity: 0; } }
   .map-pin-lock { position: absolute; right: -6px; top: -6px; width: 10px; height: 10px; background: #0f141d; border: 1px solid #64748B; border-radius: 9999px; padding: 2px; }
+  .unlock-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: unlockDraw 1.5s ease-in-out forwards; } @keyframes unlockDraw { to { stroke-dashoffset: 0; } }
+  .lockbreak { animation: lockBreak 1.1s ease-in forwards; } @keyframes lockBreak { 0% { transform: rotate(0); } 14% { transform: rotate(-20deg) scale(1.25); } 28% { transform: rotate(18deg) scale(1.25); } 42% { transform: rotate(-12deg) scale(1.2); } 100% { transform: translateY(30px) rotate(50deg) scale(0.5); opacity: 0; } }
+  .unlock-pop { animation: unlockPop 1.3s ease-out; } @keyframes unlockPop { 0% { transform: scale(0.7); } 40% { transform: scale(1.55); } 100% { transform: scale(1); } }
+  .map-pin-burst { position: absolute; inset: -6px; border-radius: 9999px; border: 3px solid #FDE68A; animation: mapPinRing 1.1s ease-out 3; pointer-events: none; }
   .map-pin-star { position: absolute; right: -9px; top: -12px; font-size: 17px; color: #FDE68A; }
   .guide-wave { position: absolute; inset: -2px; border-radius: 50%; border: 2px solid rgba(253,230,138,0.9); pointer-events: none; animation: guideWave 2s ease-out infinite; } .guide-wave.w2 { animation-delay: 1s; } @keyframes guideWave { 0% { transform: scale(1); opacity: 0.85; } 100% { transform: scale(1.65); opacity: 0; } }
   .guide-dot { animation: guidePulse 1.6s ease-out infinite; } @keyframes guidePulse { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); } 80%, 100% { box-shadow: 0 0 0 9px rgba(239,68,68,0); } }
@@ -1835,7 +1839,7 @@ const TH_PAIRS = [
   ["Come on, I just ate dinner.", 'เอาน่า ฉันเพิ่งกินข้าวเย็นเสร็จเองนะ'],
   ["If anything, are we sure about Jenna? She wouldn't say a single word when I asked her.", 'ถ้าจะสงสัยใคร แน่ใจเหรอว่าเจนนาไม่มีพิรุธ? ตอนฉันถามเธอไม่ยอมพูดสักคำ'],
   ["The last lantern dies out. Everyone is pointing fingers\u2014I have to choose who to protect tonight.", 'ตะเกียงดวงสุดท้ายดับลง ทุกคนต่างชี้นิ้วใส่กัน\u2014ฉันต้องเลือกว่าคืนนี้จะปกป้องใคร'],
-  ['Skip', 'ข้าม'], ["Wait\u2014nobody died? Then whoever tried to attack froze up. Look at Jenna, she's been hiding under her blankets the whole time.", "เดี๋ยวนะ—ไม่มีใครตายเหรอ? งั้นคนที่ตั้งใจจะลงมือก็คงขวัญเสีย ดูเจนนาสิ เธอซ่อนตัวอยู่ใต้ผ้าห่มตลอดเลย"], ["Honestly... Charlie might have a point. Why else wouldn't she say a single word all night?", "พูดตามตรง... ชาร์ลีอาจจะพูดถูกนะ ไม่งั้นทำไมเธอถึงไม่ยอมพูดสักคำทั้งคืน?"], ["(sniffling) I didn't do anything! I was terrified\u2014please, I'm not a werewolf!", "(สะอื้น) ฉันไม่ได้ทำอะไรนะ! ฉันกลัวมาก—ได้โปรด ฉันไม่ใช่มนุษย์หมาป่า!"], ["...Hold on. Look at her\u2014maybe it really wasn't her.", "...เดี๋ยวก่อน ดูเธอสิ—บางทีอาจไม่ใช่เธอจริง ๆ"], ["Yeah, maybe you're right... no point rushing into a mistake yet.", "อืม บางทีเธอก็พูดถูก... ไม่ต้องรีบทำพลาดตอนนี้หรอก"], ["I'm voting Jenna", "ฉันโหวตเจนนา"], ["I'm voting Charlie", "ฉันโหวตชาร์ลี"], ["I'm voting Stacy", "ฉันโหวตสเตซี่"], ["I'm skipping", "ฉันข้ามการโหวต"], ["Sorry, Jenna\u2014we can't take chances. I'm voting Jenna.", "ขอโทษนะ เจนนา—เราเสี่ยงไม่ได้ ฉันโหวตเจนนา"], ["Agreed. Better safe than sorry\u2014I'm voting Jenna too.", "เห็นด้วย ปลอดภัยไว้ก่อน—ฉันก็โหวตเจนนาเหมือนกัน"], ["If both of you are sure... alright, I'll follow the majority and vote Jenna.", "ถ้าพวกนายมั่นใจกันทั้งคู่... ก็ได้ ฉันจะตามเสียงส่วนใหญ่แล้วโหวตเจนนา"], ["Wait a second\u2014Charlie's been pushing blame since last night. I'm voting Charlie.", "เดี๋ยวก่อน—ชาร์ลีโยนความผิดมาตั้งแต่เมื่อคืน ฉันโหวตชาร์ลี"], ["Me?! I didn't touch anyone\u2014you're guessing with zero proof!", "ฉันเหรอ?! ฉันไม่ได้แตะต้องใครเลย—นายแค่เดาโดยไม่มีหลักฐานสักอย่าง!"], ["Hold on, Pooh\u2014Charlie has a point, we don't have real proof yet. I'm not voting him today.", "เดี๋ยวก่อน พูห์—ชาร์ลีพูดมีเหตุผล เรายังไม่มีหลักฐานจริง ๆ ฉันไม่โหวตเขาวันนี้"], ["Stacy was the one who snuck outside before dark. I'm voting Stacy.", "สเตซี่คือคนที่แอบออกไปข้างนอกก่อนมืด ฉันโหวตสเตซี่"], ["Finally someone sees it! I'm voting Stacy too.", "ในที่สุดก็มีคนเห็น! ฉันก็โหวตสเตซี่เหมือนกัน"], ["Are you serious?! You're falling for his bluff\u2014I'm innocent!", "จริงเหรอเนี่ย?! นายหลงกลเขาแล้ว—ฉันบริสุทธิ์นะ!"], ["Nobody died last night. Voting blind is too risky\u2014I'm skipping.", "เมื่อคืนไม่มีใครตาย การโหวตแบบมั่ว ๆ เสี่ยงเกินไป—ฉันขอข้าม"], ["Smart move. I'm skipping too.", "ตัดสินใจฉลาด ฉันก็ข้ามเหมือนกัน"], ["Same here\u2014let's wait until we actually know something. Skip.", "ฉันก็เหมือนกัน—รอจนกว่าจะรู้อะไรจริง ๆ ก่อนเถอะ ข้าม"], ['(guarded last night)', '(เพิ่งถูกปกป้องเมื่อคืน)'], ['🛡️ Cooldown', '🛡️ พักฟื้น'],
+  ['Skip', 'ข้าม'], ['\u21BB Reset Progress', '\u21BB รีเซ็ตความคืบหน้า'], ['Tap again to confirm', 'แตะอีกครั้งเพื่อยืนยัน'], ['Continue to Level {#}', 'ไปต่อด่าน {1}'], ['Retry Level {#}', 'ลองด่าน {1} อีกครั้ง'], ['Back to Map', 'กลับไปแผนที่'], ['Campaign \u00B7 Level {#}', 'แคมเปญ \u00B7 ด่าน {1}'], ['Level 2 \u2014 Unlocked (Coming Soon)', 'ด่าน 2 \u2014 ปลดล็อกแล้ว (เร็ว ๆ นี้)'], ['Level 2 \u2014 Unlocked', 'ด่าน 2 \u2014 ปลดล็อกแล้ว'], ['Pick your players and cards against bots', 'เลือกผู้เล่นและไพ่เพื่อสู้กับบอท'], ["Wait\u2014nobody died? Then whoever tried to attack froze up. Look at Jenna, she's been hiding under her blankets the whole time.", "เดี๋ยวนะ—ไม่มีใครตายเหรอ? งั้นคนที่ตั้งใจจะลงมือก็คงขวัญเสีย ดูเจนนาสิ เธอซ่อนตัวอยู่ใต้ผ้าห่มตลอดเลย"], ["Honestly... Charlie might have a point. Why else wouldn't she say a single word all night?", "พูดตามตรง... ชาร์ลีอาจจะพูดถูกนะ ไม่งั้นทำไมเธอถึงไม่ยอมพูดสักคำทั้งคืน?"], ["(sniffling) I didn't do anything! I was terrified\u2014please, I'm not a werewolf!", "(สะอื้น) ฉันไม่ได้ทำอะไรนะ! ฉันกลัวมาก—ได้โปรด ฉันไม่ใช่มนุษย์หมาป่า!"], ["...Hold on. Look at her\u2014maybe it really wasn't her.", "...เดี๋ยวก่อน ดูเธอสิ—บางทีอาจไม่ใช่เธอจริง ๆ"], ["Yeah, maybe you're right... no point rushing into a mistake yet.", "อืม บางทีเธอก็พูดถูก... ไม่ต้องรีบทำพลาดตอนนี้หรอก"], ["I'm voting Jenna", "ฉันโหวตเจนนา"], ["I'm voting Charlie", "ฉันโหวตชาร์ลี"], ["I'm voting Stacy", "ฉันโหวตสเตซี่"], ["I'm skipping", "ฉันข้ามการโหวต"], ["Sorry, Jenna\u2014we can't take chances. I'm voting Jenna.", "ขอโทษนะ เจนนา—เราเสี่ยงไม่ได้ ฉันโหวตเจนนา"], ["Agreed. Better safe than sorry\u2014I'm voting Jenna too.", "เห็นด้วย ปลอดภัยไว้ก่อน—ฉันก็โหวตเจนนาเหมือนกัน"], ["If both of you are sure... alright, I'll follow the majority and vote Jenna.", "ถ้าพวกนายมั่นใจกันทั้งคู่... ก็ได้ ฉันจะตามเสียงส่วนใหญ่แล้วโหวตเจนนา"], ["Wait a second\u2014Charlie's been pushing blame since last night. I'm voting Charlie.", "เดี๋ยวก่อน—ชาร์ลีโยนความผิดมาตั้งแต่เมื่อคืน ฉันโหวตชาร์ลี"], ["Me?! I didn't touch anyone\u2014you're guessing with zero proof!", "ฉันเหรอ?! ฉันไม่ได้แตะต้องใครเลย—นายแค่เดาโดยไม่มีหลักฐานสักอย่าง!"], ["Hold on, Pooh\u2014Charlie has a point, we don't have real proof yet. I'm not voting him today.", "เดี๋ยวก่อน พูห์—ชาร์ลีพูดมีเหตุผล เรายังไม่มีหลักฐานจริง ๆ ฉันไม่โหวตเขาวันนี้"], ["Stacy was the one who snuck outside before dark. I'm voting Stacy.", "สเตซี่คือคนที่แอบออกไปข้างนอกก่อนมืด ฉันโหวตสเตซี่"], ["Finally someone sees it! I'm voting Stacy too.", "ในที่สุดก็มีคนเห็น! ฉันก็โหวตสเตซี่เหมือนกัน"], ["Are you serious?! You're falling for his bluff\u2014I'm innocent!", "จริงเหรอเนี่ย?! นายหลงกลเขาแล้ว—ฉันบริสุทธิ์นะ!"], ["Nobody died last night. Voting blind is too risky\u2014I'm skipping.", "เมื่อคืนไม่มีใครตาย การโหวตแบบมั่ว ๆ เสี่ยงเกินไป—ฉันขอข้าม"], ["Smart move. I'm skipping too.", "ตัดสินใจฉลาด ฉันก็ข้ามเหมือนกัน"], ["Same here\u2014let's wait until we actually know something. Skip.", "ฉันก็เหมือนกัน—รอจนกว่าจะรู้อะไรจริง ๆ ก่อนเถอะ ข้าม"], ['(guarded last night)', '(เพิ่งถูกปกป้องเมื่อคืน)'], ['🛡️ Cooldown', '🛡️ พักฟื้น'],
   ["They struck overnight, and my shield held\u2014the Werewolf came straight after {} last night!", 'พวกมันลงมือเมื่อคืน แต่โล่ของฉันยังต้านไว้ได้\u2014มนุษย์หมาป่าพุ่งตรงไปหา {1} เมื่อคืนนี้!'], ["Oh no... I guarded {}, and the beast went after {} instead!", 'ตายแล้ว... ฉันปกป้อง {1} แต่เจ้าอสูรกลับไปหา {2} แทน!'], ['🗳️ Cast Your Vote', '🗳️ ลงคะแนนโหวต'], ['Agree to Skip', 'เห็นด้วย ข้ามไปก่อน'], ['Stay Silent', 'เงียบไว้'], ['Question Someone', 'ซักถามใครสักคน'], ['You stay silent.', 'คุณเลือกที่จะเงียบ'], ["Let's skip the vote and wait for more clues.", 'ข้ามการโหวตก่อน แล้วรอเบาะแสเพิ่มเถอะ'], ['{}, what are you hiding? Explain yourself.', '{1} เธอปิดบังอะไรอยู่? อธิบายมาซะ'], ['Back', 'กลับ'], ['Day Discussion', 'การอภิปรายตอนกลางวัน'],
   ['(yourself)', '(ตัวคุณเอง)'],
   ["Nobody died last night. Voting blind is too risky\u2014I'm skipping.", 'เมื่อคืนไม่มีใครตาย โหวตมั่ว ๆ เสี่ยงเกินไป\u2014ฉันขอข้าม'],
@@ -2427,7 +2431,7 @@ function LobbyBackdrop({ mode }) {
   );
 }
 
-function StartScreen({ onPlay, onMulti, onAi, gameCount, onClearGames }) {
+function StartScreen({ onPlay, onMulti, onAi, onCustomAi, gameCount, onClearGames }) {
   const [step, setStep] = useState('mode'); // mode -> play
   const [pv, setPv] = useState('classic'); // which mode art the selector backdrop previews
   const homeBgs = [DEFAULT_BG, LOBBY_BG.classic.src, LOBBY_BG.outbreak.src]; // the home backdrop rotates through these
@@ -2580,6 +2584,12 @@ function StartScreen({ onPlay, onMulti, onAi, gameCount, onClearGames }) {
                   <span className="block text-xl font-bold leading-tight tracking-wide md:text-2xl">Adventure</span>
                   <span className="mt-1 block text-[13px] font-semibold leading-snug text-white/90">Campaign levels &amp; custom AI matches</span>
                 </span>
+              </button>
+              <button data-ui-sound="primary" onClick={onCustomAi} aria-label="Custom AI"
+                className="relative col-span-2 flex min-h-[56px] items-center gap-3 overflow-hidden rounded-2xl px-4 py-2.5 text-left text-white transition hover:brightness-110 active:scale-[0.98]"
+                style={{ background: 'rgba(21,26,36,0.82)', border: '1px solid rgba(167,139,250,0.55)', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.8)' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true" className="shrink-0 text-violet-200"><path d="M12 5v14M5 12h14" /></svg>
+                <span><span className="block text-lg font-bold leading-tight tracking-wide">Custom AI</span><span className="block text-[12px] font-semibold leading-snug text-white/80">Pick your players and cards against bots</span></span>
               </button>
               <button data-ui-sound="primary" onClick={onMulti} aria-label="Online Multiplayer"
                 className="relative col-span-2 flex min-h-[68px] items-center gap-4 overflow-hidden rounded-2xl px-4 py-3 text-left text-white transition hover:brightness-110 active:scale-[0.98]"
@@ -6399,7 +6409,6 @@ function MpOver({ room, players, meId, onRetry }) {
           <ul className="mt-3 flex flex-col gap-1.5 text-left text-[13px] font-semibold">
             <li className="rounded-lg px-3 py-2 text-emerald-200" style={{ background: 'rgba(6,78,59,0.4)', border: '1px solid rgba(52,211,153,0.5)' }}>Seer unlocked</li>
             <li className="rounded-lg px-3 py-2 text-slate-200" style={{ background: 'rgba(30,41,59,0.6)', border: '1px solid rgba(148,163,184,0.45)' }}>Bodyguard is resting and will recover for Level 2</li>
-            <li className="rounded-lg px-3 py-2 text-violet-200" style={{ background: 'rgba(76,29,149,0.35)', border: '1px solid rgba(167,139,250,0.5)' }}>Rare Card Unlocked: Medusa</li>
           </ul>
         </Panel>
       )}
@@ -6408,7 +6417,6 @@ function MpOver({ room, players, meId, onRetry }) {
           <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-red-300">Level 1 failed</div>
           <h2 className="font-display mt-1 text-2xl font-black text-red-100">Defeat</h2>
           <p className="mt-2 text-sm leading-snug text-red-50">The Werewolf got to the village first. Watch who you protect and find Charlie in time.</p>
-          {onRetry && <Btn className="mt-4" onClick={onRetry}>Retry Level 1</Btn>}
         </Panel>
       )}
       <Panel className="text-center" style={{ border: `1px solid ${W.color}`, background: W.bg }}>
@@ -6669,7 +6677,7 @@ function MpHostPanel({ room, players, write, director }) {
 }
 
 /* ---------- the room (everything after joining) ---------- */
-function MpRoom({ session, onExit, onPhase, onRetry }) {
+function MpRoom({ session, onExit, onPhase, onRetry, onMap, onNext }) {
   const { code, pid } = session;
   const { room, err, refresh } = useRoom(code);
   const [cardsStep, setCardsStep] = useState(false);
@@ -6817,7 +6825,9 @@ function MpRoom({ session, onExit, onPhase, onRetry }) {
     else if (ph === 'night') body = <MpNight key={`n${room.k}`} me={me} players={players} room={room} write={write} immersive={!isHost || hostPlays} onLeave={() => setConfirmLeave(true)} />;
     else if (ph === 'day') body = <MpDay key={`d${room.k}`} me={me} players={players} room={room} write={write} onTimeUp={isHost && hostPlays ? () => { if (room.vd === 1) return; const t = mpTally(players); write(mpVotePatch(players, t.tie ? '' : t.top, { tie: t.tie, skip: t.skip, none: t.voted === 0 })); } : undefined} />;
     else body = <MpOver room={room} players={players} meId={pid} onRetry={onRetry} />;
-    if (hostPlays && ph !== 'lobby') body = <div className="flex flex-1 flex-col gap-4">{body}{ph === 'over' && <><Btn variant="secondary" disabled={busy} onClick={leave}>Exit to Home</Btn><MpHostPanel room={room} players={players} write={write} director={director} /></>}</div>;
+    if (hostPlays && ph !== 'lobby') body = <div className="flex flex-1 flex-col gap-4">{body}{ph === 'over' && (room.adv === 1
+      ? <>{room.w === 'village' ? <Btn onClick={onNext}>{`Continue to Level ${2}`}</Btn> : <Btn onClick={onRetry}>{`Retry Level ${1}`}</Btn>}<Btn variant="secondary" onClick={onMap}>Back to Map</Btn></>
+      : <><Btn variant="secondary" disabled={busy} onClick={leave}>Exit to Home</Btn><MpHostPanel room={room} players={players} write={write} director={director} /></>)}</div>;
   } else {
     body = <MpMod room={room} players={players} me={me} write={write} director={director} />;
   }
@@ -6847,7 +6857,7 @@ function MpRoom({ session, onExit, onPhase, onRetry }) {
       </div>
     )}
     <Screen className={ph === 'day' ? 'relative z-10' : ''}>
-      {fullHost ? (ph !== 'night' && <div className="h-6" />) : <MpHeader code={code} roomName={room.rn} onLeave={() => setConfirmLeave(true)} leaveLabel="Leave room" />}
+      {fullHost ? (ph !== 'night' && <div className="h-6" />) : ph === 'over' && room.adv === 1 ? <header className="relative flex items-center gap-2 pb-3"><ExitButton onClick={() => setConfirmLeave(true)} aria-label="Leave match" /><div className="mx-auto pr-10 font-display text-sm font-bold uppercase tracking-[0.24em] text-violet-100">{`Campaign \u00B7 Level ${1}`}</div></header> : <MpHeader code={code} roomName={room.rn} onLeave={() => setConfirmLeave(true)} leaveLabel="Leave room" />}
       {session.local && !session.ai && <p className="mb-3 text-center text-[11px] font-semibold tracking-wide text-slate-500">Preview Mode &mdash; deploy to Vercel for live multi-phone sync</p>}
       {(err || wErr) && <p role="alert" className="mb-3 rounded-xl px-3 py-2 text-center text-xs font-semibold text-amber-200" style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)' }}>{wErr || `${err} Retrying...`}</p>}
       {body}
@@ -7737,7 +7747,7 @@ const MAP_PINS = [[42, 84], [33, 86], [50, 82], [51, 73], [26, 66], [20, 69], [2
 const MAP_ZONES = [[1, 4], [5, 7], [8, 11], [12, 16], [17, 20]]; // level ranges that share one landmark; each gets its own trail
 const mapBow = (a, b, sg, f) => { const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1; return [(a[0] + b[0]) / 2 - (dy / L) * L * f * sg, (a[1] + b[1]) / 2 + (dx / L) * L * f * sg]; };
 const mapZonePath = (pts) => pts.slice(1).map((q, i) => { const c = mapBow(pts[i], q, i % 2 ? -1 : 1, 0.16); return `${i ? '' : `M${pts[0][0]} ${pts[0][1]} `}Q${Math.round(c[0])} ${Math.round(c[1])} ${q[0]} ${q[1]}`; }).join(' ');
-const MapPainted = React.memo(function MapPainted({ tab, src, tiles, w, h, cleared, selected, hint }) {
+const MapPainted = React.memo(function MapPainted({ tab, src, tiles, w, h, cleared, l2 = -1, selected, hint }) {
   const [tBad, setTBad] = useState(false);
   const PINS = MAP_PINS;
   const pts = PINS.map(([x, y]) => [Math.round((x * w) / 100), Math.round((y * h) / 100)]);
@@ -7758,19 +7768,25 @@ const MapPainted = React.memo(function MapPainted({ tab, src, tiles, w, h, clear
         {zones.map((d, i) => <path key={`g${i}`} d={d} fill="none" stroke={ob ? '#34D399' : '#FDE68A'} strokeWidth="16" strokeOpacity="0.18" strokeLinecap="round" strokeLinejoin="round" />)}
         {zones.map((d, i) => <path key={`z${i}`} d={d} fill="none" stroke={ob ? '#A7F3D0' : '#FFF3C4'} strokeWidth="5" strokeOpacity="0.92" strokeDasharray="14 12" strokeLinecap="round" strokeLinejoin="round" className="map-foam" />)}
       </svg>
+      {tab === 'classic' && l2 >= 1 && (
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          <path d={mapZonePath(pts.slice(0, 2))} fill="none" stroke="#FBBF24" strokeWidth="18" strokeOpacity="0.35" strokeLinecap="round" pathLength="1" className={l2 === 1 ? 'unlock-draw' : ''} />
+          <path d={mapZonePath(pts.slice(0, 2))} fill="none" stroke="#FEF3C7" strokeWidth="6" strokeLinecap="round" pathLength="1" className={l2 === 1 ? 'unlock-draw' : ''} />
+        </svg>
+      )}
       <div className="map-fade" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: '#10b981', mixBlendMode: 'soft-light', opacity: ob ? 0.3 : 0 }} />
       {PINS.map(([x, y], i) => {
-        const n = i + 1; const lit = tab === 'classic' && n === 1; const sel = selected === n;
+        const n = i + 1; const open2 = tab === 'classic' && n === 2 && l2 >= 2; const lit = (tab === 'classic' && n === 1) || open2; const sel = selected === n;
         return (
-          <div key={n} data-node={n} role="button" tabIndex={0} aria-label={lit ? `Level 1, House number 1, Harbor Cottage${cleared ? ', cleared' : ', unlocked'}` : `Level ${n}, locked, coming soon`} className="map-pin" style={{ left: `${x}%`, top: `${y}%`, cursor: 'pointer', outline: 'none' }}>
-            <div data-node={n} className={`map-pin-dot ${lit ? 'lit' : ''} ${sel ? 'sel' : ''}`}>
-              {lit && <span className="map-pin-ring" />}
+          <div key={n} data-node={n} role="button" tabIndex={0} aria-label={open2 ? 'Level 2, unlocked, coming soon' : lit ? `Level 1, House number 1, Harbor Cottage${cleared ? ', cleared' : ', unlocked'}` : `Level ${n}, locked, coming soon`} className="map-pin" style={{ left: `${x}%`, top: `${y}%`, cursor: 'pointer', outline: 'none' }}>
+            <div data-node={n} className={`map-pin-dot ${lit ? 'lit' : ''} ${sel ? 'sel' : ''} ${n === 2 && l2 === 2 ? 'unlock-pop' : ''}`}>
+              {lit && <span className="map-pin-ring" />}{n === 2 && l2 === 2 && <span className="map-pin-burst" />}
               <span data-node={n}>{n}</span>
-              {!lit && <svg className="map-pin-lock" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}
+              {(!lit || (n === 2 && l2 === 2)) && <svg className={`map-pin-lock ${n === 2 && l2 === 2 ? 'lockbreak' : ''}`} width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}
               {lit && cleared && <span className="map-pin-star">&#9733;</span>}
             </div>
             {lit && hint && <span className="guide-arrow" aria-hidden="true"><svg width="40" height="28" viewBox="0 0 40 28"><path d="M2 9 H20 V2 L38 14 L20 26 V19 H2 Z" fill="#EF4444" stroke="#7F1D1D" strokeWidth="2" strokeLinejoin="round" /></svg></span>}
-            {lit && <div data-node={n} className="map-pin-label">House #1 &mdash; Harbor Cottage</div>}
+            {lit && <div data-node={n} className="map-pin-label">{n === 1 ? <>House #1 &mdash; Harbor Cottage</> : 'Level 2 \u2014 Unlocked'}</div>}
           </div>
         );
       })}
@@ -7812,7 +7828,7 @@ function Level1Scene({ cleared, onBack, onPlay }) {
   );
 }
 
-function AdvHub({ onBack, onCustom, onPlay1 }) {
+function AdvHub({ onBack, onReset, unlock, onPlay1 }) {
   const [tab, setTab] = useState('classic');
   const [sel, setSel] = useState(null);
   const [toast, setToast] = useState(0);
@@ -7828,6 +7844,16 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
   const [art, setArt] = useState({}); // painted maps found in /images: { classic: { w, h }, outbreak: { w, h } }
   const [artReady, setArtReady] = useState(false);
   const cleared = !!loadAdv().classicLevel1Cleared;
+  const [uStage, setUStage] = useState(unlock ? 0 : 3); // Level 2 unlock: 0 locked, 1 the trail lights up, 2 the padlock breaks, 3 settled
+  const [confirmReset, setConfirmReset] = useState(false);
+  useEffect(() => { if (!confirmReset) return undefined; const t = setTimeout(() => setConfirmReset(false), 3200); return () => clearTimeout(t); }, [confirmReset]);
+  const doReset = () => {
+    if (!confirmReset) { setConfirmReset(true); return; }
+    setConfirmReset(false); onReset();
+    ctimers.current.forEach(clearTimeout); ctimers.current = [];
+    setHeard(false); setRead(false); setUnread(true); setChat(false); setCstep(0); setGTop(null); setSel(null); setToast(0); setUStage(3);
+    Sfx.click('primary'); focus(1, homeK(), 900);
+  };
   const vp = useRef(null), world = useRef(null), cam = useRef({ x: 0, y: 0, k: 0.5 });
   const ptrs = useRef(new Map()), g = useRef({ moved: 0, target: null, dist: 0, mx: 0, my: 0 });
   const KMAX = 2.2;
@@ -7880,8 +7906,10 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
   useEffect(() => { // open on the whole map, then glide to the harbor
     if (!artReady) return undefined;
     apply(clampCam({ k: kmin(), x: 0, y: 0 }, 0), 0);
-    const t = setTimeout(() => focus(1, homeK(), 1300), 80);
-    return () => clearTimeout(t);
+    const un = unlock && cleared && tab === 'classic';
+    const t = setTimeout(() => focus(un ? 2 : 1, homeK(), 1300), 80);
+    const ts = un ? [setTimeout(() => { setUStage(1); Sfx.msg(); }, 1900), setTimeout(() => { setUStage(2); Sfx.click('primary'); }, 3600), setTimeout(() => setUStage(3), 5600)] : [];
+    return () => { clearTimeout(t); ts.forEach(clearTimeout); };
   }, [artReady, tab, !!pa]);
   useEffect(() => {
     const el = vp.current;
@@ -7931,7 +7959,7 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
       {!artReady && <div aria-hidden="true" className="map-shimmer absolute inset-0" />}
       <div ref={vp} className="absolute inset-0 select-none" style={{ touchAction: 'none', cursor: 'grab' }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={(e) => { if (e.pointerType === 'mouse' && ptrs.current.has(e.pointerId)) up(e); }}>
         <div ref={world} style={{ width: dim.w, height: dim.h, transformOrigin: '0 0', willChange: 'transform', visibility: artReady ? 'visible' : 'hidden' }}>
-          {pa ? <MapPainted tab={tab} src={pa.src} tiles={pa.tiles} w={pa.w} h={pa.h} cleared={cleared} selected={sel} hint={read && !cleared && !chat} /> : <MapWorld tab={tab} cleared={cleared} selected={sel} art={{}} />}
+          {pa ? <MapPainted tab={tab} src={pa.src} tiles={pa.tiles} w={pa.w} h={pa.h} cleared={cleared} l2={cleared ? uStage : -1} selected={sel} hint={read && !cleared && !chat} /> : <MapWorld tab={tab} cleared={cleared} selected={sel} art={{}} />}
         </div>
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10" style={{ background: 'linear-gradient(180deg, rgba(6,12,24,0.94) 55%, rgba(6,12,24,0))', paddingTop: 'max(8px, env(safe-area-inset-top))', paddingBottom: 22 }}>
@@ -7940,9 +7968,8 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5 L8 12 L15 19" /></svg>
           </button>
           <h1 className="font-display text-lg font-bold tracking-wide">ADVENTURE</h1>
-          <button onClick={onCustom} aria-label="Custom AI" title="Custom AI" className="ml-auto flex h-11 min-w-[44px] items-center justify-center gap-1 rounded-full px-3 text-violet-100 hover:bg-white/10" style={{ border: '1px solid rgba(167,139,250,0.55)', background: 'rgba(21,26,36,0.7)' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-            <span className="text-[11px] font-bold uppercase tracking-wider">Custom AI</span>
+          <button onClick={doReset} aria-label="Reset progress" title="Reset progress" className="ml-auto flex h-11 min-w-[44px] items-center justify-center gap-1 rounded-full px-3 text-red-100 hover:bg-white/10" style={{ border: `1px solid ${confirmReset ? 'rgba(248,113,113,0.95)' : 'rgba(167,139,250,0.55)'}`, background: confirmReset ? 'rgba(127,29,29,0.75)' : 'rgba(21,26,36,0.7)' }}>
+            <span className="text-[11px] font-bold uppercase tracking-wider">{confirmReset ? 'Tap again to confirm' : '\u21BB Reset Progress'}</span>
           </button>
         </div>
         <div role="tablist" className="pointer-events-auto mx-auto mt-2 flex w-full max-w-xl gap-2 px-4">{tabBtn('classic', 'Classic')}{tabBtn('outbreak', 'Outbreak')}</div>
@@ -7980,7 +8007,7 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
       {toast > 0 && (
         <div role="status" className="screen-in pointer-events-none absolute inset-x-0 z-20 flex justify-center px-6" style={{ bottom: 'max(24px, env(safe-area-inset-bottom))' }}>
           <div className="rounded-2xl px-5 py-3 text-center" style={{ background: 'rgba(10,12,20,0.94)', border: '1px solid rgba(148,163,184,0.5)', boxShadow: '0 10px 30px rgba(0,0,0,0.6)' }}>
-            <div className="font-display text-base font-bold text-slate-100">Level {toast} &mdash; Locked (Coming Soon)</div>
+            <div className="font-display text-base font-bold text-slate-100">{toast === 2 && cleared && tab === 'classic' ? 'Level 2 \u2014 Unlocked (Coming Soon)' : `Level ${toast} \u2014 Locked (Coming Soon)`}</div>
             <div className="text-xs text-slate-400">{MAP_NAME(toast)} &middot; {MAP_BIOME(toast)}</div>
           </div>
         </div>
@@ -7991,8 +8018,9 @@ function AdvHub({ onBack, onCustom, onPlay1 }) {
   );
 }
 
-function AiScreen({ onBack, onPhase }) {
-  const [view, setView] = useState('hub'); // hub | mode | count | deck | name | lvlname | room
+function AiScreen({ onBack, onPhase, startView }) {
+  const [unlock, setUnlock] = useState(false); // coming back from a Level 1 victory: play the Level 2 unlock on the map
+  const [view, setView] = useState(startView === 'mode' ? 'mode' : 'hub'); // hub | mode | count | deck | name | lvlname | room
   const [cfg, setCfg] = useState({ n: 8, deck: null });
   const [sandbox, setSandboxS] = useState(() => !!loadAdv().sandbox);
   const setSandbox = (on) => { setSandboxS(on); saveAdv({ ...loadAdv(), sandbox: on }); };
@@ -8012,6 +8040,8 @@ function AiScreen({ onBack, onPhase }) {
     Mp.get(`rooms/${s.code}`).then((r) => { if (!live) return; if (r && r.ai) { setSession(s); setView('room'); } else { Mp.local = false; saveSession(null); } setChecking(false); }, () => { if (live) { Mp.local = false; setChecking(false); } });
     return () => { live = false; };
   }, []);
+  const toMap = (un) => { Mp.local = false; saveSession(null); setSession(null); setUnlock(!!un); setView('hub'); };
+  const resetProgress = () => { saveAdv({}); setSandboxS(false); try { localStorage.removeItem('nightfall.guideY'); } catch (e) { /* ignore */ } };
   const exitRoom = () => { Mp.local = false; saveSession(null); setSession(null); onBack(); };
   const start = async (name, c) => {
     setBusy(true); setErr('');
@@ -8019,14 +8049,14 @@ function AiScreen({ onBack, onPhase }) {
     catch (e) { Mp.local = false; setErr('Could not start the match. Try again.'); }
     setBusy(false);
   };
-  if (view === 'room' && session) return <MpRoom key={session.code} session={session} onExit={exitRoom} onPhase={onPhase} onRetry={session.ai ? () => playLevel1() : undefined} />;
+  if (view === 'room' && session) return <MpRoom key={session.code} session={session} onExit={exitRoom} onPhase={onPhase} onRetry={session.ai ? () => playLevel1() : undefined} onMap={() => toMap(false)} onNext={() => toMap(true)} />;
   const playLevel1 = () => { // fixed training match: no deck builder, the human is the Bodyguard
     setGameMode('classic');
     const c = { n: 4, deck: { ...emptyDeck(), ...ADV_L1_DECK }, adv: 1 };
     setCfg(c);
     if (loadName().trim()) start(loadName().trim(), c); else setView('lvlname');
   };
-  if (view === 'hub' && !checking) return <AdvHub onBack={onBack} onCustom={() => setView('mode')} onPlay1={playLevel1} />;
+  if (view === 'hub' && !checking) return <AdvHub onBack={onBack} onReset={resetProgress} unlock={unlock} onPlay1={playLevel1} />;
   if (view === 'deck' && cfg.deck) return <ChooseCards count={cfg.n} deck={cfg.deck} setDeck={(d) => setCfg((c) => ({ ...c, deck: d }))} onBack={() => setView('count')} onStart={() => setView('name')} startLabel="Lock Deck" showBalance adv={advProps} />;
   return (
     <Screen>
@@ -8044,7 +8074,7 @@ function AiScreen({ onBack, onPhase }) {
           ? <AiNameStep onBack={() => setView('deck')} onStart={(n) => start(n, { ...cfg, adv: 0 })} busy={busy} err={err} />
           : view === 'count'
             ? <MpCountStep n={cfg.n} setN={(n) => setCfg((c) => ({ ...c, n }))} onBack={() => setView('mode')} onNext={() => { setCfg((c) => ({ ...c, deck: noRare(c.n), adv: 0 })); setView('deck'); }} />
-            : <MpModeStep onBack={() => setView('hub')} onPick={(m) => { setGameMode(m); setView('count'); }} />}
+            : <MpModeStep onBack={() => (startView === 'mode' ? onBack() : setView('hub'))} onPick={(m) => { setGameMode(m); setView('count'); }} />}
     </Screen>
   );
 }
@@ -8119,6 +8149,7 @@ function saveGames(g) {
 }
 
 function AppInner() {
+  const [aiStart, setAiStart] = useState('');
   const [screen, setScreen] = useState('start'); // start | home | setup | cards | reveal | shield | moderator
   const [games, setGames] = useState(loadGames);
   const [count, setCount] = useState(6);
@@ -8230,10 +8261,10 @@ function AppInner() {
     if (screen !== 'start' && Ambience.unlocked()) Ambience.start();
   }, [screen, soundOn, musicOn, mpPhase]);
   if (screen === 'start') {
-    return <StartScreen onPlay={() => setScreen('home')} onMulti={() => setScreen('multi')} onAi={() => setScreen('ai')} gameCount={games.length} onClearGames={() => setGames([])} />;
+    return <StartScreen onPlay={() => setScreen('home')} onMulti={() => setScreen('multi')} onAi={() => { setAiStart(''); setScreen('ai'); }} onCustomAi={() => { setAiStart('mode'); setScreen('ai'); }} gameCount={games.length} onClearGames={() => setGames([])} />;
   }
   if (screen === 'ai') {
-    return <AiScreen onBack={() => setScreen('start')} onPhase={setMpPhase} />;
+    return <AiScreen startView={aiStart} onBack={() => setScreen('start')} onPhase={setMpPhase} />;
   }
   if (screen === 'multi') {
     return <MultiScreen onBack={() => setScreen('start')} onPhase={setMpPhase} gameCount={games.length} onClearGames={() => setGames([])} />;

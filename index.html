@@ -1844,6 +1844,8 @@ const TH_PAIRS = [
   ["If anything, are we sure about Jenna? She wouldn't say a single word when I asked her.", 'ถ้าจะสงสัยใคร แน่ใจเหรอว่าเจนนาไม่มีพิรุธ? ตอนฉันถามเธอไม่ยอมพูดสักคำ'],
   ["The last lantern dies out. Everyone is pointing fingers\u2014I have to choose who to protect tonight.", 'ตะเกียงดวงสุดท้ายดับลง ทุกคนต่างชี้นิ้วใส่กัน\u2014ฉันต้องเลือกว่าคืนนี้จะปกป้องใคร'],
   ['Skip', 'ข้าม'],
+  ["Hmm... yeah. You have a point. I don't know...", "อืม... ใช่ เธอพูดมีเหตุผล ฉันก็ไม่รู้เหมือนกัน..."],
+  ["What do you think, {}?", "เธอคิดว่ายังไง {1}?"],
   ["They struck overnight, and my shield held—the Werewolf came straight after Stacy again! Three nights and nobody died... we have to make a real choice today.", "พวกมันลงมือเมื่อคืน แต่โล่ของฉันยังต้านไว้ได้—มนุษย์หมาป่าพุ่งตรงไปหาสเตซี่อีกแล้ว! สามคืนแล้วไม่มีใครตาย... วันนี้เราต้องตัดสินใจจริง ๆ สักที"],
   ["Oh no... I guarded {}, and the beast went after Stacy instead! Only Jenna and Charlie are left...", "ตายแล้ว... ฉันปกป้อง {1} แต่เจ้าอสูรกลับไปหาสเตซี่แทน! เหลือแค่เจนนากับชาร์ลีแล้ว..."],
   ["Oh no... I guarded myself, and the beast went after Stacy instead! Only Jenna and Charlie are left...", "ตายแล้ว... ฉันปกป้องตัวเอง แต่เจ้าอสูรกลับไปหาสเตซี่แทน! เหลือแค่เจนนากับชาร์ลีแล้ว..."],
@@ -6876,8 +6878,9 @@ const L1_LINES = [
   { s: 'l', w: 'charlie', t: "I watched Stacy go outside from the window... there's something off about her." },
   { s: 'l', w: 'stacy', t: "Come on, what's wrong with you? I really just needed to go, I can't exactly help that." },
   { s: 'l', w: 'charlie', t: "Convenient timing right before dark. Nobody else needed to step outside." },
-  { s: 'l', w: 'stacy', t: "Come on, I just ate dinner." },
-  { s: 'l', w: 'stacy', t: "If anything, are we sure about Jenna? She wouldn't say a single word when I asked her." },
+  { s: 'l', w: 'stacy', t: "Come on, I just ate dinner. If anything, are we sure about Jenna? She wouldn't say a single word when I asked her." },
+  { s: 'l', w: 'charlie', t: "Hmm... yeah. You have a point. I don't know..." },
+  { s: 'l', w: 'charlie', t: "What do you think, {me}?" },
   { s: 'r', w: 'bodyguard', t: "The last lantern dies out. Everyone is pointing fingers—I have to choose who to protect tonight." }
 ];
 const L1_TAGS = { Stacy: 'Slipped out to the bathroom earlier', Jenna: 'Hid under the blankets, silent', Charlie: 'Watched from the window' };
@@ -6895,7 +6898,9 @@ function L1Avatar({ w, big = false }) {
   );
 }
 function Level1Prologue({ onDone, onLeave }) {
-  const total = L1_LINES.length;
+  const myName = loadName().trim() || PROFILE_DEFAULT;
+  const lines = useMemo(() => L1_LINES.map((L) => ({ ...L, t: L.t.replace('{me}', myName) })), [myName]);
+  const total = lines.length;
   const [n, setN] = useState(0); // lines shown so far
   const [typing, setTyping] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -6912,7 +6917,7 @@ function Level1Prologue({ onDone, onLeave }) {
   useEffect(() => {
     if (n >= total) { setTyping(false); return undefined; }
     const lead = n === 0 ? 900 : 800; const t1 = setTimeout(() => setTyping(true), lead); // ~2.4-2.8 s per message in all: a beat, then the typing dots, then the bubble
-    const t2 = setTimeout(() => { setTyping(false); setN(n + 1); Sfx.msg(); }, 2400 + Math.min(400, L1_LINES[n].t.length * 4));
+    const t2 = setTimeout(() => { setTyping(false); setN(n + 1); Sfx.msg(); }, 2400 + Math.min(400, lines[n].t.length * 4));
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [n]);
   useEffect(() => { const go = () => { if (endRef.current && endRef.current.scrollIntoView) endRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' }); }; go(); const t = setTimeout(go, 380); return () => clearTimeout(t); }, [n, typing]); // second pass once the button space has opened
@@ -6928,7 +6933,7 @@ function Level1Prologue({ onDone, onLeave }) {
       {L.s === 'l' && <div className="mb-1 ml-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: L1_NPC[L.w].c }}>{L1_NPC[L.w].n}</div>}
       <div className={`${L.s === 'r' ? 'guide-bub' : 'guide-bub-l'} inline-block rounded-[22px] px-4 py-2.5 text-left text-[14px] leading-snug text-white ${L.s === 'r' ? 'italic' : 'font-semibold'}`} style={L1_BUB}><p>{L.t}</p></div>
     </div>, i);
-  const cur = n < total ? L1_LINES[n] : null;
+  const cur = n < total ? lines[n] : null;
   return (
     <div role="dialog" aria-label="Harbor Cottage, before Night 1" className="fixed inset-0 z-40 overflow-hidden" style={{ background: '#05060d' }} onPointerDown={spawn} onClick={skip}>
       <img src={IMG} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 h-full w-full select-none" style={{ objectFit: 'cover', filter: 'blur(26px) brightness(0.4)', transform: 'scale(1.15)' }} />
@@ -6941,7 +6946,7 @@ function Level1Prologue({ onDone, onLeave }) {
       <div className="absolute z-20" style={{ right: 16, top: 'calc(max(10px, env(safe-area-inset-top)) + 52px)' }}><L1Avatar w="bodyguard" big /></div>
       <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md overflow-y-auto px-4" style={{ top: 'calc(max(10px, env(safe-area-inset-top)) + 130px)', paddingBottom: 96 }}>
         <div className="flex min-h-full flex-col justify-end gap-3">
-          {L1_LINES.slice(0, n).map((L, i) => bubble(L, i))}
+          {lines.slice(0, n).map((L, i) => bubble(L, i))}
           {typing && cur && row(cur, n, <div className={`${cur.s === 'r' ? 'guide-bub' : 'guide-bub-l'} guide-dots rounded-[20px] px-3.5 py-2.5`} style={L1_BUB} aria-hidden="true"><span /><span /><span /></div>, 'typing')}
           <div aria-hidden="true" style={{ height: n >= total ? 84 : 0, transition: 'height 300ms ease' }} />{/* room for the button, so the last thought is never hidden under it */}
           <div ref={endRef} />

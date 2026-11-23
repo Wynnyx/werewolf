@@ -6734,9 +6734,9 @@ function L1Reveal({ room, players, code, win, ambush, onContinue }) {
   }, []);
   useEffect(() => { if (stage === 2) { if (lose) Sfx.lose(); else Sfx.win('village'); } }, [stage]); // the fanfare plays as VICTORY appears
   if (stage === 0) return null;
-  const col = lose ? { k: '#fca5a5', t: '#fee2e2', tint: 'radial-gradient(ellipse at 50% 40%, rgba(127,29,29,0.34), rgba(5,7,12,0.12) 70%)', glow: 'rgba(239,68,68,0.7)' } : { k: '#fcd34d', t: '#fef3c7', tint: 'radial-gradient(ellipse at 50% 40%, rgba(146,64,14,0.3), rgba(5,7,12,0.12) 70%)', glow: 'rgba(251,191,36,0.7)' };
+  const col = lose ? { k: '#fca5a5', t: '#fee2e2', bg: 'radial-gradient(ellipse at 50% 30%, rgba(127,29,29,0.6), rgba(5,7,12,0.98) 70%)', glow: 'rgba(239,68,68,0.7)' } : { k: '#fcd34d', t: '#fef3c7', bg: 'radial-gradient(ellipse at 50% 30%, rgba(146,64,14,0.55), rgba(5,7,12,0.98) 70%)', glow: 'rgba(251,191,36,0.7)' };
   return (
-    <div role="dialog" aria-modal="true" aria-label={lose ? 'Defeat' : 'Victory'} className="fixed inset-0 z-[65] flex flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-8 text-center screen-in" style={{ background: `${col.tint}, url(images/reveal-purple.webp) center / cover no-repeat, #07050d` }}>
+    <div role="dialog" aria-modal="true" aria-label={lose ? 'Defeat' : 'Victory'} className="fixed inset-0 z-[65] flex flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-8 text-center screen-in" style={{ background: col.bg }}>
       {showLine && <p key="el" className="screen-in max-w-xs text-base font-semibold text-slate-100">{`${el.n} was voted out \u2014 she was an innocent Villager.`}</p>}
       {stage === 2 && (
         <div key="out" className="screen-in flex flex-col items-center gap-3">
@@ -7525,7 +7525,7 @@ function MpRoom({ session, onExit, onPhase, onRetry, onMap, onNext }) {
     <>
     {ph === 'day' && <DayBackdrop />}
     {ph === 'reveal' && <RevealBackdrop />}
-    {ph === 'over' && room.adv === 1 && room.w !== 'village' && <RevealBackdrop src="images/night-sky.webp" />}
+    {ph === 'over' && room.adv === 1 && <RevealBackdrop src="images/reveal-purple.webp" />}
     {showPlayer && me && room.adv === 1 && room.k === 1 && ((ph === 'night' && room.ns === 'i') || ph === 'day') && <AdvTip key={ph} text={ph === 'night' ? "Tip: Remember everyone's alibi before the lantern went out..." : 'Tip: Read the Village Chat, work out who the Werewolf is, and vote together!'} />}
     {showPlayer && me && ph === 'over' && room.adv === 1 && room.am === 1 && AM_SEEN.key !== `${code}:${room.dl || 0}` && <L1Reveal key="amb" ambush room={room} players={players} code={code} win="werewolf" onContinue={() => { AM_SEEN.key = `${code}:${room.dl || 0}`; amBump((x) => x + 1); }} />}
     {showPlayer && me && ph === 'day' && room.adv === 1 && room.vd === 1 && <L1VoteCountdown key={`cd${code}:${room.dl || 0}:${room.k}`} />}

@@ -1630,6 +1630,10 @@ const Sfx = (() => {
     noiseHit(c, out, t, { type: 'lowpass', ff: 2600, ff1: 160, dur: 0.5, gain: 0.45 });
     noiseHit(c, out, t, { type: 'highpass', ff: 2200, ff1: 1200, dur: 0.09, gain: 0.16 });
   });
+  const fizzle = () => synth((c, out, t) => { // a good orb shot down: a quiet, muted fizzle and soft pop, nothing like the power-up chime
+    voice(c, out, { type: 'sine', f0: 260, f1: 110, glide: 0.12, t0: t, dur: 0.16, gain: 0.09, attack: 0.004, filter: 'lowpass', ff: 700 });
+    noiseHit(c, out, t, { type: 'bandpass', ff: 2600, ff1: 900, dur: 0.28, gain: 0.07 });
+  });
   const relief = () => synth((c, out, t) => { // morning news: the guard held, a warm rising chime
     [[659.25, 0], [830.6, 0.14], [987.8, 0.28], [1318.5, 0.44]].forEach(([f, d]) => { voice(c, out, { type: 'triangle', f0: f, t0: t + d, dur: 0.9, gain: 0.1, attack: 0.02 }); bellNote(c, out, t + d, f, 0.13, 1.8); });
   });
@@ -1664,7 +1668,7 @@ const Sfx = (() => {
     voice(c, out, { type: 'sawtooth', f0: 92, f1: 70, glide: 2, t0: t + 0.2, dur: 2, gain: 0.1, attack: 0.6, filter: 'lowpass', ff: 260, vib: 4, vibDepth: 20 });
   });
   return {
-    bell, win, lose, grim, relief, burstGood, burstBad, click, chime, rumble, msg, owned: () => ownN,
+    bell, win, lose, grim, relief, burstGood, burstBad, fizzle, click, chime, rumble, msg, owned: () => ownN,
     preload: () => { try { FILES.forEach(load); } catch (e) { /* ignore */ } },
     unlock: () => { try { const c = getCtx(); if (c && c.state !== 'running') { const r = c.resume(); if (r && r.catch) r.catch(() => {}); } } catch (e) { /* ignore */ } },
     flip: () => play('audio/card-flip.mp3'),
@@ -8564,7 +8568,7 @@ function MapWind({ tab }) {
 /* The rules live in plain functions (seerNew / seerUpdate / ...) so they stay separate from drawing and React.      */
 /* ------------------------------------------------------------------ */
 /*SEER-LOGIC-START*/
-const SEER = { LANE: 1.15, CAMH: 1.5, FAR: 60, HIT: 1.9, GONE: 1.0, ORB_R: 0.42, ORB_H: 0.85, HITR: 0.666, FOCUS_MS: 3000, RECHARGE_MS: 3000, GOOD: 6, GOOD_R: 1, DMG: 15, SHATTER: 5, SHOT: 4, ARROW_SPEED: 60, ARROW_REGEN: 1.2, ARROWS: 3, DRAW_S: 1, HI_AT: 80, HIGH_GOOD: 8, BASE_V: 11, SPD: [0, 1, 1.35, 1.75] };
+const SEER = { LANE: 1.15, CAMH: 1.5, FAR: 60, HIT: 1.9, GONE: 1.0, ORB_R: 0.42, ORB_H: 0.85, HITR: 0.613, FOCUS_MS: 3000, RECHARGE_MS: 3000, GOOD: 6, GOOD_R: 0.92, DMG: 15, SHATTER: 5, SHOT: 4, ARROW_SPEED: 60, ARROW_REGEN: 1.2, ARROWS: 3, DRAW_S: 1, HI_AT: 80, HIGH_GOOD: 8, BASE_V: 11, SPD: [0, 1, 1.35, 1.75] };
 function seerNew() {
   return { t: 0, lane: 0, camX: 0, orbs: [], ev: [], spawned: 0, nextSpawn: 1.2, runGood: 0, runBad: 0, gauge: 0, hp: 100, focusLeft: 0, recharge: 0, rv: 0, aura: 0, auraPulse: 0, flash: 0, shake: 0, ripple: -1, winT: -1, loseT: -1, ended: false, uid: 0, arrows: [], charges: 3, drawing: false, drawT: 0, spd: 1, hiSeen: false, lockId: null };
 }
@@ -8574,10 +8578,10 @@ const seerOrbHAt = (o, d) => { // orb height at distance d: low orbs skim the wa
   return o.good ? SEER.ORB_H + 2.6 + 1.2 * k : SEER.ORB_H + 5.6 * k;
 };
 const seerOrbH = (o) => seerOrbHAt(o, o.d);
-const seerLockPick = (S, x) => { // the lock sticks to one exact orb: it only lets go when that orb is shot, hits Jenna, or has passed her (d <= GONE); until then no other orb can take it
+const seerLockPick = (S) => { // always the single active orb closest to Jenna, in any lane; the lock then sticks to that exact orb until it is shot, hits Jenna, or has passed her (d <= GONE)
   const cur = S.lockId ? S.orbs.find((o) => o.id === S.lockId && !o.gone && o.d > SEER.GONE) : null;
   if (cur) return cur;
-  let best = null; S.orbs.forEach((o) => { if (o.gone || o.d <= SEER.GONE || Math.abs(o.lane - x) > 0.5) return; if (!best || o.d < best.d) best = o; }); // a new lock takes the nearest orb in front, however close it is
+  let best = null; S.orbs.forEach((o) => { if (o.gone || o.d <= SEER.GONE) return; if (!best || o.d < best.d) best = o; });
   return best;
 };
 const seerLockTarget = (S) => (S.lockId ? S.orbs.find((o) => o.id === S.lockId && !o.gone && o.d > SEER.GONE) || null : null);
@@ -8609,7 +8613,7 @@ function seerShoot(S, aim) { // fires one Astral Spirit Arrow; it drifts from wh
   S.ev.push({ k: 'fire' }); return true;
 }
 const seerArrowHt = (a, d) => (a.ht == null ? SEER.ORB_H - (SEER.ORB_H - 0.05) * Math.max(0, 1 - (d - 1.5) / 7) : 0.05 + (a.ht - 0.05) * Math.max(0, Math.min(1, (d - 1.5) / Math.max(1, a.di - 1.5))));
-const seerArrowX = (a, d) => a.x0 + (a.aim - a.x0) * Math.max(0, Math.min(1, (d - 1.5) / 5));
+const seerArrowX = (a, d) => a.x0 + (a.aim - a.x0) * Math.max(0, Math.min(1, (d - 1.5) / (a.ht == null ? 5 : Math.max(0.3, Math.min(5, a.di - 1.5))))); // an arrow with a locked target reaches the target's lane by the time it meets it
 function seerGain(S, n) {
   S.gauge = Math.min(100, S.gauge + n);
   if (S.gauge >= SEER.HI_AT && !S.hiSeen) { S.hiSeen = true; S.ev.push({ k: 'high' }); }
@@ -8720,6 +8724,9 @@ function seerBurst(sc, x, y, kind, n) {
     sc.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40, life: 0, max: 0.5 + Math.random() * 0.5, size: 1.5 + Math.random() * 3, c: kind === 'gold' ? (Math.random() < 0.5 ? '255,226,120' : '255,246,200') : kind === 'good' ? (Math.random() < 0.5 ? '255,226,120' : '60,224,200') : kind === 'bad' ? (Math.random() < 0.5 ? '220,38,38' : '60,10,16') : '200,220,255' });
   }
 }
+function seerDust(sc, x, y, n) { // fading gold dust drifting away from a wasted blessing
+  for (let i = 0; i < n; i++) sc.parts.push({ x: x + (Math.random() - 0.5) * 24, y: y + (Math.random() - 0.5) * 24, vx: (Math.random() - 0.5) * 60, vy: -10 - Math.random() * 30, g: -8, life: 0, max: 0.9 + Math.random() * 0.7, size: 1 + Math.random() * 1.6, c: Math.random() < 0.6 ? '230,200,110' : '210,190,140' });
+}
 function seerStream(sc, x, y, tx, ty) { // scattered essence flowing straight into Jenna
   for (let i = 0; i < 30; i++) { const life = 0.45 + Math.random() * 0.35; sc.parts.push({ x: x + (Math.random() - 0.5) * 30, y: y + (Math.random() - 0.5) * 30, vx: (tx - x) / life + (Math.random() - 0.5) * 60, vy: (ty - y) / life + (Math.random() - 0.5) * 60, g: 0, life: 0, max: life, size: 2 + Math.random() * 2.5, c: Math.random() < 0.5 ? '255,226,120' : '255,246,200' }); }
 }
@@ -8793,7 +8800,7 @@ function seerDrawArrows(ctx, S, W, H) { // silver-cyan Astral Spirit Arrows stre
 function seerDrawReticle(ctx, S, W, H, t) { // while the bow is drawn: a silver aim line and reticle; fully drawn it pulses and locks onto the closest orb in the lane
   if (!S.drawing) return;
   const q = Math.min(1, S.drawT / SEER.DRAW_S), full = q >= 1, tg = seerLockTarget(S), p0 = seerProj(S, W, H, S.camX, 3, 0.3), p1 = seerProj(S, W, H, S.camX, 40, SEER.ORB_H);
-  const pr = tg && tg.d < 55 ? seerProj(S, W, H, tg.lane, tg.d, seerOrbH(tg)) : seerProj(S, W, H, S.camX, 16, SEER.ORB_H), pulse = full ? 0.5 + 0.5 * Math.sin(t * 9) : 0, R = (tg && tg.d < 55 ? Math.max(24, SEER.ORB_R * pr.s * 1.9) : 30) - 12 * q + 4 * pulse;
+  const pr = tg ? seerProj(S, W, H, tg.lane, tg.d, seerOrbH(tg)) : seerProj(S, W, H, S.camX, 16, SEER.ORB_H), pulse = full ? 0.5 + 0.5 * Math.sin(t * 9) : 0, R = (tg ? Math.max(24, SEER.ORB_R * pr.s * 1.9) : 30) - 12 * q + 4 * pulse;
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
   ctx.setLineDash([6, 10]); ctx.lineDashOffset = -t * 30; ctx.strokeStyle = `rgba(190,235,255,${0.18 + 0.3 * q})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(pr.x, pr.y); ctx.stroke(); ctx.setLineDash([]);
   const g = ctx.createRadialGradient(pr.x, pr.y, 0, pr.x, pr.y, R * 1.8); g.addColorStop(0, `rgba(200,240,255,${0.25 + 0.3 * q + 0.25 * pulse})`); g.addColorStop(1, 'rgba(150,210,255,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(pr.x, pr.y, R * 1.8, 0, 6.283); ctx.fill();
@@ -8911,7 +8918,7 @@ function SeerMiniGame({ onExit }) {
         else if (e.k === 'arrowHiGood') { seerBurst(sc, p.x, p.y, 'gold', 26); seerStream(sc, p.x, p.y, W / 2, H * 0.82); Sfx.burstGood(); }
         else if (e.k === 'high') { setNote(true); clearTimeout(noteT.current); noteT.current = setTimeout(() => setNote(false), 4500); }
         else if (e.k === 'arrowBad') { seerBurst(sc, p.x, p.y, 'bad', 20); seerBurst(sc, p.x, p.y, 'seer', 26); Sfx.burstBad(); }
-        else if (e.k === 'arrowGood') { seerBurst(sc, p.x, p.y, 'gold', 20); Sfx.burstGood(); }
+        else if (e.k === 'arrowGood') { seerDust(sc, p.x, p.y, 22); Sfx.fizzle(); }
         else if (e.k === 'hit') { seerMakeCrack(sc, W, H); seerBurst(sc, p.x, p.y, 'bad', 34); Sfx.burstBad(); try { navigator.vibrate && navigator.vibrate(60); } catch (er) { /* ignore */ } }
         else if (e.k === 'focus') Sfx.chime();
         else if (e.k === 'winStart') { Sfx.win('village'); seerBurst(sc, W / 2, H * 0.5, 'seer', 60); }

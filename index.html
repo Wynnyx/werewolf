@@ -2632,6 +2632,7 @@ function ConfirmExit({ body, title = 'Exit game?', confirmLabel = 'Exit game', c
 // and the speaker button mutes / unmutes.
 // Screens where the tension music plays instead of the forest ambience (set by AppInner).
 let tensionScreen = false;
+let advToGame = false; // Play Level 1 was pressed: the map music carries straight on instead of restarting
 let advHubOpen = false; // the Adventure map is open: tension music plays
 // Ambient forest sound starts on the very first tap, click or key press anywhere (loading screen, Classic / Outbreak, any button).
 // Browsers refuse audio before a gesture, so this one-time starter runs in the capture phase and stays armed until the sound really plays.
@@ -8427,11 +8428,11 @@ function MapWind({ tab }) {
 }
 function AdvHub({ onBack, onReset, unlock, onPlay1 }) {
   useEffect(() => { // the map plays its music together with the forest ambience; both end when the page is left or Level 1 starts
-    advHubOpen = true;
+    advHubOpen = true; advToGame = false;
     const st = getSettings();
     if (st.music) Tension.start();
     if (st.sound) Ambience.start();
-    return () => { advHubOpen = false; Tension.stop(); };
+    return () => { advHubOpen = false; if (!advToGame) Tension.stop(); };
   }, []);
   const [tab, setTab] = useState('classic');
   const [sel, setSel] = useState(null);
@@ -8439,9 +8440,6 @@ function AdvHub({ onBack, onReset, unlock, onPlay1 }) {
   const [zoomIn, setZoomIn] = useState(false); // camera is zooming into House #1
   const [scene, setScene] = useState(false); // Level 1 first-person scene is open
   const [chat, setChat] = useState(false); // the Bodyguard's chat panel
-  useEffect(() => { // the House #1 scene is ambience only; the map music returns when you go back to the map
-    if (scene) Tension.stop(); else if (getSettings().music) Tension.start();
-  }, [scene]);
   const [unread, setUnread] = useState(() => !loadAdv().guideL1); // red dot on his avatar until the chat is opened
   const [heard, setHeard] = useState(() => !!loadAdv().guideL1); // has read the Level 1 chat (the arrow points at Level 1 from then on)
   const [read, setRead] = useState(false); // read the chat during this visit: the arrow moves from the Bodyguard to Level 1 (every visit, until Level 1 is cleared)
@@ -8622,7 +8620,7 @@ function AdvHub({ onBack, onReset, unlock, onPlay1 }) {
         </div>
       )}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[15]" style={{ background: 'radial-gradient(circle at 50% 58%, rgba(2,4,12,0) 18%, rgba(2,4,12,0.78) 62%, rgba(2,4,12,1) 100%)', opacity: zoomIn ? 1 : 0, transition: L1_REDUCED() ? 'none' : 'opacity 480ms ease-in-out' }} />
-      {scene && <Level1Scene cleared={cleared} onBack={backFromL1} onPlay={onPlay1} />}
+      {scene && <Level1Scene cleared={cleared} onBack={backFromL1} onPlay={() => { advToGame = true; onPlay1(); }} />}
     </div>
   );
 }
@@ -8862,6 +8860,7 @@ function AppInner() {
   const { sound: soundOn, music: musicOn } = useSettings();
   useEffect(() => {
     if (advHubOpen) return; // the Adventure map manages its own music + ambience
+    if (advToGame) { if (mpPhase) advToGame = false; else return; } // Play Level 1: keep the music going until the match phase is known
     const isTense = screen === 'setup' || screen === 'cards' || screen === 'reveal' || ((screen === 'multi' || screen === 'ai') && (mpPhase === 'lobby' || mpPhase === 'cards' || mpPhase === 'reveal'));
     const tense = isTense && musicOn;
     tensionScreen = isTense;

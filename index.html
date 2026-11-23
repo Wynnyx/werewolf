@@ -8564,7 +8564,7 @@ function MapWind({ tab }) {
 /* The rules live in plain functions (seerNew / seerUpdate / ...) so they stay separate from drawing and React.      */
 /* ------------------------------------------------------------------ */
 /*SEER-LOGIC-START*/
-const SEER = { LANE: 1.15, CAMH: 1.5, FAR: 60, HIT: 1.9, GONE: 1.0, LOCK_MIN: 1.6, ORB_R: 0.42, ORB_H: 0.85, HITR: 0.68, FOCUS_MS: 3000, RECHARGE_MS: 3000, GOOD: 6, GOOD_R: 1.02, DMG: 15, SHATTER: 5, SHOT: 4, ARROW_SPEED: 60, ARROW_REGEN: 1.2, ARROWS: 3, DRAW_S: 1, HI_AT: 80, HIGH_GOOD: 8, BASE_V: 11, SPD: [0, 1, 1.35, 1.75] };
+const SEER = { LANE: 1.15, CAMH: 1.5, FAR: 60, HIT: 1.9, GONE: 1.0, ORB_R: 0.42, ORB_H: 0.85, HITR: 0.666, FOCUS_MS: 3000, RECHARGE_MS: 3000, GOOD: 6, GOOD_R: 1, DMG: 15, SHATTER: 5, SHOT: 4, ARROW_SPEED: 60, ARROW_REGEN: 1.2, ARROWS: 3, DRAW_S: 1, HI_AT: 80, HIGH_GOOD: 8, BASE_V: 11, SPD: [0, 1, 1.35, 1.75] };
 function seerNew() {
   return { t: 0, lane: 0, camX: 0, orbs: [], ev: [], spawned: 0, nextSpawn: 1.2, runGood: 0, runBad: 0, gauge: 0, hp: 100, focusLeft: 0, recharge: 0, rv: 0, aura: 0, auraPulse: 0, flash: 0, shake: 0, ripple: -1, winT: -1, loseT: -1, ended: false, uid: 0, arrows: [], charges: 3, drawing: false, drawT: 0, spd: 1, hiSeen: false, lockId: null };
 }
@@ -8574,12 +8574,13 @@ const seerOrbHAt = (o, d) => { // orb height at distance d: low orbs skim the wa
   return o.good ? SEER.ORB_H + 2.6 + 1.2 * k : SEER.ORB_H + 5.6 * k;
 };
 const seerOrbH = (o) => seerOrbHAt(o, o.d);
-const seerLockPick = (S, x) => { // the closest orb in front inside the aim cone, low or high, even one about to reach Jenna; the lock stays on its orb until it is shot or has gone past
-  let best = null; S.orbs.forEach((o) => { if (o.gone || o.d <= SEER.LOCK_MIN || Math.abs(o.lane - x) > 0.5) return; if (!best || o.d < best.d) best = o; });
-  const cur = S.lockId ? S.orbs.find((o) => o.id === S.lockId && !o.gone && o.d > SEER.LOCK_MIN && Math.abs(o.lane - x) <= 0.8) : null;
-  return best && (!cur || best.d < cur.d) ? best : (cur || best);
+const seerLockPick = (S, x) => { // the lock sticks to one exact orb: it only lets go when that orb is shot, hits Jenna, or has passed her (d <= GONE); until then no other orb can take it
+  const cur = S.lockId ? S.orbs.find((o) => o.id === S.lockId && !o.gone && o.d > SEER.GONE) : null;
+  if (cur) return cur;
+  let best = null; S.orbs.forEach((o) => { if (o.gone || o.d <= SEER.GONE || Math.abs(o.lane - x) > 0.5) return; if (!best || o.d < best.d) best = o; }); // a new lock takes the nearest orb in front, however close it is
+  return best;
 };
-const seerLockTarget = (S) => (S.lockId ? S.orbs.find((o) => o.id === S.lockId && !o.gone && o.d > SEER.LOCK_MIN) || null : null);
+const seerLockTarget = (S) => (S.lockId ? S.orbs.find((o) => o.id === S.lockId && !o.gone && o.d > SEER.GONE) || null : null);
 const seerWave = (S) => (S.gauge < 30 ? 1 : S.gauge < 65 ? 2 : 3); // difficulty phase, read from Awakening progress
 function seerSet(S, x) { if (S.winT >= 0 || S.loseT >= 0) return; S.lane = Math.max(-1, Math.min(1, x)); } // continuous sidestep, -1 (left) to +1 (right)
 function seerMove(S, dir) { if (S.winT >= 0 || S.loseT >= 0) return; S.lane = Math.max(-1, Math.min(1, S.lane + dir)); }
@@ -8603,7 +8604,7 @@ function seerShoot(S, aim) { // fires one Astral Spirit Arrow; it drifts from wh
   if (S.charges < 1 || S.winT >= 0 || S.loseT >= 0) return false;
   S.charges -= 1; S.auraPulse = Math.max(S.auraPulse, 0.5);
   const tg = seerLockPick(S, aim === undefined ? S.camX : aim), ax = Math.max(-1.2, Math.min(1.2, tg ? tg.lane : (aim === undefined ? S.camX : aim))); let ht = null, di = 0; // the arrow flies at the locked orb
-  if (tg) { const tt = (tg.d - 1.5) / (SEER.ARROW_SPEED + tg.v); di = 1.5 + SEER.ARROW_SPEED * tt; ht = seerOrbHAt(tg, tg.d - tg.v * tt); } // an arrow climbs to meet a high orb
+  if (tg) { const tt = Math.max(0, tg.d - 1.5) / (SEER.ARROW_SPEED + tg.v); di = Math.max(1.6, 1.5 + SEER.ARROW_SPEED * tt); ht = seerOrbHAt(tg, tg.d - tg.v * tt); } // an arrow climbs to meet a high orb
   S.arrows.push({ id: ++S.uid, d: 1.5, x0: S.camX, aim: ax, dead: false, ht, di });
   S.ev.push({ k: 'fire' }); return true;
 }

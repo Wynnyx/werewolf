@@ -8523,7 +8523,7 @@ function AdvHub({ onBack, onReset, unlock, onPlay1 }) {
     if (!had) return;
     if (ptrs.current.size === 0) {
       apply(clampCam(cam.current, 0), 260); // rubber band back inside the map
-      if (s.moved < 8 && s.target && s.target.closest) { const nd = s.target.closest('[data-node]'); if (nd) { const n = Number(nd.getAttribute('data-node')); if (tab === 'classic' && n === 1) goL1(); else { Sfx.click('tap'); setSel(n); setToast(n); } // House #1 plays the Create-a-new-game sound instead of the tap } }
+      if (s.moved < 8 && s.target && s.target.closest) { const nd = s.target.closest('[data-node]'); if (nd) { const n = Number(nd.getAttribute('data-node')); if (tab === 'classic' && n === 1) goL1(); else { Sfx.click('tap'); setSel(n); setToast(n); } } }
     } else if (ptrs.current.size === 1) { s.dist = 0; }
   };
   const zoomBtn = (f) => { const { w, h } = size(); zoomAt(w / 2, h / 2, cam.current.k * f, 240); };

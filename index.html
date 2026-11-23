@@ -6308,6 +6308,12 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
   const [opened, setOpened] = useState('');
   const [sent, setSent] = useState('');
   useEffect(() => { if (ns === 'i' && room.bm) Sfx.rumble(); }, [ns, room.nk]);
+  useEffect(() => { // Level 1: the 3-2-1 before the morning news
+    if (ns !== 'd') return undefined;
+    let k = 3; setN(3);
+    const t = setInterval(() => { k -= 1; setN(Math.max(1, k)); if (k <= 1) clearInterval(t); }, 1000);
+    return () => clearInterval(t);
+  }, [ns, room.nk]);
   useEffect(() => {
     if (ns !== 'c') return;
     let k = 5; setN(5);
@@ -6323,6 +6329,7 @@ function MpNightAuto({ me, players, room, write, immersive, onLeave }) {
   const wrap = (body, pitch) => <NightStage fixed={!!immersive} pitch={pitch} blood={!!room.bm} onExit={immersive ? onLeave : undefined}>{(isWave || (viewing && room.nightStyle === 'eyes_open')) && me.a === 1 && mine0 && <WaveBadge players={players} room={room} />}{isWave && <p role="note" className="mb-3 rounded-xl px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-amber-100" style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.5)' }}>{room.adv === 1 ? `Solo Campaign \u00B7 Night ${room.k || 1}` : 'Keep your screen hidden from others!'}</p>}{!pitch && partner && <LoverBadge name={partner.n} className="mb-3" />}{body}{!pitch && chatGroup && <TeamChat me={me} group={group} room={room} write={write} tag={tag} />}</NightStage>;
   const mine = me.a === 1 && ((!!role && me.r === role && me.nd !== 1) || (viewing && me.r === 'seer' && me.rd !== 1) || (role === 'infected' && me.jt === 1) || (role === 'cured' && me.cj === 1)) && sent !== tag;
 
+  if (ns === 'd') return wrap(<LockView key="d" title={`Night ${nightWord(room.k)} Begins...`} sub="The village falls silent." count={n} />);
   if (ns === 'i') return wrap(<><LockView key="i" title={`Night ${nightWord(room.k)} Begins...`} sub="The village falls silent." />{room.bm ? <BloodMoonBanner className="mb-6" /> : null}</>);
   if (ns === 'c') return wrap(<><LockView key="c" eye title="Close Your Eyes" sub="Keep them closed until the narrator says otherwise." count={n} />{room.bm ? <BloodMoonBanner className="mb-6" /> : null}</>);
   if (mine && !isWave && opened !== tag) {
@@ -6501,6 +6508,7 @@ function useNightDirector({ room, players, write }) {
         if (!seerQuiet) { await Narrator.say('Seer, close your eyes.'); if (!live()) return; }
         await wait(seerQuiet ? 900 : 2200); if (!live()) return;
       }
+      if (latest.current.room.adv === 1) { await step('d', 'Night countdown'); await wait(3000); if (!live()) return; } // Campaign Level 1: a 3-2-1 beat on the Night screen before the morning
       setDir({ on: true, label: 'Dawn' });
       await Narrator.say('Everyone, open your eyes. Morning has broken.'); if (!live()) return;
       const result = mpResolveNight(latest.current.room);
@@ -7360,7 +7368,7 @@ function MpRoom({ session, onExit, onPhase, onRetry, onMap, onNext }) {
   }, [hostPlays, ph, room && room.k, room && room.vd, allSeen, autoWinner, hunterPending, director.dir.on, l1Pro]);
   useEffect(() => { // Level 1 ambush: the Night 1 screen stays up for 3 more seconds, then the defeat reveal
     if (!hostPlays || !room || room.am !== 1 || ph !== 'night') return undefined;
-    const t = setTimeout(() => { const h = players.find((p) => p.bot !== 1); write({ ph: 'over', ns: null, nk: null, ...(h ? { [`pl/${h.id}/a`]: 0 } : {}) }); }, 3000);
+    const t = setTimeout(() => { const h = players.find((p) => p.bot !== 1); write({ ph: 'over', ns: null, nk: null, ...(h ? { [`pl/${h.id}/a`]: 0 } : {}) }); }, 300); // the 3-2-1 already played
     return () => clearTimeout(t);
   }, [hostPlays, room && room.am, ph]);
   const voteClosed = useRef('');

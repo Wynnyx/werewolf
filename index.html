@@ -5495,7 +5495,8 @@ function mpResolveNight(room) {
   const ch1 = room.adv === 1 && k === 1 ? ps.find((p) => p.n === 'Charlie' && p.bot === 1) : null; const bg1 = ch1 ? ps.find((p) => p.a === 1 && p.r === 'bodyguard' && p.bot !== 1) : null;
   const ch2 = room.adv === 1 && (k === 2 || k === 3) ? ps.find((p) => p.n === 'Charlie' && p.bot === 1 && p.a === 1) : null; const bg2 = ch2 ? ps.find((p) => p.a === 1 && p.r === 'bodyguard' && p.bot !== 1) : null;
   const guardCh = !!(bg2 && ch2 && bg2.t === ch2.id); // Level 1, Night 2 or 3: guarding Charlie ends the game the same way as Night 1 (one ambush defeat, no day)
-  const ambush = !!(bg1 && ch1 && bg1.t === ch1.id) || guardCh; // Level 1: guarding Charlie means he ambushes the Bodyguard from behind
+  const lateAmb = !!(bg2 && k === 3 && room.cg === 2 && bg2.t); // Level 1, Night 3 after you guarded yourself on Night 2 and skipped Day 2: the shield is on cooldown, so whoever you guard, the beast takes you
+  const ambush = !!(bg1 && ch1 && bg1.t === ch1.id) || guardCh || lateAmb; // Level 1: guarding Charlie means he ambushes the Bodyguard from behind
   if (ambush) { const g = bg1 || bg2; c0.werewolf = g.id; c0.werewolf2 = null; c0.bodyguard = null; }
   const je2 = room.adv === 1 && (k === 2 || k === 3) ? ps.find((p) => p.n === 'Jenna' && p.bot === 1 && p.a === 1) : null; const st2 = room.adv === 1 && (k === 2 || k === 3) ? ps.find((p) => p.n === 'Stacy' && p.bot === 1) : null;
   const bg3 = ch2 && je2 && st2 && st2.a !== 1 ? ps.find((p) => p.a === 1 && p.r === 'bodyguard' && p.bot !== 1) : null;
@@ -6631,7 +6632,7 @@ function MpVote({ me, players, room, write }) {
       <h3 className="font-display text-lg font-bold">Trial vote</h3>
       {me.r === 'mayor' && !silenced && <MayorNote className="mt-2" />}
       <p className="mb-3 mt-1 text-xs text-slate-300">{stonedMe ? 'You are turned to stone and cannot vote today.' : me.sn === 1 ? 'The Sniper shot you. You cannot vote today.' : silenced ? 'You cannot vote today.' : 'Discuss, then vote for the player you want eliminated.'} {voted} of {voters.length} votes are in.</p>
-      <PickList players={[...alive.filter((p) => p.id !== me.id), ...(room.adv === 1 && (room.cg === 2 || room.cg === 3) && room.k === 2 ? [] : [{ id: 'skip', n: 'Skip Vote (no elimination)' }])]} value={silenced ? '' : pick} onChange={setPick} locked={silenced} />
+      <PickList players={[...alive.filter((p) => p.id !== me.id), ...(room.adv === 1 && room.cg === 3 && room.k === 2 ? [] : [{ id: 'skip', n: 'Skip Vote (no elimination)' }])]} value={silenced ? '' : pick} onChange={setPick} locked={silenced} />
       <Btn className="mt-3" disabled={silenced || !pick || pick === me.v} onClick={() => write({ [`pl/${me.id}/v`]: pick })}>{silenced ? 'Voting disabled' : pick === 'skip' ? (me.v === 'skip' ? 'Vote: Skip' : 'Cast Skip Vote') : me.v ? 'Change Vote' : 'Cast Vote'}</Btn>
       {!silenced && me.v && <p className="mt-2 text-center text-xs text-emerald-300">Your vote: {nm(me.v)}</p>}
     </Panel>

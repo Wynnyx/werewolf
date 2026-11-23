@@ -7128,10 +7128,6 @@ function MpOver({ room, players, meId, onRetry }) {
           <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-amber-300">Level 1 cleared ★</div>
           <h2 className="font-display mt-1 text-2xl font-black text-amber-100">Victory!</h2>
           <p className="mt-2 text-sm leading-snug text-amber-50">You defeated the Werewolf&mdash;but the real Alpha is still hiding deeper in the forest...</p>
-          <ul className="mt-3 flex flex-col gap-1.5 text-left text-[13px] font-semibold">
-            <li className="rounded-lg px-3 py-2 text-emerald-200" style={{ background: 'rgba(6,78,59,0.4)', border: '1px solid rgba(52,211,153,0.5)' }}>Seer unlocked</li>
-            <li className="rounded-lg px-3 py-2 text-slate-200" style={{ background: 'rgba(30,41,59,0.6)', border: '1px solid rgba(148,163,184,0.45)' }}>Bodyguard is resting and will recover for Level 2</li>
-          </ul>
         </Panel>
       )}
       {room.adv === 1 && room.w !== 'village' && (

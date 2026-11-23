@@ -8977,7 +8977,7 @@ const SEER_HINTS = [null, [
 ], [
   'Orbs now fly high and low, and come faster. Golden yellow orbs can be struck back!',
   'Golden yellow orbs are harmless. Tap one, flick it upward, or shoot it, to send it flying back into the nearest threat farther out and destroy it.',
-  'Each deflect destroys one orb and saves you an arrow. Left alone, a golden orb grazes you for -2% HP. Your arrows do not refill between stages.',
+  'Each deflect destroys one orb and saves you an arrow. A golden orb that reaches you only cracks your screen, with no HP lost. Your arrows do not refill between stages.',
 ], [
   'Purple orbs heal you and add 1% awakening. But beware: disguised red mimics hide among them!',
   'Seer Focus shows the truth: a mimic flashes purple, then pulses red. Shoot mimics or dodge them.',
@@ -9003,7 +9003,7 @@ function SeerMiniGame({ onExit }) {
   const retry = () => begin(Sref.current.stage, Sref.current.hp0, Sref.current.ammo0); // a lost stage restarts with the HP it was entered with
   const next = () => begin(Sref.current.stage + 1, Sref.current.hp, Sref.current.ammo); // HP carries over as it is (purple orbs are the only healing); the 50 arrows are one shared quiver: nothing refills between stages
   const doPause = () => { if (phaseRef.current !== 'play' || pausedRef.current) return; pausedRef.current = true; setPaused(true); try { seerDrawCancel(Sref.current); } catch (er) { /* ignore */ } };
-  const doResume = () => { pausedRef.current = false; setPaused(false); }; // HP carries over, restored to at least 75%
+  const doResume = () => { pausedRef.current = false; setPaused(false); };
   useEffect(() => {
     const cv = cvRef.current; if (!cv) return undefined;
     const ctx = cv.getContext('2d'); let raf = 0, last = performance.now(), uiAt = 0, uiKey = '';

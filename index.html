@@ -8607,9 +8607,17 @@ function seerUpdate(S, dt) {
 }
 /*SEER-LOGIC-END*/
 
+const SEER_BG = { R: 1087 / 1447, HX: 0.64, HY: 0.51 }; // painted 3:4 backdrop: where its emerald horizon glow sits (fraction of its width / height)
+function seerView(S, W, H) { // the artwork covers the screen at full height; Jenna's sidestep slides it sideways (left lane shows the cottage, right lane the open sea)
+  let dw = H * SEER_BG.R, dh = H;
+  if (dw < W) { dw = W; dh = W / SEER_BG.R; }
+  const pan = 0.5 + 0.5 * Math.max(-1, Math.min(1, S.camX)), ox = -(dw - W) * pan, oy = -(dh - H) / 2;
+  return { dw, dh, ox, oy, vx: ox + dw * SEER_BG.HX, vy: oy + dh * SEER_BG.HY };
+}
 function seerProj(S, W, H, lx, d, h) {
-  const F = Math.min(W, H * 0.62) * 0.9, sc = F / d;
-  return { x: W / 2 + (lx - S.camX) * SEER.LANE * sc, y: H * 0.4 + (SEER.CAMH - h) * sc, s: sc };
+  const F = Math.min(W, H * 0.62) * 0.9, sc = F / d, v = seerView(S, W, H);
+  const k = Math.pow(Math.max(0, Math.min(1, (d - SEER.HIT) / (SEER.FAR - SEER.HIT))), 0.7); // far away every orb comes out of the glow; close up it settles into its lane
+  return { x: W / 2 + (lx - S.camX) * SEER.LANE * sc + (v.vx - W / 2) * k, y: v.vy + (SEER.CAMH - h) * sc, s: sc };
 }
 function seerScenery() { // stars and drifting mist, made once
   const r = (a, b) => a + Math.random() * (b - a);
@@ -8680,55 +8688,26 @@ function seerDrawWisps(ctx, W, H, a, t) { // translucent silver-blue Seer aura w
   ctx.restore();
 }
 function seerDraw(ctx, S, sc, W, H, dt) {
-  const t = S.t, hy = H * 0.4, F = Math.min(W, H * 0.62) * 0.9;
+  const t = S.t, vw = seerView(S, W, H), vx = vw.vx, vy = vw.vy;
+  ctx.clearRect(0, 0, W, H); // the canvas is transparent: the painted backdrop behind it is the scene
   ctx.save();
   if (S.shake > 0 && !L1_REDUCED()) ctx.translate((Math.random() - 0.5) * 14 * S.shake, (Math.random() - 0.5) * 14 * S.shake);
-  // sky
-  let g = ctx.createLinearGradient(0, 0, 0, hy); g.addColorStop(0, '#03060d'); g.addColorStop(0.7, '#0a1620'); g.addColorStop(1, '#0d2a28');
-  ctx.fillStyle = g; ctx.fillRect(-20, -20, W + 40, hy + 20);
-  sc.stars.forEach((s) => { ctx.globalAlpha = 0.35 + 0.45 * Math.abs(Math.sin(t * 0.9 + s.p)); ctx.fillStyle = '#dfe9ff'; ctx.fillRect(s.x * W, s.y * hy, s.s, s.s); });
-  ctx.globalAlpha = 1;
-  const mx = W * 0.8, my = hy * 0.4; // moon
-  g = ctx.createRadialGradient(mx, my, 6, mx, my, 120); g.addColorStop(0, 'rgba(220,235,255,0.35)'); g.addColorStop(1, 'rgba(220,235,255,0)');
-  ctx.fillStyle = g; ctx.fillRect(mx - 130, my - 130, 260, 260);
-  ctx.fillStyle = '#e8f0ff'; ctx.beginPath(); ctx.arc(mx, my, 24, 0, 6.283); ctx.fill();
-  ctx.fillStyle = 'rgba(150,170,200,0.35)'; ctx.beginPath(); ctx.arc(mx - 7, my - 4, 6, 0, 6.283); ctx.arc(mx + 8, my + 7, 4, 0, 6.283); ctx.fill();
-  const pulse = 0.65 + 0.35 * Math.sin(t * 1.7); // the emerald light on the horizon
+  let g;
+  const pulse = 0.65 + 0.35 * Math.sin(t * 1.7); // a soft living pulse on the artwork's green horizon, where the orbs come from
   ctx.globalCompositeOperation = 'lighter';
-  g = ctx.createRadialGradient(W / 2, hy, 4, W / 2, hy, W * 0.75); g.addColorStop(0, `rgba(52,255,170,${0.55 * pulse})`); g.addColorStop(0.25, `rgba(20,190,120,${0.28 * pulse})`); g.addColorStop(1, 'rgba(10,120,90,0)');
-  ctx.fillStyle = g; ctx.fillRect(0, hy - W * 0.75, W, W * 0.75 + 4);
-  g = ctx.createLinearGradient(0, 0, 0, hy); g.addColorStop(0, 'rgba(60,255,170,0)'); g.addColorStop(1, `rgba(90,255,190,${0.28 * pulse})`);
-  ctx.fillStyle = g; ctx.fillRect(W / 2 - 16, 0, 32, hy); // a faint beam rising into the sky
-  ctx.fillStyle = `rgba(200,255,230,${0.8 * pulse})`; ctx.beginPath(); ctx.ellipse(W / 2, hy, W * 0.07, 5, 0, 0, 6.283); ctx.fill();
+  g = ctx.createRadialGradient(vx, vy, 2, vx, vy, W * 0.34); g.addColorStop(0, `rgba(90,255,185,${0.3 * pulse})`); g.addColorStop(0.4, `rgba(40,200,140,${0.1 * pulse})`); g.addColorStop(1, 'rgba(20,140,100,0)');
+  ctx.fillStyle = g; ctx.fillRect(vx - W * 0.34, vy - W * 0.34, W * 0.68, W * 0.68);
   ctx.globalCompositeOperation = 'source-over';
-  // water
-  g = ctx.createLinearGradient(0, hy, 0, H); g.addColorStop(0, '#0c3030'); g.addColorStop(0.25, '#08202c'); g.addColorStop(1, '#040a14');
-  ctx.fillStyle = g; ctx.fillRect(-20, hy, W + 40, H - hy + 20);
-  for (let i = 0; i < 30; i++) { // shimmering wave rows in perspective, plus the green and moon reflections
-    const d = 5 * Math.pow(1.13, i), y = hy + SEER.CAMH * F / d, k = 1 - i / 30, amp = 1 + (30 - i) * 0.12 * 0 + (i * 0.08);
-    ctx.strokeStyle = `rgba(140,190,205,${0.04 + 0.08 * k})`; ctx.lineWidth = 0.6 + i * 0.07; ctx.beginPath();
-    for (let x = -10; x <= W + 10; x += 14) { const yy = y + Math.sin(x * 0.03 + t * 1.2 + i) * amp; if (x === -10) ctx.moveTo(x, yy); else ctx.lineTo(x, yy); }
-    ctx.stroke();
-    const w = 14 + i * 7, sh = Math.sin(t * 1.5 + i * 1.9);
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = `rgba(52,230,160,${(0.05 + 0.1 * (0.5 + 0.5 * sh)) * (0.4 + k)})`; ctx.fillRect(W / 2 - w / 2 - S.camX * 8 + sh * 6, y, w, 1 + i * 0.12);
-    ctx.fillStyle = `rgba(210,228,255,${(0.04 + 0.08 * (0.5 + 0.5 * Math.cos(t * 1.3 + i * 2.3))) * (0.3 + k)})`; ctx.fillRect(mx - w * 0.3 - S.camX * 6 + sh * 5, y, w * 0.6, 1 + i * 0.1);
-    ctx.globalCompositeOperation = 'source-over';
-  }
   sc.mist.forEach((m) => { // low drifting mist
     m.x += m.v * dt; if (m.x > 1.2) m.x = -0.2;
-    const y = hy + (H - hy) * Math.pow(m.y, 1.6), r = m.s * W * (0.3 + m.y), mxp = m.x * W - S.camX * 20 * m.y;
+    const y = vy + (H - vy) * Math.pow(m.y, 1.6), r = m.s * W * (0.3 + m.y), mxp = m.x * W - S.camX * 20 * m.y;
     const mg = ctx.createRadialGradient(mxp, y, 0, mxp, y, r); mg.addColorStop(0, `rgba(170,225,205,${m.a})`); mg.addColorStop(1, 'rgba(170,225,205,0)');
     ctx.fillStyle = mg; ctx.fillRect(mxp - r, y - r, r * 2, r * 2);
   });
   [...S.orbs].sort((a, b) => b.d - a.d).forEach((o) => seerDrawOrb(ctx, S, W, H, o, t));
-  // the pier: a dark railing and deck in the foreground, drifting slightly against the camera
-  const ry = H * 0.9; g = ctx.createLinearGradient(0, ry, 0, H); g.addColorStop(0, 'rgba(14,10,8,0.96)'); g.addColorStop(1, '#030203');
-  ctx.fillStyle = g; ctx.fillRect(-20, ry, W + 40, H - ry + 20);
-  ctx.fillStyle = '#1c1410'; ctx.fillRect(-20, ry - 5, W + 40, 6);
-  for (let i = -1; i < 6; i++) { const px = (i * W) / 4 - S.camX * 26; ctx.fillStyle = '#120d0a'; ctx.fillRect(px - 4, ry - 34, 8, 36); }
-  ctx.strokeStyle = 'rgba(60,44,34,0.5)'; ctx.lineWidth = 1;
-  for (let i = -6; i <= 6; i++) { ctx.beginPath(); ctx.moveTo(W / 2 + i * 14 - S.camX * 10, ry + 2); ctx.lineTo(W / 2 + i * 70 - S.camX * 20, H); ctx.stroke(); }
+  // soft dark edges so the HUD and the Seer Focus button stay readable over the painting
+  g = ctx.createLinearGradient(0, 0, 0, H * 0.16); g.addColorStop(0, 'rgba(2,6,12,0.55)'); g.addColorStop(1, 'rgba(2,6,12,0)'); ctx.fillStyle = g; ctx.fillRect(-20, -20, W + 40, H * 0.16 + 20);
+  g = ctx.createLinearGradient(0, H * 0.74, 0, H); g.addColorStop(0, 'rgba(2,6,12,0)'); g.addColorStop(1, 'rgba(2,6,12,0.6)'); ctx.fillStyle = g; ctx.fillRect(-20, H * 0.74, W + 40, H * 0.26 + 20);
   // Seer Sight: a silver wash, the eye ripple and the corner wisps
   if (S.rv > 0.01) { g = ctx.createRadialGradient(W / 2, H * 0.5, H * 0.2, W / 2, H * 0.5, H * 0.75); g.addColorStop(0, 'rgba(190,210,255,0)'); g.addColorStop(1, `rgba(170,200,255,${0.22 * S.rv})`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
   if (S.ripple >= 0) {
@@ -8760,6 +8739,7 @@ function seerDraw(ctx, S, sc, W, H, dt) {
 
 function SeerMiniGame({ onExit }) {
   const cvRef = useRef(null);
+  const bgRef = useRef(null);
   const Sref = useRef(seerNew());
   const scRef = useRef(seerScenery());
   const phaseRef = useRef('intro');
@@ -8791,6 +8771,7 @@ function SeerMiniGame({ onExit }) {
         else if (e.k === 'won') setPhase('won');
         else if (e.k === 'lost') setPhase('lost');
       });
+      if (bgRef.current && W && H) { const vw = seerView(S, W, H), st = bgRef.current.style; st.width = vw.dw + 'px'; st.height = vw.dh + 'px'; st.transform = `translate3d(${vw.ox}px, ${vw.oy}px, 0)`; }
       seerDraw(ctx, S, sc, W, H, dt);
       if (now - uiAt > 90) {
         uiAt = now;
@@ -8827,6 +8808,7 @@ function SeerMiniGame({ onExit }) {
   const card = 'mx-auto flex w-full max-w-sm flex-col items-center gap-4 rounded-3xl border px-6 py-8 text-center';
   return (
     <div className="fixed inset-0 z-[70] select-none overflow-hidden" style={{ background: '#03060d', touchAction: 'none' }}>
+      <div ref={bgRef} className="pointer-events-none absolute left-0 top-0" style={{ willChange: 'transform' }}><img src="images/seer-trial-bg.png" alt="" draggable={false} style={{ display: 'block', width: '100%', height: '100%', maxWidth: 'none' }} /></div>
       <canvas ref={cvRef} className="absolute inset-0 h-full w-full" style={{ touchAction: 'none' }} onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={() => { pd.current = null; }} />
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center gap-3 px-3" style={{ paddingTop: 'max(10px, env(safe-area-inset-top))' }}>
         <button onClick={onExit} aria-label="Back to Map" className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/20 bg-black/40 text-slate-100">
@@ -8892,6 +8874,7 @@ function SeerMiniGame({ onExit }) {
 
 function AdvHub({ onBack, onReset, unlock, onPlay1, openScene }) {
   const [mini, setMini] = useState(false); // temporary test entry for the Level 2 Seer mini-game
+  useEffect(() => { try { const im = new Image(); im.src = 'images/seer-trial-bg.png'; } catch (er) { /* ignore */ } }, []);
   useEffect(() => { // the map plays its music together with the forest ambience; both end when the page is left or Level 1 starts
     advHubOpen = true; advToGame = false; advRun = false;
     const st = getSettings();

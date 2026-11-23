@@ -173,13 +173,17 @@
   .mist-b { bottom: 6%; height: 22%; animation: mist-drift 46s linear infinite reverse;
     background-image: radial-gradient(ellipse 26% 50% at 30% 55%, rgba(200,208,228,0.13), transparent 70%), radial-gradient(ellipse 18% 55% at 70% 50%, rgba(200,208,228,0.11), transparent 70%); }
   @keyframes mist-drift { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .wind-leaf { animation: wind-leaf linear infinite; will-change: transform, opacity; }
+  @keyframes wind-leaf { 0% { transform: translate(0, 0) rotate(0deg); opacity: 0; } 8% { opacity: 0.9; } 92% { opacity: 0.85; } 100% { transform: translate(var(--wx), 112vh) rotate(var(--wr)); opacity: 0; } }
+  .wind-gust { height: 2px; border-radius: 2px; background: linear-gradient(90deg, rgba(200,225,255,0), rgba(200,225,255,0.3), rgba(200,225,255,0)); animation: wind-gust linear infinite; will-change: transform, opacity; }
+  @keyframes wind-gust { 0% { transform: translateX(-60vw) rotate(7deg); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translateX(140vw) rotate(7deg); opacity: 0; } }
   .leaf { animation: leaf-fall linear infinite; will-change: transform, opacity; }
   .leaf-shape { border-radius: 0 100% 0 100%; animation: leaf-sway ease-in-out infinite alternate; }
   @keyframes leaf-fall { 0% { transform: translate(0, 0); opacity: 0; } 8% { opacity: 0.85; } 92% { opacity: 0.85; } 100% { transform: translate(var(--dx), 108vh); opacity: 0; } }
   @keyframes leaf-sway { from { transform: translateX(-12px) rotate(-30deg); } to { transform: translateX(12px) rotate(40deg); } }
   .ember { border-radius: 50%; animation: ember-rise linear infinite; will-change: transform, opacity; }
   @keyframes ember-rise { 0% { transform: translate(0, 0) scale(1); opacity: 0; } 15% { opacity: 0.9; } 100% { transform: translate(var(--dx), -80vh) scale(0.5); opacity: 0; } }
-  @media (prefers-reduced-motion: reduce) { .atmos-drift, .blood-moon-glow, .mist { animation: none; } .leaf, .ember { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .atmos-drift, .blood-moon-glow, .mist { animation: none; } .leaf, .ember, .wind-leaf, .wind-gust { display: none; } }
   .load-pulse { animation: load-pulse 2.4s ease-in-out infinite; }
   @keyframes load-pulse { 0%, 100% { text-shadow: 0 0 18px rgba(220,38,38,0.25), 0 0 40px rgba(203,213,225,0.1); } 50% { text-shadow: 0 0 26px rgba(220,38,38,0.6), 0 0 54px rgba(203,213,225,0.28); } }
   @media (prefers-reduced-motion: reduce) { .load-pulse { animation: none; } }
@@ -8400,6 +8404,27 @@ function Level1Scene({ cleared, onBack, onPlay }) {
   );
 }
 
+// Green leaves blown across the Adventure map by a gentle wind (decoration only, never blocks a tap).
+const MAP_LEAF_TINT = { classic: ['#4D7C0F', '#65A30D', '#84CC16', '#3F6212', '#A3C76B'], outbreak: ['#4ADE80', '#86EFAC', '#BEF264', '#2DD4BF', '#65A30D'] };
+function MapWind({ tab }) {
+  const fx = useMemo(() => {
+    const r = (a, b) => a + Math.random() * (b - a);
+    const cols = MAP_LEAF_TINT[tab] || MAP_LEAF_TINT.classic;
+    const leaves = Array.from({ length: 16 }, (_, i) => ({ left: r(-10, 95), size: r(9, 17), dur: r(9, 16), delay: -r(0, 16), wx: r(140, 320), wr: r(280, 720), sway: r(1.6, 3.4), color: cols[i % cols.length] }));
+    const gusts = Array.from({ length: 3 }, () => ({ top: r(18, 78), w: r(30, 55), dur: r(6, 10), delay: -r(0, 9) }));
+    return { leaves, gusts };
+  }, [tab]);
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[5] overflow-hidden" aria-hidden="true">
+      {fx.gusts.map((g, i) => <span key={'g' + i} className="wind-gust absolute" style={{ top: g.top + '%', left: 0, width: g.w + 'vw', animationDuration: g.dur + 's', animationDelay: g.delay + 's' }} />)}
+      {fx.leaves.map((l, i) => (
+        <span key={'w' + i} className="wind-leaf absolute" style={{ left: l.left + '%', top: '-4vh', animationDuration: l.dur + 's', animationDelay: l.delay + 's', '--wx': l.wx + 'px', '--wr': l.wr + 'deg' }}>
+          <span className="leaf-shape block" style={{ width: l.size, height: l.size * 0.8, background: l.color, opacity: 0.88, boxShadow: '0 1px 3px rgba(0,0,0,0.45)', animationDuration: l.sway + 's' }} />
+        </span>
+      ))}
+    </div>
+  );
+}
 function AdvHub({ onBack, onReset, unlock, onPlay1 }) {
   useEffect(() => { // the map plays its music together with the forest ambience; both end when the page is left or Level 1 starts
     advHubOpen = true;
@@ -8541,6 +8566,7 @@ function AdvHub({ onBack, onReset, unlock, onPlay1 }) {
           {pa ? <MapPainted tab={tab} src={pa.src} tiles={pa.tiles} w={pa.w} h={pa.h} cleared={cleared} l2={cleared ? uStage : -1} selected={sel} hint={read && !cleared && !chat} /> : <MapWorld tab={tab} cleared={cleared} selected={sel} art={{}} />}
         </div>
       </div>
+      <MapWind tab={tab} />
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10" style={{ background: 'linear-gradient(180deg, rgba(6,12,24,0.94) 55%, rgba(6,12,24,0))', paddingTop: 'max(8px, env(safe-area-inset-top))', paddingBottom: 22 }}>
         <div className="pointer-events-auto mx-auto flex w-full max-w-xl items-center gap-1 px-3">
           <button onClick={onBack} aria-label="Back to start" className="flex h-11 w-11 items-center justify-center rounded-full text-slate-200 hover:bg-white/10">

@@ -8573,7 +8573,7 @@ function MapWind({ tab }) {
 /* The rules live in plain functions (seerNew / seerUpdate / ...) so they stay separate from drawing and React.      */
 /* ------------------------------------------------------------------ */
 /*SEER-LOGIC-START*/
-const SEER = { LANE: 1.15, CAMH: 1.5, FAR: 60, HIT: 1.9, GONE: 1.0, ORB_R: 0.42, ORB_H: 0.85, HITR: 0.613, FOCUS_MS: 3200, RECHARGE_MS: 2000, GOOD: 8, GOOD_R: 0.92, DMG: 15, SHATTER: 5, SHOT: 0, ARROW_SPEED: 60, AMMO: [0, 20, 30, 35], SF: [0, 1, 1.2, 1.4], DENS: [0, 1, 1.1, 1.3], HEAL: 5, HEAL_GAUGE: 0, DEFLECT_V: 55, DEFLECT_KILL: 0, DRAW_S: 1, HI_AT: 80, HIGH_GOOD: 8, BASE_V: 11, SPD: [0, 1, 1.35, 1.75] };
+const SEER = { LANE: 1.15, CAMH: 1.5, FAR: 60, HIT: 1.9, GONE: 1.0, ORB_R: 0.42, ORB_H: 0.85, HITR: 0.613, FOCUS_MS: 3200, RECHARGE_MS: 2000, GOOD: 8, GOOD_R: 0.92, DMG: 15, SHATTER: 5, SHOT: 0, ARROW_SPEED: 60, AMMO: [0, 20, 30, 35], SF: [0, 1, 1.2, 1.4], DENS: [0, 1, 1.1, 1.3], HEAL: 5, HEAL_GAUGE: 0, DEFLECT_V: 33, DEFLECT_KILL: 0, DRAW_S: 1, HI_AT: 80, HIGH_GOOD: 8, BASE_V: 11, SPD: [0, 1, 1.35, 1.75] };
 function seerNew(stage = 1, hp = 100) {
   return { t: 0, lane: 0, camX: 0, orbs: [], ev: [], spawned: 0, nextSpawn: 1.2, runGood: 0, runBad: 0, gauge: 0, hp, hp0: hp, stage, revealT: 0, focusLeft: 0, recharge: 0, rv: 0, aura: 0, auraPulse: 0, flash: 0, shake: 0, ripple: -1, winT: -1, loseT: -1, ended: false, uid: 0, arrows: [], ammo: SEER.AMMO[stage], ammoMax: SEER.AMMO[stage], drawing: false, drawT: 0, spd: SEER.SF[stage] * SEER.SPD[1], hiSeen: stage >= 2, lockId: null };
 }
@@ -8691,7 +8691,7 @@ function seerUpdate(S, dt) {
     if (o.proj) { // a deflected golden yellow orb flying back toward the horizon: it shatters every orb it passes through
       const p0 = o.d + step, p1 = o.d;
       S.orbs.forEach((q) => {
-        if (q === o || q.gone || q.proj || q.d <= SEER.GONE || Math.abs(q.lane - o.lane) > 0.5 || p0 - q.d > 0.8 || p1 - q.d < -0.8) return;
+        if (q === o || q.gone || q.proj || q.d <= SEER.GONE || Math.abs(q.lane - o.lane) > 0.7 || q.d > p0 + 1.2 + q.v * dt || q.d < p1 - 1.2 - q.v * dt) return; // swept depth range of this frame plus a generous buffer, and a wide shockwave
         q.gone = true; const kq = seerKind(q), h = seerOrbH(q);
         if (kq === 'bad' || kq === 'trap') { S.ev.push({ k: 'deflectKill', lane: q.lane, d: q.d, h }); seerGain(S, SEER.DEFLECT_KILL); }
         else S.ev.push({ k: 'deflectWaste', lane: q.lane, d: q.d, h, kk: kq });
@@ -8777,7 +8777,7 @@ function seerDrawOrb(ctx, S, W, H, o, t) {
   if (r < 0.5) return;
   const al = (o.d < SEER.HIT ? Math.max(0, (o.d - SEER.GONE) / (SEER.HIT - SEER.GONE)) : 1) * Math.min(1, (SEER.FAR - o.d) / 10), rv = S.rv;
   const x = p.x, y = p.y + Math.sin(t * 2 + o.id) * 0.05 * p.s, gp = seerProj(S, W, H, o.lane, o.d, 0);
-  const kd = seerKind(o), tm = S.revealT < 0.35 ? 0 : 0.55 + 0.45 * Math.sin((S.revealT - 0.35) * 14); // a mimic shows purple for 0.35s, then flickers purple and red
+  const kd = seerKind(o), tm = S.revealT < 1.2 ? 0 : (S.revealT - 1.2) % 1.8 < 0.25 ? Math.sin(Math.PI * ((S.revealT - 1.2) % 1.8) / 0.25) : 0; // a mimic is a perfect steady purple for 1.2s, then gives one brief 0.25s crimson tell every 1.8s
   const trapC = `${Math.round(176 + 59 * tm)},${Math.round(112 - 67 * tm)},${Math.round(255 - 195 * tm)}`;
   const tint = rv > 0.5 ? (kd === 'good' ? '70,230,200' : kd === 'heal' ? '170,110,255' : kd === 'trap' ? trapC : kd === 'deflect' ? '255,213,79' : '200,40,50') : '170,235,205';
   if (o.proj) { // a deflected golden yellow orb: a piercing cyan projectile racing back to the horizon
@@ -8807,7 +8807,7 @@ function seerDrawOrb(ctx, S, W, H, o, t) {
       g = ctx.createRadialGradient(x, y, 0, x, y, r * 1.5); g.addColorStop(0, 'rgba(255,248,200,1)'); g.addColorStop(0.35, 'rgba(250,204,70,0.95)'); g.addColorStop(0.62, 'rgba(45,212,191,0.8)'); g.addColorStop(1, 'rgba(45,212,191,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 1.5, 0, 6.283); ctx.fill();
       ctx.strokeStyle = 'rgba(255,240,170,0.9)'; ctx.lineWidth = Math.max(1, r * 0.08); ctx.beginPath(); ctx.arc(x, y, r * 0.95, 0, 6.283); ctx.stroke();
-    } else if (kd === 'heal') { // steady amethyst purple: heals when absorbed
+    } else if (kd === 'heal' || (kd === 'trap' && tm <= 0.001)) { // (a mimic between its tells is drawn exactly like a true healing orb) steady amethyst purple: heals when absorbed
       g = ctx.createRadialGradient(x, y, 0, x, y, r * 1.5); g.addColorStop(0, 'rgba(248,230,255,1)'); g.addColorStop(0.35, 'rgba(195,135,255,0.95)'); g.addColorStop(0.65, 'rgba(140,80,230,0.75)'); g.addColorStop(1, 'rgba(120,60,210,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 1.5, 0, 6.283); ctx.fill();
       ctx.strokeStyle = 'rgba(238,215,255,0.9)'; ctx.lineWidth = Math.max(1, r * 0.08); ctx.beginPath(); ctx.arc(x, y, r * 0.95, 0, 6.283); ctx.stroke();
@@ -8816,7 +8816,7 @@ function seerDrawOrb(ctx, S, W, H, o, t) {
       g = ctx.createRadialGradient(x, y, 0, x, y, r * 1.5); g.addColorStop(0, `rgba(255,${tm > 0.5 ? 225 : 235},245,1)`); g.addColorStop(0.35, `rgba(${trapC},0.95)`); g.addColorStop(0.7, `rgba(${trapC},0.6)`); g.addColorStop(1, `rgba(${trapC},0)`);
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 1.5, 0, 6.283); ctx.fill();
       ctx.strokeStyle = `rgba(${trapC},0.95)`; ctx.lineWidth = Math.max(1, r * 0.09); ctx.beginPath(); ctx.arc(x, y, r * 0.95, 0, 6.283); ctx.stroke();
-      if (S.revealT >= 0.35) { ctx.lineWidth = Math.max(1.2, r * 0.07); ctx.globalAlpha = al * rv * tm; for (let i = 0; i < 10; i++) { const a = (i / 10) * 6.283 + t, c = Math.cos(a), sn = Math.sin(a); ctx.beginPath(); ctx.moveTo(x + c * r * 1.1, y + sn * r * 1.1); ctx.lineTo(x + c * r * 1.4, y + sn * r * 1.4); ctx.stroke(); } }
+      if (tm > 0) { ctx.lineWidth = Math.max(1.2, r * 0.07); ctx.globalAlpha = al * rv * tm; for (let i = 0; i < 10; i++) { const a = (i / 10) * 6.283 + t, c = Math.cos(a), sn = Math.sin(a); ctx.beginPath(); ctx.moveTo(x + c * r * 1.1, y + sn * r * 1.1); ctx.lineTo(x + c * r * 1.4, y + sn * r * 1.4); ctx.stroke(); } }
     } else if (kd === 'deflect') { // crystalline golden yellow: harmless, and tap or flick it to fire it back
       g = ctx.createRadialGradient(x, y, 0, x, y, r * 1.5); g.addColorStop(0, 'rgba(255,250,222,1)'); g.addColorStop(0.4, 'rgba(255,213,79,0.92)'); g.addColorStop(0.75, 'rgba(255,170,40,0.5)'); g.addColorStop(1, 'rgba(255,140,20,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 1.5, 0, 6.283); ctx.fill();

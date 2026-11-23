@@ -5465,7 +5465,6 @@ function mpResolveNight(room) {
   if (Object.keys(cz).length) an.cz = cz;
   if (res.dead.length && getSettings().revealDead) an.rv = Object.fromEntries(res.dead.map((id) => [id, byId[id].r]));
   const patch = { ph: 'day', an, ns: null, nk: null, bd: nextBgIdx('day', room.bd) };
-  if (ambush) { patch.ph = 'over'; patch.w = 'werewolf'; patch.am = 1; } // straight to the defeat reveal, no morning news
   res.next.forEach((q) => {
     const o = byId[q.id]; const b = `pl/${q.id}/`;
     patch[b + 's'] = q.silencedTag ? 1 : 0; patch[b + 'x'] = q.stoneTag ? 1 : 0; patch[b + 'sn'] = q.id === shotHit ? 1 : 0;
@@ -5482,7 +5481,7 @@ function mpResolveNight(room) {
     if (o.r === 'bodyguard' && o.a === 1 && q.lastGuard && o.t && q.lastGuard !== (o.lp || null)) patch[b + 'lp'] = o.t; // each Bodyguard remembers their own pick
     if (o.r === 'medusa' && o.a === 1) patch[b + 'lp'] = q.lastStone || '';
   });
-  return { patch, dead: res.dead, saved: res.saved, victim: res.victim || '', shotHit, silenced: silencedAlive, stoned: stonedAlive, lines, silencedLine: silencedAlive ? `${byId[silencedAlive].n} has been silenced for the day. They cannot speak or vote.` : '', stonedLine: stonedAlive ? stoneLine(byId[stonedAlive].n) : '' };
+  return { patch: ambush ? { am: 1, w: 'werewolf' } : patch, dead: res.dead, saved: res.saved, victim: res.victim || '', shotHit, silenced: silencedAlive, stoned: stonedAlive, lines, silencedLine: silencedAlive ? `${byId[silencedAlive].n} has been silenced for the day. They cannot speak or vote.` : '', stonedLine: stonedAlive ? stoneLine(byId[stonedAlive].n) : '' };
 }
 
 /* ------------------------------------------------------------------ */
@@ -6680,13 +6679,13 @@ function L1Reveal({ room, players, code, win, ambush, onContinue }) {
   const lose = win !== 'village';
   const showLine = !ambush && lose && innocent;
   useEffect(() => {
-    const hold = L1_REDUCED() ? 0 : ambush ? 2400 : 1100; // the ambush gets a long, silent beat of darkness first
+    const hold = L1_REDUCED() || ambush ? 0 : 1100;
     const ts = [setTimeout(() => setStage(showLine ? 1 : 2), hold)];
     if (showLine) ts.push(setTimeout(() => setStage(2), hold + (L1_REDUCED() ? 0 : 1900)));
     return () => ts.forEach(clearTimeout);
   }, []);
   useEffect(() => { if (stage === 2 && lose) Sfx.lose(); }, [stage]);
-  if (stage === 0) return ambush ? <div aria-hidden="true" className="fixed inset-0 z-[65]" style={{ background: '#05070c' }} /> : null;
+  if (stage === 0) return null;
   const col = lose ? { k: '#fca5a5', t: '#fee2e2', bg: 'radial-gradient(ellipse at 50% 30%, rgba(127,29,29,0.6), rgba(5,7,12,0.98) 70%)', glow: 'rgba(239,68,68,0.7)' } : { k: '#fcd34d', t: '#fef3c7', bg: 'radial-gradient(ellipse at 50% 30%, rgba(146,64,14,0.55), rgba(5,7,12,0.98) 70%)', glow: 'rgba(251,191,36,0.7)' };
   return (
     <div role="dialog" aria-modal="true" aria-label={lose ? 'Defeat' : 'Victory'} className="fixed inset-0 z-[65] flex flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-8 text-center screen-in" style={{ background: col.bg }}>
@@ -7045,12 +7044,12 @@ function MpOver({ room, players, meId, onRetry }) {
           <p className="mt-2 text-sm leading-snug text-red-50">{room.am === 1 ? 'You watched over the wrong bed\u2014and fell in the dark...' : room.vr && room.vr.t === 'out' && (room.vr.n === 'Jenna' || room.vr.n === 'Stacy') ? 'You condemned an innocent villager\u2014and left the cottage to the beast...' : 'You hesitated when the truth was right in front of you...'}</p>
         </Panel>
       )}
-      <Panel className="text-center" style={{ border: `1px solid ${W.color}`, background: W.bg }}>
+      {room.am !== 1 && <Panel className="text-center" style={{ border: `1px solid ${W.color}`, background: W.bg }}>
         <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-300">Game over</div>
         <h2 className="font-display mt-1 text-3xl font-black" style={{ color: W.title }}>{W.name}</h2>
         {players.some((p) => p.r === 'plaguedoctor') && <p className="mt-2 text-sm text-slate-300">{plagueLine(players.map((p) => ({ role: p.r, alive: p.a === 1, side: pdSide(p.pdc, p.pdi, p.pdl) })), room.w).trim()}</p>}
-      </Panel>
-      <ul className="flex flex-col gap-2">
+      </Panel>}
+      {room.am !== 1 && <ul className="flex flex-col gap-2">
         {players.map((p) => {
           const r = ROLES_DATA[p.r];
           const shown = !!seen[p.id];
@@ -7071,7 +7070,7 @@ function MpOver({ room, players, meId, onRetry }) {
             </li>
           );
         })}
-      </ul>
+      </ul>}
       {view && <RoleViewModal role={view} onClose={() => setView('')} />}
     </div>
   );
@@ -7354,11 +7353,16 @@ function MpRoom({ session, onExit, onPhase, onRetry, onMap, onNext }) {
     const key = `${ph}:${room.k}:${room.vd}:${autoWinner}`;
     let t = 0;
     if (ph === 'reveal' && allSeen && (room.adv !== 1 || l1Pro)) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, soloAi ? 250 : 1800);
-    else if (ph === 'night') t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start({ again: true }); } }, 6000); // only if the director is not running (for example after a refresh)
+    else if (ph === 'night' && room.am !== 1) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start({ again: true }); } }, 6000); // only if the director is not running (for example after a refresh)
     else if (ph === 'day' && autoWinner) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; write({ ph: 'over', w: autoWinner }); } }, hunterPending ? 20000 : room.adv === 1 && room.vd === 1 ? 90000 : 7000); // Level 1: the reveal screen's Continue ends the game
     else if (ph === 'day' && room.vd === 1) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, hunterPending ? 30000 : room.adv === 1 && VR_SEEN.key === `${code}:${room.dl || 0}:${room.k}` ? 400 : 12000); // time to read who was voted out
     return () => clearTimeout(t);
   }, [hostPlays, ph, room && room.k, room && room.vd, allSeen, autoWinner, hunterPending, director.dir.on, l1Pro]);
+  useEffect(() => { // Level 1 ambush: the Night 1 screen stays up for 3 more seconds, then the defeat reveal
+    if (!hostPlays || !room || room.am !== 1 || ph !== 'night') return undefined;
+    const t = setTimeout(() => { const h = players.find((p) => p.bot !== 1); write({ ph: 'over', ns: null, nk: null, ...(h ? { [`pl/${h.id}/a`]: 0 } : {}) }); }, 3000);
+    return () => clearTimeout(t);
+  }, [hostPlays, room && room.am, ph]);
   const voteClosed = useRef('');
   useEffect(() => {
     if (!hostPlays || ph !== 'day' || room.vd === 1) return;

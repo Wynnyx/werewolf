@@ -1601,6 +1601,12 @@ const Sfx = (() => {
   });
   /* UI taps (synthesized, no files): 'primary' = deep thud + crisp stone click, 'tap' = light muted click. */
   let noiseBuf = null;
+  const lose = () => synth((c, out, t) => { // Level 1 defeat sting: a heavy thud, a falling dark tone and a low tolling bell
+    voice(c, out, { type: 'sine', f0: 90, f1: 32, glide: 0.55, t0: t, dur: 1.2, gain: 0.55, attack: 0.005 });
+    voice(c, out, { type: 'sawtooth', f0: 233, f1: 98, glide: 2.2, t0: t + 0.05, dur: 2.6, gain: 0.13, attack: 0.08, filter: 'lowpass', ff: 900, ff1: 180, vib: 4.5, vibDepth: 18 });
+    voice(c, out, { type: 'sawtooth', f0: 175, f1: 73, glide: 2.4, t0: t + 0.05, dur: 2.7, gain: 0.1, attack: 0.1, filter: 'lowpass', ff: 700, ff1: 160 });
+    bellNote(c, out, t + 0.1, 196, 0.22, 3.2); bellNote(c, out, t + 0.7, 146.8, 0.18, 3.4);
+  });
   const click = (kind) => {
     if (!getSettings().sound || Date.now() - lastAt < 50) return;
     synth((c, out, t) => {
@@ -1631,7 +1637,7 @@ const Sfx = (() => {
     voice(c, out, { type: 'sawtooth', f0: 92, f1: 70, glide: 2, t0: t + 0.2, dur: 2, gain: 0.1, attack: 0.6, filter: 'lowpass', ff: 260, vib: 4, vibDepth: 20 });
   });
   return {
-    bell, win, click, chime, rumble, msg,
+    bell, win, lose, click, chime, rumble, msg,
     preload: () => { try { FILES.forEach(load); } catch (e) { /* ignore */ } },
     unlock: () => { try { const c = getCtx(); if (c && c.state !== 'running') { const r = c.resume(); if (r && r.catch) r.catch(() => {}); } } catch (e) { /* ignore */ } },
     flip: () => play('audio/card-flip.mp3'),
@@ -6679,6 +6685,7 @@ function L1Reveal({ room, players, code, win, ambush, onContinue }) {
     if (showLine) ts.push(setTimeout(() => setStage(2), hold + (L1_REDUCED() ? 0 : 1900)));
     return () => ts.forEach(clearTimeout);
   }, []);
+  useEffect(() => { if (stage === 2 && lose) Sfx.lose(); }, [stage]);
   if (stage === 0) return ambush ? <div aria-hidden="true" className="fixed inset-0 z-[65]" style={{ background: '#05070c' }} /> : null;
   const col = lose ? { k: '#fca5a5', t: '#fee2e2', bg: 'radial-gradient(ellipse at 50% 30%, rgba(127,29,29,0.6), rgba(5,7,12,0.98) 70%)', glow: 'rgba(239,68,68,0.7)' } : { k: '#fcd34d', t: '#fef3c7', bg: 'radial-gradient(ellipse at 50% 30%, rgba(146,64,14,0.55), rgba(5,7,12,0.98) 70%)', glow: 'rgba(251,191,36,0.7)' };
   return (

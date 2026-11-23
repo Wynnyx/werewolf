@@ -2635,6 +2635,7 @@ function ConfirmExit({ body, title = 'Exit game?', confirmLabel = 'Exit game', c
 // and the speaker button mutes / unmutes.
 // Screens where the tension music plays instead of the forest ambience (set by AppInner).
 let tensionScreen = false;
+let advRun = false; // Adventure Level 1 is starting or running: the forest ambience is never cut, only the music
 let advToGame = false; // Play Level 1 was pressed: the map music carries straight on instead of restarting
 let advHubOpen = false; // the Adventure map is open: tension music plays
 // Ambient forest sound starts on the very first tap, click or key press anywhere (loading screen, Classic / Outbreak, any button).
@@ -8435,7 +8436,7 @@ function MapWind({ tab }) {
 }
 function AdvHub({ onBack, onReset, unlock, onPlay1 }) {
   useEffect(() => { // the map plays its music together with the forest ambience; both end when the page is left or Level 1 starts
-    advHubOpen = true; advToGame = false;
+    advHubOpen = true; advToGame = false; advRun = false;
     const st = getSettings();
     if (st.music) Tension.start();
     if (st.sound) Ambience.start();
@@ -8627,7 +8628,7 @@ function AdvHub({ onBack, onReset, unlock, onPlay1 }) {
         </div>
       )}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[15]" style={{ background: 'radial-gradient(circle at 50% 58%, rgba(2,4,12,0) 18%, rgba(2,4,12,0.78) 62%, rgba(2,4,12,1) 100%)', opacity: zoomIn ? 1 : 0, transition: L1_REDUCED() ? 'none' : 'opacity 480ms ease-in-out' }} />
-      {scene && <Level1Scene cleared={cleared} onBack={backFromL1} onPlay={() => { advToGame = true; if (getSettings().music) { tensionScreen = true; Ambience.stop(true); } onPlay1(); }} />}
+      {scene && <Level1Scene cleared={cleared} onBack={backFromL1} onPlay={() => { advToGame = true; advRun = true; onPlay1(); }} />}
     </div>
   );
 }
@@ -8871,7 +8872,8 @@ function AppInner() {
     const isTense = screen === 'setup' || screen === 'cards' || screen === 'reveal' || ((screen === 'multi' || screen === 'ai') && (mpPhase === 'lobby' || mpPhase === 'cards' || mpPhase === 'reveal'));
     const tense = isTense && musicOn;
     tensionScreen = isTense;
-    if (tense) { Ambience.stop(true); Tension.start(); return; }   // music does not depend on the Sound switch
+    if (screen !== 'ai') advRun = false;
+    if (tense) { if (advRun && soundOn) Ambience.start(); else Ambience.stop(true); Tension.start(); return; } // Level 1: the ambience keeps playing under the music   // music does not depend on the Sound switch
     Tension.stop();
     if (!soundOn) { Ambience.stop(); return; }
     if (screen !== 'start' && Ambience.unlocked()) Ambience.start();
@@ -8918,6 +8920,9 @@ function activeImageSources() {
   const list = [DEFAULT_BG, LOADING_BG, DEFAULT_BACK, nightPool.get()[0], dayPool.get()[0]];
   list.push(LOBBY_BG.classic.src, LOBBY_BG.outbreak.src); // Step 2 mode backgrounds: cached before Classic / Outbreak is tapped
   list.push(mayorArtStore.get(), medusaArtStore.get(), shadowArtStore.get());
+  const ms = getSettings().mapStyle; // Adventure: the painted map, the cottage picture and the cottage characters are ready before the map opens
+  if (ms === 'storybookhd') list.push('images/classic-map-storybook-hd.webp'); else if (ms === 'storybook') list.push('images/classic-map-storybook.webp'); else ['tl', 'tr', 'bl', 'br'].forEach((q) => list.push(`images/classic-map-${q}.webp`));
+  list.push('images/level1-harbor-pov.webp', 'images/guide-bodyguard.webp', 'images/npc-charlie.webp', 'images/npc-stacy.webp', 'images/npc-jenna.webp');
   ROLE_IDS.forEach((id) => {
     const src = ROLES_DATA[id].imageUrl;
     if (src) list.push(src);

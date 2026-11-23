@@ -1667,13 +1667,18 @@ const Sfx = (() => {
     voice(c, out, { type: 'sine', f0: 1244.5, t0: t + 0.08, dur: 0.18, gain: 0.15, attack: 0.004 });
   }, true); // quiet: a chat pop never silences the button tap that triggered it
   const chime = () => { synth((c, out, t) => { voice(c, out, { type: 'sine', f0: 880, t0: t, dur: 0.4, gain: 0.14, attack: 0.01 }); voice(c, out, { type: 'sine', f0: 1318.5, t0: t + 0.09, dur: 0.5, gain: 0.12, attack: 0.01 }); }); };
+  const seerOpen = () => synth((c, out, t) => { // Seer Focus: a soft, low, airy swell, like an eye slowly opening (no sharp beep)
+    voice(c, out, { type: 'sine', f0: 196, f1: 262, glide: 0.5, t0: t, dur: 0.75, gain: 0.1, attack: 0.18, filter: 'lowpass', ff: 700 });
+    voice(c, out, { type: 'sine', f0: 294, f1: 392, glide: 0.5, t0: t + 0.04, dur: 0.7, gain: 0.06, attack: 0.2, filter: 'lowpass', ff: 900 });
+    voice(c, out, { type: 'triangle', f0: 524, t0: t + 0.2, dur: 0.6, gain: 0.025, attack: 0.25, filter: 'lowpass', ff: 1100 });
+  });
   const rumble = () => synth((c, out, t) => { // Blood Moon: a low crimson rumble
     voice(c, out, { type: 'sawtooth', f0: 46, f1: 38, glide: 2.2, t0: t, dur: 2.6, gain: 0.3, attack: 0.5, filter: 'lowpass', ff: 160, ff1: 90, trem: 5 });
     voice(c, out, { type: 'sine', f0: 62, f1: 50, glide: 2.2, t0: t + 0.1, dur: 2.4, gain: 0.3, attack: 0.4, trem: 3 });
     voice(c, out, { type: 'sawtooth', f0: 92, f1: 70, glide: 2, t0: t + 0.2, dur: 2, gain: 0.1, attack: 0.6, filter: 'lowpass', ff: 260, vib: 4, vibDepth: 20 });
   });
   return {
-    bell, win, lose, grim, relief, burstGood, burstBad, fizzle, deflect, click, chime, rumble, msg, owned: () => ownN,
+    bell, win, lose, grim, relief, burstGood, burstBad, fizzle, deflect, click, chime, seerOpen, rumble, msg, owned: () => ownN,
     preload: () => { try { FILES.forEach(load); } catch (e) { /* ignore */ } },
     unlock: () => { try { const c = getCtx(); if (c && c.state !== 'running') { const r = c.resume(); if (r && r.catch) r.catch(() => {}); } } catch (e) { /* ignore */ } },
     flip: () => play('audio/card-flip.mp3'),
@@ -8999,7 +9004,7 @@ function SeerMiniGame({ onExit }) {
         else if (e.k === 'deflectKill') { seerBurst(sc, p.x, p.y, 'bad', 22); seerBurst(sc, p.x, p.y, 'ice', 22); Sfx.burstBad(); }
         else if (e.k === 'deflectSplash' || e.k === 'deflectWaste') { seerDust(sc, p.x, p.y, 18, 'ice'); Sfx.fizzle(); }
         else if (e.k === 'hit') { seerMakeCrack(sc, W, H); seerBurst(sc, p.x, p.y, 'bad', 34); Sfx.burstBad(); try { navigator.vibrate && navigator.vibrate(60); } catch (er) { /* ignore */ } }
-        else if (e.k === 'focus') Sfx.chime();
+        else if (e.k === 'focus') Sfx.seerOpen();
         else if (e.k === 'winStart') { if (S.stage < 3) Sfx.relief(); else Sfx.win('village'); seerBurst(sc, W / 2, H * 0.5, 'seer', 60); }
         else if (e.k === 'loseStart') Sfx.lose();
         else if (e.k === 'won') setPhase(S.stage < 3 ? 'clear' : 'won');

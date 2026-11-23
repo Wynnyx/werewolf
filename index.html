@@ -1531,10 +1531,11 @@ const Sfx = (() => {
       const x = pool[f]; x.currentTime = 0; const p = x.play(); if (p && p.catch) p.catch(() => {});
     } catch (e) { /* ignore */ }
   };
+  let ownN = 0; // how many button-specific sounds have fired: the generic click only plays if a tap produced none
   let lastAt = 0; // when any sound effect last fired: the generic UI click stays quiet if a button already made its own sound
   const play = (f) => {
     if (!getSettings().sound) return;
-    lastAt = Date.now();
+    lastAt = Date.now(); ownN++;
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* unsupported */ }
     const c = getCtx();
     if (c && bufs[f]) {
@@ -1548,9 +1549,9 @@ const Sfx = (() => {
     fallback(f);
   };
   /* Built-in synthesizer effects (no audio files): the discussion bell and the faction victory sounds. */
-  const synth = (build) => {
+  const synth = (build, quiet) => {
     if (!getSettings().sound) return;
-    lastAt = Date.now();
+    if (!quiet) { lastAt = Date.now(); ownN++; }
     try {
       if (navigator.audioSession) navigator.audioSession.type = 'playback';
       const c = getCtx(); if (!c) return;
@@ -1615,8 +1616,9 @@ const Sfx = (() => {
   const relief = () => synth((c, out, t) => { // morning news: the guard held, a warm rising chime
     [[659.25, 0], [830.6, 0.14], [987.8, 0.28], [1318.5, 0.44]].forEach(([f, d]) => { voice(c, out, { type: 'triangle', f0: f, t0: t + d, dur: 0.9, gain: 0.1, attack: 0.02 }); bellNote(c, out, t + d, f, 0.13, 1.8); });
   });
-  const click = (kind) => {
-    if (!getSettings().sound || Date.now() - lastAt < 50) return;
+  const click = (kind, force) => {
+    if (!getSettings().sound || (!force && Date.now() - lastAt < 50)) return;
+    if (!force) ownN++;
     synth((c, out, t) => {
       if (kind === 'primary') {
         voice(c, out, { type: 'sine', f0: 180, f1: 90, glide: 0.045, t0: t, dur: 0.06, gain: 0.55, attack: 0.004 });
@@ -1631,13 +1633,13 @@ const Sfx = (() => {
       } else {
         voice(c, out, { type: 'triangle', f0: 320, f1: 160, glide: 0.03, t0: t, dur: 0.04, gain: 0.3, attack: 0.003, filter: 'lowpass', ff: 1800 });
       }
-    });
+    }, true);
     lastAt = Date.now();
   };
   const msg = () => synth((c, out, t) => { // chat message arriving: a soft two-note pop
     voice(c, out, { type: 'sine', f0: 520, f1: 900, glide: 0.07, t0: t, dur: 0.13, gain: 0.24, attack: 0.004 });
     voice(c, out, { type: 'sine', f0: 1244.5, t0: t + 0.08, dur: 0.18, gain: 0.15, attack: 0.004 });
-  });
+  }, true); // quiet: a chat pop never silences the button tap that triggered it
   const chime = () => { synth((c, out, t) => { voice(c, out, { type: 'sine', f0: 880, t0: t, dur: 0.4, gain: 0.14, attack: 0.01 }); voice(c, out, { type: 'sine', f0: 1318.5, t0: t + 0.09, dur: 0.5, gain: 0.12, attack: 0.01 }); }); };
   const rumble = () => synth((c, out, t) => { // Blood Moon: a low crimson rumble
     voice(c, out, { type: 'sawtooth', f0: 46, f1: 38, glide: 2.2, t0: t, dur: 2.6, gain: 0.3, attack: 0.5, filter: 'lowpass', ff: 160, ff1: 90, trem: 5 });
@@ -1645,7 +1647,7 @@ const Sfx = (() => {
     voice(c, out, { type: 'sawtooth', f0: 92, f1: 70, glide: 2, t0: t + 0.2, dur: 2, gain: 0.1, attack: 0.6, filter: 'lowpass', ff: 260, vib: 4, vibDepth: 20 });
   });
   return {
-    bell, win, lose, grim, relief, click, chime, rumble, msg,
+    bell, win, lose, grim, relief, click, chime, rumble, msg, owned: () => ownN,
     preload: () => { try { FILES.forEach(load); } catch (e) { /* ignore */ } },
     unlock: () => { try { const c = getCtx(); if (c && c.state !== 'running') { const r = c.resume(); if (r && r.catch) r.catch(() => {}); } } catch (e) { /* ignore */ } },
     flip: () => play('audio/card-flip.mp3'),
@@ -1658,12 +1660,14 @@ const Sfx = (() => {
 // Global UI click sound: one delegated listener covers every current and future button.
 // It runs after React's own handlers, so a button that plays its own sound (stamped in Sfx) or carries data-no-ui-sound stays single-voiced.
 document.addEventListener('pointerdown', () => Sfx.unlock(), { passive: true, capture: true }); // wake the AudioContext on the first touch (iOS)
-document.addEventListener('click', (e) => {
+document.addEventListener('click', (e) => { // capture phase: judged while the tapped button still exists, then played once React's handlers have run and only if they made no sound of their own
   if (!e.isTrusted || !e.target || !e.target.closest) return;
   const el = e.target.closest('button, [role="button"]');
   if (!el || el.disabled || el.getAttribute('aria-disabled') === 'true' || el.closest('[data-no-ui-sound]')) return;
-  Sfx.click(el.closest('[data-ui-sound="primary"]') ? 'primary' : 'tap');
-});
+  const kind = el.closest('[data-ui-sound="primary"]') ? 'primary' : 'tap';
+  const n0 = Sfx.owned();
+  setTimeout(() => { if (Sfx.owned() === n0) Sfx.click(kind, true); }, 0);
+}, true);
 
 ['pagehide', 'freeze'].forEach((n) => window.addEventListener(n, () => { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }));
 document.addEventListener('visibilitychange', () => { if (document.hidden) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } } });

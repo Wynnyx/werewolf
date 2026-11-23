@@ -8401,10 +8401,12 @@ function Level1Scene({ cleared, onBack, onPlay }) {
 }
 
 function AdvHub({ onBack, onReset, unlock, onPlay1 }) {
-  useEffect(() => { // the map has its own music; it hands back to the forest ambience when the page is left or Night 1 starts
-    advHubOpen = true; tensionScreen = true;
-    if (getSettings().music) { Ambience.stop(true); Tension.start(); }
-    return () => { advHubOpen = false; tensionScreen = false; Tension.stop(); const st = getSettings(); if (st.sound && Ambience.unlocked()) Ambience.start(); };
+  useEffect(() => { // the map plays its music together with the forest ambience; both end when the page is left or Level 1 starts
+    advHubOpen = true;
+    const st = getSettings();
+    if (st.music) Tension.start();
+    if (st.sound) Ambience.start();
+    return () => { advHubOpen = false; Tension.stop(); };
   }, []);
   const [tab, setTab] = useState('classic');
   const [sel, setSel] = useState(null);
@@ -8829,7 +8831,8 @@ function AppInner() {
 
   const { sound: soundOn, music: musicOn } = useSettings();
   useEffect(() => {
-    const isTense = advHubOpen || screen === 'setup' || screen === 'cards' || screen === 'reveal' || ((screen === 'multi' || screen === 'ai') && (mpPhase === 'lobby' || mpPhase === 'cards' || mpPhase === 'reveal'));
+    if (advHubOpen) return; // the Adventure map manages its own music + ambience
+    const isTense = screen === 'setup' || screen === 'cards' || screen === 'reveal' || ((screen === 'multi' || screen === 'ai') && (mpPhase === 'lobby' || mpPhase === 'cards' || mpPhase === 'reveal'));
     const tense = isTense && musicOn;
     tensionScreen = isTense;
     if (tense) { Ambience.stop(true); Tension.start(); return; }   // music does not depend on the Sound switch

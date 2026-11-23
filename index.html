@@ -8439,6 +8439,9 @@ function AdvHub({ onBack, onReset, unlock, onPlay1 }) {
   const [zoomIn, setZoomIn] = useState(false); // camera is zooming into House #1
   const [scene, setScene] = useState(false); // Level 1 first-person scene is open
   const [chat, setChat] = useState(false); // the Bodyguard's chat panel
+  useEffect(() => { // the House #1 scene is ambience only; the map music returns when you go back to the map
+    if (scene) Tension.stop(); else if (getSettings().music) Tension.start();
+  }, [scene]);
   const [unread, setUnread] = useState(() => !loadAdv().guideL1); // red dot on his avatar until the chat is opened
   const [heard, setHeard] = useState(() => !!loadAdv().guideL1); // has read the Level 1 chat (the arrow points at Level 1 from then on)
   const [read, setRead] = useState(false); // read the chat during this visit: the arrow moves from the Bodyguard to Level 1 (every visit, until Level 1 is cleared)

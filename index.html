@@ -7044,11 +7044,11 @@ function MpOver({ room, players, meId, onRetry }) {
           <p className="mt-2 text-sm leading-snug text-red-50">{room.am === 1 ? 'You watched over the wrong bed\u2014and fell in the dark...' : room.vr && room.vr.t === 'out' && (room.vr.n === 'Jenna' || room.vr.n === 'Stacy') ? 'You condemned an innocent villager\u2014and left the cottage to the beast...' : 'You hesitated when the truth was right in front of you...'}</p>
         </Panel>
       )}
-      {room.am !== 1 && <Panel className="text-center" style={{ border: `1px solid ${W.color}`, background: W.bg }}>
+      <Panel className="text-center" style={{ border: `1px solid ${W.color}`, background: W.bg }}>
         <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-300">Game over</div>
         <h2 className="font-display mt-1 text-3xl font-black" style={{ color: W.title }}>{W.name}</h2>
         {players.some((p) => p.r === 'plaguedoctor') && <p className="mt-2 text-sm text-slate-300">{plagueLine(players.map((p) => ({ role: p.r, alive: p.a === 1, side: pdSide(p.pdc, p.pdi, p.pdl) })), room.w).trim()}</p>}
-      </Panel>}
+      </Panel>
       {room.am !== 1 && <ul className="flex flex-col gap-2">
         {players.map((p) => {
           const r = ROLES_DATA[p.r];

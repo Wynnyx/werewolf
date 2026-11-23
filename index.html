@@ -7949,7 +7949,8 @@ function l1DayPlan(players, k) { // Campaign Level 1: who says what today, and h
   if (k === 1 && up(st)) { // Scene 1A: nobody died, so all three bots skip and Pooh cannot carry a vote alone
     votes = { [ch.id]: 'skip', [st.id]: 'skip', ...(up(je) ? { [je.id]: 'skip' } : {}) };
   } else if (!up(st) && up(je)) { // Scenes 1B / 2B / 3C: Stacy is gone, Charlie and Jenna accuse each other and Pooh decides
-    votes = { [ch.id]: je.id, [je.id]: ch.id };
+    const hu = players.find((p) => p.bot !== 1);
+    votes = { [ch.id]: je.id, [je.id]: k === 1 && hu && hu.lp === hu.id ? 'skip' : ch.id }; // Day 1 after guarding yourself on Night 1: Jenna holds her vote until she is sure, so Charlie alone cannot be voted out
   } else if (!up(st)) { votes = { [ch.id]: 'skip' };
   } else if (up(je)) { // Stacy and Jenna both alive
     votes = k === 2 ? { [ch.id]: je.id, [st.id]: 'skip', [je.id]: 'skip' } // Scene 2A: Charlie secretly votes Jenna, so Pooh decides

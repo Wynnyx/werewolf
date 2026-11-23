@@ -6732,7 +6732,7 @@ function L1Reveal({ room, players, code, win, ambush, onContinue }) {
     if (showLine) ts.push(setTimeout(() => setStage(2), hold + (L1_REDUCED() ? 0 : 1900)));
     return () => ts.forEach(clearTimeout);
   }, []);
-  useEffect(() => { if (stage === 2 && lose) Sfx.lose(); }, [stage]);
+  useEffect(() => { if (stage === 2) { if (lose) Sfx.lose(); else Sfx.win('village'); } }, [stage]); // the fanfare plays as VICTORY appears
   if (stage === 0) return null;
   const col = lose ? { k: '#fca5a5', t: '#fee2e2', tint: 'radial-gradient(ellipse at 50% 40%, rgba(127,29,29,0.34), rgba(5,7,12,0.12) 70%)', glow: 'rgba(239,68,68,0.7)' } : { k: '#fcd34d', t: '#fef3c7', tint: 'radial-gradient(ellipse at 50% 40%, rgba(146,64,14,0.3), rgba(5,7,12,0.12) 70%)', glow: 'rgba(251,191,36,0.7)' };
   return (
@@ -7079,7 +7079,7 @@ function MpOver({ room, players, meId, onRetry }) {
   const W = WIN_UI[room.w] || WIN_UI.werewolf;
   const [seen, setSeen] = useState({});
   const [view, setView] = useState('');
-  useEffect(() => { Sfx.win(room.w === 'zombie' ? 'zombie' : room.w); if (room.adv === 1 && room.w === 'village') saveAdv({ ...loadAdv(), classicLevel1Cleared: true, seerUnlocked: true, bodyguardResting: true }); }, []);
+  useEffect(() => { if (!(room.adv === 1 && room.w === 'village')) Sfx.win(room.w === 'zombie' ? 'zombie' : room.w); if (room.adv === 1 && room.w === 'village') saveAdv({ ...loadAdv(), classicLevel1Cleared: true, seerUnlocked: true, bodyguardResting: true }); }, []);
   return (
     <div className="flex flex-1 flex-col gap-4">
       {room.adv === 1 && room.w === 'village' && (

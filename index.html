@@ -6780,6 +6780,7 @@ const DAY_PAL = ['#FDBA74', '#A5B4FC', '#86EFAC', '#F0ABFC', '#FDE047', '#7DD3FC
 function DayAv({ name, mine, adv }) {
   const npc = L1_NPC[String(name || '').toLowerCase()];
   if (mine && adv) return <L1Avatar w="bodyguard" />;
+  if (npc && !mine) return <L1Avatar w={String(name).toLowerCase()} />; // Charlie, Stacy and Jenna have portraits
   const c = npc ? npc.c : mine ? '#FDE68A' : DAY_PAL[String(name || '?').split('').reduce((a, ch) => a + ch.charCodeAt(0), 0) % DAY_PAL.length];
   return <span className="flex shrink-0 items-center justify-center font-display text-lg font-black text-white" style={{ width: 40, height: 50, borderRadius: '50%', border: `2px solid ${c}`, background: npc ? npc.bg : 'linear-gradient(160deg, #334155, #1E293B)', boxShadow: '0 4px 12px rgba(0,0,0,0.55)' }}>{String(name || '?')[0]}</span>;
 }
@@ -6893,7 +6894,7 @@ function L1Avatar({ w, big = false }) {
   const npc = L1_NPC[w]; const sz = big ? { width: 58, height: 72 } : { width: 40, height: 50 };
   return (
     <span className="relative block shrink-0 overflow-hidden" style={{ ...sz, borderRadius: '50%', border: `2px solid ${npc ? npc.c : '#FDE68A'}`, background: npc ? npc.bg : '#0a0e18', boxShadow: npc ? '0 4px 12px rgba(0,0,0,0.55)' : '0 0 16px rgba(251,191,36,0.45), 0 6px 16px rgba(0,0,0,0.6)' }}>
-      {npc ? <span className="flex h-full w-full items-center justify-center font-display text-lg font-black text-white">{npc.n[0]}</span> : <img src="images/guide-bodyguard.webp" alt="" draggable={false} className="h-full w-full select-none" style={{ objectFit: 'cover' }} />}
+      {npc ? <><span className="absolute inset-0 flex items-center justify-center font-display text-lg font-black text-white">{npc.n[0]}</span><img src={`images/npc-${w}.webp`} alt="" draggable={false} className="relative h-full w-full select-none" style={{ objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} /></> : <img src="images/guide-bodyguard.webp" alt="" draggable={false} className="h-full w-full select-none" style={{ objectFit: 'cover' }} />}
     </span>
   );
 }

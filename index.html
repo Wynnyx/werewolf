@@ -1843,7 +1843,7 @@ const TH_PAIRS = [
   ["Come on, I just ate dinner.", 'เอาน่า ฉันเพิ่งกินข้าวเย็นเสร็จเองนะ'],
   ["If anything, are we sure about Jenna? She wouldn't say a single word when I asked her.", 'ถ้าจะสงสัยใคร แน่ใจเหรอว่าเจนนาไม่มีพิรุธ? ตอนฉันถามเธอไม่ยอมพูดสักคำ'],
   ["The last lantern dies out. Everyone is pointing fingers\u2014I have to choose who to protect tonight.", 'ตะเกียงดวงสุดท้ายดับลง ทุกคนต่างชี้นิ้วใส่กัน\u2014ฉันต้องเลือกว่าคืนนี้จะปกป้องใคร'],
-  ['Skip', 'ข้าม'],
+  ['Skip', 'ข้าม'], ['{} was voted out \u2014 she was an innocent Villager.', '{1} ถูกโหวตออก \u2014 เธอเป็นชาวบ้านผู้บริสุทธิ์'], ['With the cottage unprotected, Charlie bared his fangs in the dark. Charlie was the Baby Werewolf.', 'เมื่อกระท่อมไร้การปกป้อง ชาร์ลีก็เผยเขี้ยวในความมืด ชาร์ลีคือหมาป่าน้อย'], ['The village struck true\u2014Charlie was the Baby Werewolf!', 'หมู่บ้านลงมือได้ตรงจุด\u2014ชาร์ลีคือหมาป่าน้อย!'], ['You condemned an innocent villager\u2014and left the cottage to the beast...', 'เธอกล่าวโทษชาวบ้านผู้บริสุทธิ์\u2014และทิ้งกระท่อมไว้ให้เจ้าอสูร...'], ['Victory', 'ชนะแล้ว'], 
   ["Come on, I just ate dinner. If anything, are we sure about Jenna? She wouldn't say a single word when I asked her.", "เอาน่า ฉันเพิ่งกินข้าวเย็นเสร็จเองนะ ถ้าจะสงสัยใคร แน่ใจเหรอว่าเจนนาไม่มีพิรุธ? ตอนฉันถามเธอไม่ยอมพูดสักคำ"],
   ["Hmm... yeah. You have a point. I don't know...", "อืม... ใช่ เธอพูดมีเหตุผล ฉันก็ไม่รู้เหมือนกัน..."],
   ["What do you think, {}?", "เธอคิดว่ายังไง {1}?"],
@@ -6660,6 +6660,36 @@ function VoteResultGate({ room, code, onContinue }) {
   );
 }
 
+// Campaign Level 1: a vote that ends the level gets a full-screen reveal (who was voted out, then the killer) before the summary.
+function L1Reveal({ room, players, code, win, onContinue }) {
+  const [stage, setStage] = useState(0); // 0 holds on "The village has decided.", 1 who was voted out, 2 the outcome
+  const vr = room.vr;
+  const el = vr && vr.t === 'out' ? players.find((p) => p.id === vr.id) : null;
+  const innocent = !!el && el.bot === 1 && el.r !== 'werewolf' && el.n !== 'Charlie';
+  const lose = win !== 'village';
+  const showLine = lose && innocent;
+  useEffect(() => {
+    const hold = L1_REDUCED() ? 0 : 1100;
+    const ts = [setTimeout(() => setStage(showLine ? 1 : 2), hold)];
+    if (showLine) ts.push(setTimeout(() => setStage(2), hold + (L1_REDUCED() ? 0 : 1900)));
+    return () => ts.forEach(clearTimeout);
+  }, []);
+  if (stage === 0) return null;
+  const col = lose ? { k: '#fca5a5', t: '#fee2e2', bg: 'radial-gradient(ellipse at 50% 30%, rgba(127,29,29,0.6), rgba(5,7,12,0.98) 70%)', glow: 'rgba(239,68,68,0.7)' } : { k: '#fcd34d', t: '#fef3c7', bg: 'radial-gradient(ellipse at 50% 30%, rgba(146,64,14,0.55), rgba(5,7,12,0.98) 70%)', glow: 'rgba(251,191,36,0.7)' };
+  return (
+    <div role="dialog" aria-modal="true" aria-label={lose ? 'Defeat' : 'Victory'} className="fixed inset-0 z-[65] flex flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-8 text-center screen-in" style={{ background: col.bg }}>
+      {showLine && <p key="el" className="screen-in max-w-xs text-base font-semibold text-slate-100">{`${el.n} was voted out \u2014 she was an innocent Villager.`}</p>}
+      {stage === 2 && (
+        <div key="out" className="screen-in flex flex-col items-center gap-3">
+          <h2 className="font-display text-5xl font-black uppercase tracking-[0.12em]" style={{ color: col.t, textShadow: `0 0 30px ${col.glow}` }}>{lose ? 'Defeat' : 'Victory'}</h2>
+          <p className="max-w-xs text-base leading-snug" style={{ color: col.k }}>{lose ? 'With the cottage unprotected, Charlie bared his fangs in the dark. Charlie was the Baby Werewolf.' : 'The village struck true\u2014Charlie was the Baby Werewolf!'}</p>
+          <div className="mt-3 w-full max-w-xs"><Btn onClick={() => { VR_SEEN.key = `${code}:${room.dl || 0}:${room.k}`; onContinue(); }}>Continue</Btn></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const DAWN_SEEN = { key: '' };
 function MpDay({ me, players, room, write, onTimeUp }) {
   const fxKey = room.an && room.an.k === room.k && room.an.t ? String(room.an.t) : '';
@@ -6717,7 +6747,7 @@ function MpDay({ me, players, room, write, onTimeUp }) {
             <div className="mt-8 flex items-center justify-between gap-3"><div className="font-display text-lg font-bold tracking-wide text-slate-100">Trial Voting</div></div>
             {timer}
             <MpVote me={me} players={players} room={room} write={write} />
-            <div className="mt-auto pt-4"><Btn variant="ghost" onClick={() => setStep('talk')}>Back to Discussion</Btn></div>
+            {room.vd !== 1 && <div className="mt-auto pt-4"><Btn variant="ghost" onClick={() => setStep('talk')}>Back to Discussion</Btn></div>}
           </>
         )}
       </div>
@@ -6767,7 +6797,7 @@ function MpDay({ me, players, room, write, onTimeUp }) {
       ) : (
         <>
           <MpVote me={me} players={players} room={room} write={write} />
-          <div className="mt-auto pt-4"><Btn variant="ghost" onClick={() => setVoting(false)}>Back to Discussion</Btn></div>
+          {room.vd !== 1 && <div className="mt-auto pt-4"><Btn variant="ghost" onClick={() => setVoting(false)}>Back to Discussion</Btn></div>}
         </>
       )}
       {room.ai === 1 && <VillageChat open={chatOpen} onClose={() => setChatOpen(false)} me={me} players={players} room={room} write={write} />}
@@ -7000,7 +7030,7 @@ function MpOver({ room, players, meId, onRetry }) {
         <Panel className="text-center" role="status" style={{ border: '1px solid rgba(239,68,68,0.7)', background: 'linear-gradient(160deg, rgba(127,29,29,0.5), rgba(21,26,36,0.95))' }}>
           <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-red-300">Level 1 failed</div>
           <h2 className="font-display mt-1 text-2xl font-black text-red-100">Defeat</h2>
-          <p className="mt-2 text-sm leading-snug text-red-50">{players.some((p) => p.n === 'Jenna' && p.a !== 1) && players.some((p) => p.id === meId && p.a === 1) ? 'You hesitated when the truth was right in front of you...' : 'The Werewolf got to the village first. Watch who you protect and find Charlie in time.'}</p>
+          <p className="mt-2 text-sm leading-snug text-red-50">{room.vr && room.vr.t === 'out' && (room.vr.n === 'Jenna' || room.vr.n === 'Stacy') ? 'You condemned an innocent villager\u2014and left the cottage to the beast...' : 'You hesitated when the truth was right in front of you...'}</p>
         </Panel>
       )}
       <Panel className="text-center" style={{ border: `1px solid ${W.color}`, background: W.bg }}>
@@ -7312,7 +7342,7 @@ function MpRoom({ session, onExit, onPhase, onRetry, onMap, onNext }) {
     let t = 0;
     if (ph === 'reveal' && allSeen && (room.adv !== 1 || l1Pro)) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, soloAi ? 250 : 1800);
     else if (ph === 'night') t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start({ again: true }); } }, 6000); // only if the director is not running (for example after a refresh)
-    else if (ph === 'day' && autoWinner) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; write({ ph: 'over', w: autoWinner }); } }, hunterPending ? 20000 : 7000);
+    else if (ph === 'day' && autoWinner) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; write({ ph: 'over', w: autoWinner }); } }, hunterPending ? 20000 : room.adv === 1 && room.vd === 1 ? 90000 : 7000); // Level 1: the reveal screen's Continue ends the game
     else if (ph === 'day' && room.vd === 1) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, hunterPending ? 30000 : room.adv === 1 && VR_SEEN.key === `${code}:${room.dl || 0}:${room.k}` ? 400 : 12000); // time to read who was voted out
     return () => clearTimeout(t);
   }, [hostPlays, ph, room && room.k, room && room.vd, allSeen, autoWinner, hunterPending, director.dir.on, l1Pro]);
@@ -7422,7 +7452,8 @@ function MpRoom({ session, onExit, onPhase, onRetry, onMap, onNext }) {
     {ph === 'day' && <DayBackdrop />}
     {ph === 'reveal' && <RevealBackdrop />}
     {showPlayer && me && room.adv === 1 && room.k === 1 && ((ph === 'night' && room.ns === 'i') || ph === 'day') && <AdvTip key={ph} text={ph === 'night' ? "Tip: Remember everyone's alibi before the lantern went out..." : 'Tip: Read the Village Chat, work out who the Werewolf is, and vote together!'} />}
-    {showPlayer && me && ph === 'day' && <VoteResultGate room={room} code={code} onContinue={room.adv === 1 && hostPlays && !autoWinner && !hunterPending ? () => { if (director.dir.on || autoFired.current === `${ph}:${room.k}:${room.vd}:${autoWinner}`) return; autoFired.current = `${ph}:${room.k}:${room.vd}:${autoWinner}`; director.start(); } : undefined} />}
+    {showPlayer && me && ph === 'day' && room.adv === 1 && room.vd === 1 && autoWinner && hostPlays && <L1Reveal key={`${code}:${room.dl || 0}:${room.k}`} room={room} players={players} code={code} win={autoWinner} onContinue={() => { autoFired.current = `${ph}:${room.k}:${room.vd}:${autoWinner}`; write({ ph: 'over', w: autoWinner }); }} />}
+    {showPlayer && me && ph === 'day' && !(room.adv === 1 && room.vd === 1 && autoWinner) && <VoteResultGate room={room} code={code} onContinue={room.adv === 1 && hostPlays && !autoWinner && !hunterPending ? () => { if (director.dir.on || autoFired.current === `${ph}:${room.k}:${room.vd}:${autoWinner}`) return; autoFired.current = `${ph}:${room.k}:${room.vd}:${autoWinner}`; director.start(); } : undefined} />}
     {showPlayer && me && ph === 'day' && <ElimGate me={me} room={room} code={code} />}
     {fullHost && session.ai && (ph === 'day' || (ph === 'reveal' && !(me && me.d === 1))) && (
       <ExitButton onClick={() => setConfirmLeave(true)} className="fixed left-3 z-50" style={{ top: 'max(10px, env(safe-area-inset-top))' }} />
@@ -8434,7 +8465,7 @@ function MapWind({ tab }) {
     </div>
   );
 }
-function AdvHub({ onBack, onReset, unlock, onPlay1 }) {
+function AdvHub({ onBack, onReset, unlock, onPlay1, openScene }) {
   useEffect(() => { // the map plays its music together with the forest ambience; both end when the page is left or Level 1 starts
     advHubOpen = true; advToGame = false; advRun = false;
     const st = getSettings();
@@ -8445,15 +8476,15 @@ function AdvHub({ onBack, onReset, unlock, onPlay1 }) {
   const [tab, setTab] = useState('classic');
   const [sel, setSel] = useState(null);
   const [toast, setToast] = useState(0);
-  const [zoomIn, setZoomIn] = useState(false); // camera is zooming into House #1
-  const [scene, setScene] = useState(false); // Level 1 first-person scene is open
+  const [zoomIn, setZoomIn] = useState(!!openScene); // camera is zooming into House #1
+  const [scene, setScene] = useState(!!openScene); // Level 1 first-person scene is open
   const [chat, setChat] = useState(false); // the Bodyguard's chat panel
   const [unread, setUnread] = useState(() => !loadAdv().guideL1); // red dot on his avatar until the chat is opened
   const [heard, setHeard] = useState(() => !!loadAdv().guideL1); // has read the Level 1 chat (the arrow points at Level 1 from then on)
   const [read, setRead] = useState(false); // read the chat during this visit: the arrow moves from the Bodyguard to Level 1 (every visit, until Level 1 is cleared)
   const [cstep, setCstep] = useState(0); // 0 typing, 1 first message, 2 both messages
   const ctimers = useRef([]);
-  const lockR = useRef(false);
+  const lockR = useRef(!!openScene);
   const [art, setArt] = useState({}); // painted maps found in /images: { classic: { w, h }, outbreak: { w, h } }
   const [artReady, setArtReady] = useState(false);
   const cleared = !!loadAdv().classicLevel1Cleared;
@@ -8655,7 +8686,8 @@ function AiScreen({ onBack, onPhase, startView }) {
     Mp.get(`rooms/${s.code}`).then((r) => { if (!live) return; if (r && r.ai) { setSession(s); setView('room'); } else { Mp.local = false; saveSession(null); } setChecking(false); }, () => { if (live) { Mp.local = false; setChecking(false); } });
     return () => { live = false; };
   }, []);
-  const toMap = (un) => { Mp.local = false; saveSession(null); setSession(null); setUnlock(!!un); setView('hub'); };
+  const [openL1, setOpenL1] = useState(false); // Retry Level 1: land on the Level 1 intro card, not straight in Night 1
+  const toMap = (un, l1) => { Mp.local = false; saveSession(null); setSession(null); setUnlock(!!un); setOpenL1(!!l1); setView('hub'); };
   const resetProgress = () => { saveAdv({}); setSandboxS(false); try { localStorage.removeItem('nightfall.guideY'); } catch (e) { /* ignore */ } };
   const exitRoom = () => { Mp.local = false; saveSession(null); setSession(null); onBack(); };
   const start = async (name, c) => {
@@ -8664,14 +8696,14 @@ function AiScreen({ onBack, onPhase, startView }) {
     catch (e) { Mp.local = false; setErr('Could not start the match. Try again.'); }
     setBusy(false);
   };
-  if (view === 'room' && session) return <MpRoom key={session.code} session={session} onExit={exitRoom} onPhase={onPhase} onRetry={session.ai ? () => playLevel1() : undefined} onMap={() => toMap(false)} onNext={() => toMap(true)} />;
+  if (view === 'room' && session) return <MpRoom key={session.code} session={session} onExit={exitRoom} onPhase={onPhase} onRetry={session.ai ? () => toMap(false, true) : undefined} onMap={() => toMap(false)} onNext={() => toMap(true)} />;
   const playLevel1 = () => { // fixed training match: no deck builder, the human is the Bodyguard
     setGameMode('classic');
     const c = { n: 4, deck: { ...emptyDeck(), ...ADV_L1_DECK }, adv: 1 };
     setCfg(c);
     start(loadName().trim() || PROFILE_DEFAULT, c); // the saved Player Profile name
   };
-  if (view === 'hub' && !checking) return <AdvHub onBack={onBack} onReset={resetProgress} unlock={unlock} onPlay1={playLevel1} />;
+  if (view === 'hub' && !checking) return <AdvHub key={openL1 ? 'r' : 'm'} onBack={onBack} onReset={resetProgress} unlock={unlock} openScene={openL1} onPlay1={() => { setOpenL1(false); playLevel1(); }} />;
   if (view === 'deck' && cfg.deck) return <ChooseCards count={cfg.n} deck={cfg.deck} setDeck={(d) => setCfg((c) => ({ ...c, deck: d }))} onBack={() => setView('count')} onStart={() => setView('name')} startLabel="Lock Deck" showBalance adv={advProps} />;
   return (
     <Screen>

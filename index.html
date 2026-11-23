@@ -5494,11 +5494,12 @@ function mpResolveNight(room) {
   const c0 = { ...mpChoices(ps), shadow: mpShadowRedirect(ps) };
   const ch1 = room.adv === 1 && k === 1 ? ps.find((p) => p.n === 'Charlie' && p.bot === 1) : null; const bg1 = ch1 ? ps.find((p) => p.a === 1 && p.r === 'bodyguard' && p.bot !== 1) : null;
   const ch2 = room.adv === 1 && (k === 2 || k === 3) ? ps.find((p) => p.n === 'Charlie' && p.bot === 1 && p.a === 1) : null; const bg2 = ch2 ? ps.find((p) => p.a === 1 && p.r === 'bodyguard' && p.bot !== 1) : null;
+  const je2 = room.adv === 1 && (k === 2 || k === 3) ? ps.find((p) => p.n === 'Jenna' && p.bot === 1 && p.a === 1) : null; const st2 = room.adv === 1 && (k === 2 || k === 3) ? ps.find((p) => p.n === 'Stacy' && p.bot === 1) : null;
+  const stacyThenJenna = !!(bg2 && je2 && st2 && st2.a === 1 && k === 2 && bg2.t === je2.id); // Level 1, Night 2 with everyone alive (you guarded Stacy on Night 1 and skipped Day 1): guarding Jenna ends in the same ambush defeat
   const guardCh = !!(bg2 && ch2 && bg2.t === ch2.id); // Level 1, Night 2 or 3: guarding Charlie ends the game the same way as Night 1 (one ambush defeat, no day)
   const lateAmb = !!(bg2 && k === 3 && room.cg === 2 && bg2.t); // Level 1, Night 3 after you guarded yourself on Night 2 and skipped Day 2: the shield is on cooldown, so whoever you guard, the beast takes you
-  const ambush = !!(bg1 && ch1 && bg1.t === ch1.id) || guardCh || lateAmb; // Level 1: guarding Charlie means he ambushes the Bodyguard from behind
+  const ambush = !!(bg1 && ch1 && bg1.t === ch1.id) || guardCh || lateAmb || stacyThenJenna; // Level 1: guarding Charlie means he ambushes the Bodyguard from behind
   if (ambush) { const g = bg1 || bg2; c0.werewolf = g.id; c0.werewolf2 = null; c0.bodyguard = null; }
-  const je2 = room.adv === 1 && (k === 2 || k === 3) ? ps.find((p) => p.n === 'Jenna' && p.bot === 1 && p.a === 1) : null; const st2 = room.adv === 1 && (k === 2 || k === 3) ? ps.find((p) => p.n === 'Stacy' && p.bot === 1) : null;
   const bg3 = ch2 && je2 && st2 && st2.a !== 1 ? ps.find((p) => p.a === 1 && p.r === 'bodyguard' && p.bot !== 1) : null;
   const jennaAfterSelf = !!(k === 2 && bg3 && bg3.t === je2.id && bg3.lp === bg3.id); // Night 1 yourself, Night 2 Jenna: the beast goes for Jenna, your shield blocks it, and nobody dies
   if (jennaAfterSelf) { c0.werewolf = je2.id; c0.werewolf2 = null; }

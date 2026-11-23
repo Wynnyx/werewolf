@@ -8478,6 +8478,7 @@ const MapPainted = React.memo(function MapPainted({ tab, src, tiles, w, h, clear
   const zones = MAP_ZONES.map(([a, b]) => mapZonePath(pts.slice(a - 1, b)));
   const links = MAP_ZONES.slice(1).map(([a], i) => { const p0 = pts[MAP_ZONES[i][1] - 1], p1 = pts[a - 1]; const c = mapBow(p0, p1, i % 2 ? -1 : 1, 0.08); return `M${p0[0]} ${p0[1]} Q${Math.round(c[0])} ${Math.round(c[1])} ${p1[0]} ${p1[1]}`; });
   const ob = tab === 'outbreak';
+  const seg23 = (() => { const a = pts[1], b = pts[2], c = mapBow(a, b, -1, 0.16); return `M${a[0]} ${a[1]} Q${Math.round(c[0])} ${Math.round(c[1])} ${b[0]} ${b[1]}`; })(); // the same bow as the painted 2-to-3 segment, so the golden light rides exactly on the dotted path
   return (
     <div style={{ position: 'relative', width: w, height: h }}>
       {tiles && !tBad ? (
@@ -8500,8 +8501,8 @@ const MapPainted = React.memo(function MapPainted({ tab, src, tiles, w, h, clear
       )}
       {tab === 'classic' && l3 >= 1 && (
         <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-          <path d={mapZonePath(pts.slice(1, 3))} fill="none" stroke="#FBBF24" strokeWidth="18" strokeOpacity="0.35" strokeLinecap="round" pathLength="1" className={l3 === 1 ? 'unlock-draw' : ''} />
-          <path d={mapZonePath(pts.slice(1, 3))} fill="none" stroke="#FEF3C7" strokeWidth="6" strokeLinecap="round" pathLength="1" className={l3 === 1 ? 'unlock-draw' : ''} />
+          <path d={seg23} fill="none" stroke="#FBBF24" strokeWidth="18" strokeOpacity="0.35" strokeLinecap="round" pathLength="1" className={l3 === 1 ? 'unlock-draw' : ''} />
+          <path d={seg23} fill="none" stroke="#FEF3C7" strokeWidth="6" strokeLinecap="round" pathLength="1" className={l3 === 1 ? 'unlock-draw' : ''} />
         </svg>
       )}
       <div className="map-fade" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: '#10b981', mixBlendMode: 'soft-light', opacity: ob ? 0.3 : 0 }} />
@@ -9086,6 +9087,7 @@ function SeerMiniGame({ onExit, onWin }) {
     const S = Sref.current, { W, H } = size.current, r = cvRef.current.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; let best = null, bd = 1e9; // a touch that starts on a golden yellow orb is a deflect, not a slide
     if (phaseRef.current === 'play') S.orbs.forEach((o) => { if (seerKind(o) !== 'deflect' || o.gone || o.proj || o.d <= SEER.HIT) return; const q = seerProj(S, W, H, o.lane, o.d, seerOrbH(o)), dist = Math.hypot(q.x - x, q.y - y); if (dist < SEER.ORB_R * q.s * 1.6 + 36 && dist < bd) { bd = dist; best = o; } });
     pd.current = { x: e.clientX, y: e.clientY, t: performance.now(), lane: S.lane, moved: false, orb: best ? best.id : null }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    if (best && phaseRef.current === 'play' && seerDeflect(S, best)) { pd.current.orb = null; setHint(false); } // a touch on a golden orb deflects it the instant the finger lands, with no wait for the lift
   };
   const onMove = (e) => { // sliding a finger across the playfield moves Jenna continuously
     const p = pd.current; if (!p || phaseRef.current !== 'play') return;

@@ -8573,14 +8573,14 @@ function MapWind({ tab }) {
 /* The rules live in plain functions (seerNew / seerUpdate / ...) so they stay separate from drawing and React.      */
 /* ------------------------------------------------------------------ */
 /*SEER-LOGIC-START*/
-const SEER = { LANE: 1.15, CAMH: 1.5, FAR: 60, HIT: 1.9, GONE: 1.0, ORB_R: 0.42, ORB_H: 0.85, HITR: 0.613, FOCUS_MS: 3000, RECHARGE_MS: 3000, GOOD: 6, GOOD_R: 0.92, DMG: 15, SHATTER: 5, SHOT: 4, ARROW_SPEED: 60, AMMO: [0, 20, 30, 35], SF: [0, 1, 1.15, 1.3], DENS: [0, 1, 1.1, 1.25], HEAL: 5, DEFLECT_V: 55, DEFLECT_KILL: 4, DRAW_S: 1, HI_AT: 80, HIGH_GOOD: 8, BASE_V: 11, SPD: [0, 1, 1.35, 1.75] };
+const SEER = { LANE: 1.15, CAMH: 1.5, FAR: 60, HIT: 1.9, GONE: 1.0, ORB_R: 0.42, ORB_H: 0.85, HITR: 0.613, FOCUS_MS: 3200, RECHARGE_MS: 1800, GOOD: 6, GOOD_R: 0.92, DMG: 15, SHATTER: 5, SHOT: 4, ARROW_SPEED: 60, AMMO: [0, 20, 30, 35], SF: [0, 1, 1.15, 1.3], DENS: [0, 1, 1.1, 1.25], HEAL: 5, DEFLECT_V: 55, DEFLECT_KILL: 4, DRAW_S: 1, HI_AT: 80, HIGH_GOOD: 8, BASE_V: 11, SPD: [0, 1, 1.35, 1.75] };
 function seerNew(stage = 1, hp = 100) {
   return { t: 0, lane: 0, camX: 0, orbs: [], ev: [], spawned: 0, nextSpawn: 1.2, runGood: 0, runBad: 0, gauge: 0, hp, hp0: hp, stage, revealT: 0, focusLeft: 0, recharge: 0, rv: 0, aura: 0, auraPulse: 0, flash: 0, shake: 0, ripple: -1, winT: -1, loseT: -1, ended: false, uid: 0, arrows: [], ammo: SEER.AMMO[stage], ammoMax: SEER.AMMO[stage], drawing: false, drawT: 0, spd: SEER.SF[stage] * SEER.SPD[1], hiSeen: stage >= 2, lockId: null };
 }
-const seerOrbHAt = (o, d) => { // orb height at distance d: low orbs skim the water at eye level; from 80% some fly high; high bad orbs swoop down onto Jenna, high good orbs stay aloft
+const seerOrbHAt = (o, d) => { // low orbs skim the water at eye level; high orbs glide along the upper sky for the first 70% of the flight, then curve smoothly down to Jenna's eye level over the final 30%
   if (!o.hi) return SEER.ORB_H;
-  const k = Math.max(0, Math.min(1, (d - SEER.HIT) / 22));
-  return o.good ? SEER.ORB_H + 2.6 + 1.2 * k : SEER.ORB_H + 5.6 * k;
+  const z = Math.max(0, Math.min(1, (SEER.FAR - d) / (SEER.FAR - SEER.HIT))), u = Math.max(0, Math.min(1, (z - 0.7) / 0.3)), s = u * u * (3 - 2 * u);
+  return SEER.ORB_H + (o.good || seerKind(o) === 'heal' ? 3.4 : 5.6) * (1 - s);
 };
 const seerOrbH = (o) => seerOrbHAt(o, o.d);
 const seerKind = (o) => o.k || (o.good ? 'good' : 'bad'); // good | bad | heal | trap | deflect
@@ -8596,7 +8596,8 @@ function seerSet(S, x) { if (S.winT >= 0 || S.loseT >= 0) return; S.lane = Math.
 function seerMove(S, dir) { if (S.winT >= 0 || S.loseT >= 0) return; S.lane = Math.max(-1, Math.min(1, S.lane + dir)); }
 function seerFocus(S) {
   if (S.focusLeft > 0 || S.recharge > 0 || S.winT >= 0 || S.loseT >= 0) return false;
-  S.revealT = 0; S.focusLeft = SEER.FOCUS_MS; S.recharge = SEER.FOCUS_MS + SEER.RECHARGE_MS; // 3s of sight, then a 3s cooldown S.ripple = 0; S.ev.push({ k: 'focus' });
+  S.revealT = 0; S.focusLeft = SEER.FOCUS_MS; S.recharge = SEER.FOCUS_MS + SEER.RECHARGE_MS; // 3.2s of sight, then a 1.8s cooldown
+  S.ripple = 0; S.ev.push({ k: 'focus' });
   return true;
 }
 function seerDeflect(S, o) { // tap or flick up on a light blue orb: it flies back along its lane as a piercing projectile
@@ -8698,8 +8699,7 @@ function seerUpdate(S, dt) {
       return;
     }
     if (o.done) return;
-    if (kd === 'good' && o.hi) { if (o.d < SEER.GONE) o.done = true; } // a high good orb flies overhead: only an arrow can bring it down
-    else if (kd === 'good' || kd === 'heal') { // a good or healing orb is caught anywhere in the capture window, tested over the whole stretch it travelled this frame, so a fast orb can never skip past
+    if (kd === 'good' || kd === 'heal') { // a good or healing orb is caught anywhere in the capture window, tested over the whole stretch it travelled this frame, so a fast orb can never skip past
       if (o.d <= SEER.HIT && o.d + step >= SEER.GONE) {
         if (Math.min(Math.abs(S.camX - o.lane), Math.abs(S.lane - o.lane)) < SEER.GOOD_R) {
           o.done = true; o.gone = true; S.auraPulse = 1;

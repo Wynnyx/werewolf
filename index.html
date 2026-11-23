@@ -1607,6 +1607,14 @@ const Sfx = (() => {
     voice(c, out, { type: 'sawtooth', f0: 175, f1: 73, glide: 2.4, t0: t + 0.05, dur: 2.7, gain: 0.1, attack: 0.1, filter: 'lowpass', ff: 700, ff1: 160 });
     bellNote(c, out, t + 0.1, 196, 0.22, 3.2); bellNote(c, out, t + 0.7, 146.8, 0.18, 3.4);
   });
+  const grim = () => synth((c, out, t) => { // morning news: someone was found dead, a low tolling bell over a sinking minor third
+    voice(c, out, { type: 'sine', f0: 70, f1: 45, glide: 0.8, t0: t, dur: 1.4, gain: 0.4, attack: 0.01 });
+    bellNote(c, out, t, 196, 0.2, 2.8); bellNote(c, out, t + 0.45, 164.8, 0.17, 3);
+    voice(c, out, { type: 'sawtooth', f0: 155.6, f1: 130.8, glide: 1.8, t0: t + 0.1, dur: 2, gain: 0.07, attack: 0.15, filter: 'lowpass', ff: 600 });
+  });
+  const relief = () => synth((c, out, t) => { // morning news: the guard held, a warm rising chime
+    [[659.25, 0], [830.6, 0.14], [987.8, 0.28], [1318.5, 0.44]].forEach(([f, d]) => { voice(c, out, { type: 'triangle', f0: f, t0: t + d, dur: 0.9, gain: 0.1, attack: 0.02 }); bellNote(c, out, t + d, f, 0.13, 1.8); });
+  });
   const click = (kind) => {
     if (!getSettings().sound || Date.now() - lastAt < 50) return;
     synth((c, out, t) => {
@@ -1637,7 +1645,7 @@ const Sfx = (() => {
     voice(c, out, { type: 'sawtooth', f0: 92, f1: 70, glide: 2, t0: t + 0.2, dur: 2, gain: 0.1, attack: 0.6, filter: 'lowpass', ff: 260, vib: 4, vibDepth: 20 });
   });
   return {
-    bell, win, lose, click, chime, rumble, msg,
+    bell, win, lose, grim, relief, click, chime, rumble, msg,
     preload: () => { try { FILES.forEach(load); } catch (e) { /* ignore */ } },
     unlock: () => { try { const c = getCtx(); if (c && c.state !== 'running') { const r = c.resume(); if (r && r.catch) r.catch(() => {}); } } catch (e) { /* ignore */ } },
     flip: () => play('audio/card-flip.mp3'),
@@ -6752,6 +6760,14 @@ function MpDay({ me, players, room, write, onTimeUp }) {
   const solo = room.ai === 1 && me.a === 1 && players.filter((p) => p.bot !== 1).length === 1; // Adventure / Solo AI: Morning News -> visual-novel discussion -> vote, one screen each
   const [step, setStep] = useState(() => (room.vd === 1 || me.v ? 'vote' : 'news'));
   useEffect(() => { if (solo && room.vd === 1) setStep('vote'); }, [solo, room.vd]);
+  useEffect(() => { // the morning news gets a sound: grim when someone died, a bright chime when the Bodyguard's protection held
+    if (!solo || step !== 'news' || fx) return undefined;
+    const dead = room.an && room.an.cz && Object.keys(room.an.cz).length > 0;
+    const saved = room.an && room.an.sv === 1 && !dead;
+    if (!dead && !saved) return undefined;
+    const t = setTimeout(() => { if (dead) Sfx.grim(); else Sfx.relief(); }, 450);
+    return () => clearTimeout(t);
+  }, [solo, step, fx, room.k]);
   const vnKey = `${room.ts}:${room.dl || 0}:${room.k}`;
   const incoming = Object.values(room.dc || {}).filter((m) => m && m.i !== me.id && !m.q).length;
   useEffect(() => { if (chatOpen) setSeenN(incoming); }, [chatOpen, incoming]);

@@ -8910,7 +8910,7 @@ function SeerMiniGame({ onExit }) {
         else if (e.k === 'high') { setNote(true); clearTimeout(noteT.current); noteT.current = setTimeout(() => setNote(false), 4500); }
         else if (e.k === 'arrowBad') { seerBurst(sc, p.x, p.y, 'bad', 20); seerBurst(sc, p.x, p.y, 'seer', 26); Sfx.burstBad(); }
         else if (e.k === 'arrowGood') { seerBurst(sc, p.x, p.y, 'gold', 20); Sfx.burstGood(); }
-        else if (e.k === 'hit') { sc.floats.push({ x: Math.max(W * 0.18, Math.min(W * 0.82, p.x)), y: Math.max(H * 0.3, Math.min(H * 0.62, p.y)), life: 0, txt: `-${SEER.DMG}%` }); seerMakeCrack(sc, W, H); seerBurst(sc, p.x, p.y, 'bad', 34); Sfx.burstBad(); try { navigator.vibrate && navigator.vibrate(60); } catch (er) { /* ignore */ } }
+        else if (e.k === 'hit') { seerMakeCrack(sc, W, H); seerBurst(sc, p.x, p.y, 'bad', 34); Sfx.burstBad(); try { navigator.vibrate && navigator.vibrate(60); } catch (er) { /* ignore */ } }
         else if (e.k === 'focus') Sfx.chime();
         else if (e.k === 'winStart') { Sfx.win('village'); seerBurst(sc, W / 2, H * 0.5, 'seer', 60); }
         else if (e.k === 'loseStart') Sfx.lose();

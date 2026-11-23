@@ -9000,8 +9000,6 @@ function SeerMiniGame({ onExit, onWin }) {
   const [phase, setPhaseS] = useState('intro'); // intro | play | clear (a stage is done) | won | lost
   const [ui, setUi] = useState({ gauge: 0, hp: 100, stage: 1, ready: 1, on: false, am: SEER.QUIVER, amMax: SEER.QUIVER });
   const pausedRef = useRef(false), [paused, setPaused] = useState(false);
-  const vidRef = useRef(null);
-  useEffect(() => { const v = vidRef.current; if (!v) return; if (paused) v.pause(); else { const r = v.play(); if (r && r.catch) r.catch(() => { /* autoplay blocked: the poster stays */ }); } }, [paused]); // the living background rests while the game is paused
   const [hint, setHint] = useState(true);
   const [note, setNote] = useState(false), noteT = useRef(0);
   useEffect(() => () => clearTimeout(noteT.current), []);
@@ -9102,7 +9100,7 @@ function SeerMiniGame({ onExit, onWin }) {
     const dx = e.clientX - p.x, dy = e.clientY - p.y, tap = Math.hypot(dx, dy) < 16 && performance.now() - p.t < 500, flick = dy < -24 && Math.abs(dx) < Math.abs(dy);
     if (tap || flick) { const S = Sref.current; if (seerDeflect(S, S.orbs.find((o) => o.id === p.orb))) setHint(false); }
   };
-  useEffect(() => { const im = new Image(); im.onload = () => seerBgLoaded(im); im.src = 'images/seer-trial-bg.png'; }, []);
+  useEffect(() => { const im = new Image(); im.onload = () => seerBgLoaded(im); im.src = 'images/seer-trial-bg.jpg'; }, []);
   const barRef = useRef(null), thumbRef = useRef(null), ringRef = useRef(null), bowRef = useRef(null);
   const bowDown = (e) => { e.preventDefault(); try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ } bowStart(); };
   const barTo = (e) => { const r = barRef.current.getBoundingClientRect(), pad = 24, f = (e.clientX - r.left - pad) / Math.max(1, r.width - pad * 2); seerSet(Sref.current, f * 2 - 1); setHint(false); };
@@ -9113,7 +9111,7 @@ function SeerMiniGame({ onExit, onWin }) {
   const card = 'mx-auto flex w-full max-w-sm flex-col items-center gap-4 rounded-3xl border px-6 py-8 text-center';
   return (
     <div className="fixed inset-0 z-[70] select-none overflow-hidden" style={{ background: '#03060d', touchAction: 'none' }}>
-      <div ref={bgRef} className="pointer-events-none absolute left-0 top-0" style={{ willChange: 'transform' }}><video ref={vidRef} src="https://res.cloudinary.com/wstp9x5t/video/upload/copy_63CD8FB1-7451-4671-8795-FF1635C7A948.mp4" poster="images/seer-trial-bg.png" autoPlay loop muted playsInline preload="auto" disablePictureInPicture controls={false} onLoadedMetadata={(e) => seerBgLoaded({ naturalWidth: e.currentTarget.videoWidth, naturalHeight: e.currentTarget.videoHeight })} style={{ display: 'block', width: '100%', height: '100%', maxWidth: 'none', objectFit: 'cover', pointerEvents: 'none' }} /></div>
+      <div ref={bgRef} className="pointer-events-none absolute left-0 top-0" style={{ willChange: 'transform' }}><img src="images/seer-trial-bg.jpg" alt="" draggable={false} style={{ display: 'block', width: '100%', height: '100%', maxWidth: 'none' }} /></div>
       <canvas ref={cvRef} className="absolute inset-0 h-full w-full" style={{ touchAction: 'none' }} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { pd.current = null; }} />
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center gap-3 px-3" style={{ paddingTop: 'max(10px, env(safe-area-inset-top))' }}>
         <button onClick={onExit} aria-label="Back to Map" className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/20 bg-black/40 text-slate-100">
@@ -9247,7 +9245,7 @@ const SeerSea = (() => {
 function AdvHub({ onBack, onReset, unlock, onPlay1, openScene }) {
   const [mini, setMini] = useState(false); // temporary test entry for the Level 2 Seer mini-game
   const [cl2, setCl2] = useState(() => !!loadAdv().classicLevel2Cleared), [u3, setU3] = useState(3); // Level 3 unlock: 0 locked, 1 the trail from Level 2 lights up, 2 the padlock breaks, 3 settled
-  useEffect(() => { try { const im = new Image(); im.src = 'images/seer-trial-bg.png'; } catch (er) { /* ignore */ } }, []);
+  useEffect(() => { try { const im = new Image(); im.src = 'images/seer-trial-bg.jpg'; } catch (er) { /* ignore */ } }, []);
   useEffect(() => { // the map plays its music together with the forest ambience; both end when the page is left or Level 1 starts
     advHubOpen = true; advToGame = false; advRun = false;
     const st = getSettings();

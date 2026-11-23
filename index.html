@@ -6455,6 +6455,7 @@ function useNightDirector({ room, players, write }) {
           await stepO('v:seer', 'Seer viewing');
           await waitFor(() => latest.current.players.filter((p) => p.a === 1 && p.r === 'seer' && p.rd !== 1), MP_WAVE_SECS * 1000, true); if (!live()) return;
         }
+        if (latest.current.room.adv === 1) { await stepO('d', 'Night countdown'); await wait(3000); if (!live()) return; } // Campaign Level 1: the 3-2-1 beat before the morning
         setDir({ on: true, label: 'Dawn' });
         const resultO = mpResolveNight(latest.current.room);
         await write(resultO.patch);

@@ -8878,6 +8878,7 @@ function seerDraw(ctx, S, sc, W, H, dt) {
 function SeerMiniGame({ onExit }) {
   const cvRef = useRef(null);
   const bgRef = useRef(null);
+  useEffect(() => { SeerSea.start(); return () => SeerSea.stop(); }, []); // ocean and wind for as long as Level 2 is open
   const Sref = useRef(seerNew());
   const scRef = useRef(seerScenery());
   const phaseRef = useRef('intro');
@@ -8888,7 +8889,7 @@ function SeerMiniGame({ onExit }) {
   useEffect(() => () => clearTimeout(noteT.current), []);
   const setPhase = (p) => { phaseRef.current = p; setPhaseS(p); };
   const size = useRef({ W: 360, H: 640 });
-  const start = () => { Sref.current = seerNew(); scRef.current.parts = []; scRef.current.cracks = []; scRef.current.floats = []; setUi({ gauge: 0, hp: 100, wave: 1, ready: 1, on: false, ch: 3 }); setHint(true); setNote(false); setPhase('play'); };
+  const start = () => { SeerSea.start(); Sref.current = seerNew(); scRef.current.parts = []; scRef.current.cracks = []; scRef.current.floats = []; setUi({ gauge: 0, hp: 100, wave: 1, ready: 1, on: false, ch: 3 }); setHint(true); setNote(false); setPhase('play'); };
   useEffect(() => {
     const cv = cvRef.current; if (!cv) return undefined;
     const ctx = cv.getContext('2d'); let raf = 0, last = performance.now(), uiAt = 0, uiKey = '';
@@ -9052,6 +9053,30 @@ function SeerMiniGame({ onExit }) {
   );
 }
 
+/* Level 2 sea soundscape: the ocean (40%) and the wind (150%) loop under the Trial of the Green Tide. The two levels are mixed into the files (audio/ocean.mp3, audio/wind.mp3). */
+const SeerSea = (() => {
+  let els = null, on = false, fadeT = null;
+  const make = () => ['audio/ocean.mp3', 'audio/wind.mp3'].map((src) => { const a = new Audio(src); a.loop = true; a.preload = 'auto'; a.setAttribute('playsinline', ''); a.volume = 0; return a; });
+  const fade = (to, ms, done) => { clearInterval(fadeT); const t0 = performance.now(), from = els.map((a) => a.volume); fadeT = setInterval(() => { const q = Math.min(1, (performance.now() - t0) / ms); els.forEach((a, i) => { a.volume = Math.max(0, Math.min(1, from[i] + (to - from[i]) * q)); }); if (q >= 1) { clearInterval(fadeT); if (done) done(); } }, 40); };
+  function start() {
+    if (!getSettings().sound) return;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* unsupported */ }
+    if (!els) els = make();
+    const was = on; on = true;
+    els.forEach((a) => { const p = a.play(); if (p && p.catch) p.catch(() => {}); });
+    if (!was) fade(1, 1500);
+  }
+  function stop() {
+    if (!on || !els) return; on = false;
+    fade(0, 500, () => { if (!on) els.forEach((a) => { a.pause(); a.currentTime = 0; }); });
+  }
+  const hide = () => { if (els) els.forEach((a) => a.pause()); };
+  const show = () => { if (on && els && !document.hidden) els.forEach((a) => { const p = a.play(); if (p && p.catch) p.catch(() => {}); }); };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) hide(); else show(); });
+  window.addEventListener('pagehide', hide);
+  return { start, stop };
+})();
+
 function AdvHub({ onBack, onReset, unlock, onPlay1, openScene }) {
   const [mini, setMini] = useState(false); // temporary test entry for the Level 2 Seer mini-game
   useEffect(() => { try { const im = new Image(); im.src = 'images/seer-trial-bg.png'; } catch (er) { /* ignore */ } }, []);
@@ -9062,6 +9087,11 @@ function AdvHub({ onBack, onReset, unlock, onPlay1, openScene }) {
     if (st.sound) Ambience.start();
     return () => { advHubOpen = false; if (!advToGame) Tension.stop(); };
   }, []);
+  const miniWas = useRef(false);
+  useEffect(() => { // the map music and forest ambience rest while the Level 2 mini-game plays its own sea sounds
+    if (mini) { miniWas.current = true; Tension.stop(); Ambience.stop(); }
+    else if (miniWas.current) { miniWas.current = false; const st = getSettings(); if (st.music) Tension.start(); if (st.sound) Ambience.start(); }
+  }, [mini]);
   const [tab, setTab] = useState('classic');
   const [sel, setSel] = useState(null);
   const [toast, setToast] = useState(0);
@@ -9209,7 +9239,7 @@ function AdvHub({ onBack, onReset, unlock, onPlay1, openScene }) {
         </div>
         <div role="tablist" className={`${gate ? 'pointer-events-none opacity-50' : 'pointer-events-auto'} mx-auto mt-2 flex w-full max-w-xl gap-2 px-4`}>{tabBtn('classic', 'Classic')}{tabBtn('outbreak', 'Outbreak')}</div>
       </div>
-      <button onClick={() => setMini(true)} disabled={gate} className="absolute left-3 z-10 flex h-11 items-center gap-1.5 rounded-full px-4 text-[11px] font-bold uppercase tracking-wider text-emerald-100" style={{ bottom: 'max(20px, env(safe-area-inset-bottom))', border: '1px solid rgba(110,231,183,0.6)', background: 'rgba(6,24,20,0.82)', pointerEvents: gate ? 'none' : undefined, opacity: gate ? 0.5 : 1 }}><span aria-hidden="true">{'\uD83E\uDDEA'}</span><span>Test Level 2</span></button>
+      <button onClick={() => { SeerSea.start(); setMini(true); }} disabled={gate} className="absolute left-3 z-10 flex h-11 items-center gap-1.5 rounded-full px-4 text-[11px] font-bold uppercase tracking-wider text-emerald-100" style={{ bottom: 'max(20px, env(safe-area-inset-bottom))', border: '1px solid rgba(110,231,183,0.6)', background: 'rgba(6,24,20,0.82)', pointerEvents: gate ? 'none' : undefined, opacity: gate ? 0.5 : 1 }}><span aria-hidden="true">{'\uD83E\uDDEA'}</span><span>Test Level 2</span></button>
       {mini && <SeerMiniGame onExit={() => setMini(false)} />}
       <div className="absolute right-3 z-10 flex flex-col gap-2" style={{ bottom: 'max(20px, env(safe-area-inset-bottom))', pointerEvents: gate ? 'none' : undefined, opacity: gate ? 0.5 : 1 }}>
         <button onClick={() => zoomBtn(1.3)} aria-label="Zoom in" className="flex h-11 w-11 items-center justify-center rounded-full text-xl font-bold" style={fab}>+</button>

@@ -8699,7 +8699,7 @@ function seerUpdate(S, dt) {
   if (S.loseT >= 0) { S.loseT += dt; if (S.loseT > 0.9 && !S.ended) { S.ended = true; S.ev.push({ k: 'lost' }); } return; }
   S.spd += (SEER.SPD[seerWave(S)] * SEER.SF[S.stage] - S.spd) * Math.min(1, dt * 1.2); // orbs travel faster as Awakening grows, and faster in later stages
   S.nextSpawn -= dt;
-  if (S.nextSpawn <= 0) { seerSpawn(S); const ph = seerWave(S); S.nextSpawn = ((ph === 1 ? 2.8 : ph === 2 ? 2.1 : 1.8 / 1.05) + Math.random() * (ph === 1 ? 0.5 : 0.4)) / SEER.DENS[S.stage]; // the final phase: 5% slower orbs, 5% more of them }
+  if (S.nextSpawn <= 0) { seerSpawn(S); const ph = seerWave(S); S.nextSpawn = ((ph === 1 ? 2.8 : ph === 2 ? 2.1 : 1.8 / 1.05) + Math.random() * (ph === 1 ? 0.5 : 0.4)) / SEER.DENS[S.stage]; } // the final phase: 5% slower orbs, 5% more of them
   const hurt = (o, dmg = SEER.DMG) => { o.gone = true; S.hp = Math.max(0, S.hp - dmg); if (dmg >= SEER.DMG) { S.flash = 1; S.shake = 0.6; S.ev.push({ k: 'hit', lane: o.lane, d: o.d, h: seerOrbH(o) }); } else S.ev.push({ k: 'graze', lane: o.lane, d: o.d, h: seerOrbH(o) }); if (S.hp <= 0 && S.winT < 0) { S.loseT = 0; S.ev.push({ k: 'loseStart' }); } };
   S.orbs.forEach((o) => {
     const step = o.v * dt; o.d -= step; const kd = seerKind(o);

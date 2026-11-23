@@ -6765,13 +6765,13 @@ function MpDay({ me, players, room, write, onTimeUp }) {
   const [step, setStep] = useState(() => (room.vd === 1 || me.v ? 'vote' : 'news'));
   useEffect(() => { if (solo && room.vd === 1) setStep('vote'); }, [solo, room.vd]);
   useEffect(() => { // the morning news gets a sound: grim when someone died, a bright chime when the Bodyguard's protection held
-    if (!solo || step !== 'news' || fx) return undefined;
+    if (!solo || step !== 'news') return undefined; // plays as the dawn moon transition starts, not after it
     const dead = room.an && room.an.cz && Object.keys(room.an.cz).length > 0;
     const saved = room.an && room.an.sv === 1 && !dead;
     if (!dead && !saved) return undefined;
-    const t = setTimeout(() => { if (dead) Sfx.grim(); else Sfx.relief(); }, 450);
+    const t = setTimeout(() => { if (dead) Sfx.grim(); else Sfx.relief(); }, 120);
     return () => clearTimeout(t);
-  }, [solo, step, fx, room.k]);
+  }, [solo, step, room.k]);
   const vnKey = `${room.ts}:${room.dl || 0}:${room.k}`;
   const incoming = Object.values(room.dc || {}).filter((m) => m && m.i !== me.id && !m.q).length;
   useEffect(() => { if (chatOpen) setSeenN(incoming); }, [chatOpen, incoming]);

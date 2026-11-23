@@ -5493,10 +5493,10 @@ function mpResolveNight(room) {
   const k = room.k || 1;
   const c0 = { ...mpChoices(ps), shadow: mpShadowRedirect(ps) };
   const ch1 = room.adv === 1 && k === 1 ? ps.find((p) => p.n === 'Charlie' && p.bot === 1) : null; const bg1 = ch1 ? ps.find((p) => p.a === 1 && p.r === 'bodyguard' && p.bot !== 1) : null;
-  const ambush = !!(bg1 && ch1 && bg1.t === ch1.id); // Level 1, Night 1: guarding Charlie means he ambushes the Bodyguard from behind
-  if (ambush) { c0.werewolf = bg1.id; c0.werewolf2 = null; c0.bodyguard = null; }
   const ch2 = room.adv === 1 && (k === 2 || k === 3) ? ps.find((p) => p.n === 'Charlie' && p.bot === 1 && p.a === 1) : null; const bg2 = ch2 ? ps.find((p) => p.a === 1 && p.r === 'bodyguard' && p.bot !== 1) : null;
-  const guardCh = !!(bg2 && ch2 && bg2.t === ch2.id); // Level 1, Night 2 or 3: guarding Charlie leaves you open, so the beast takes you (spoiler-free defeat, cg 5)
+  const guardCh = !!(bg2 && ch2 && bg2.t === ch2.id); // Level 1, Night 2 or 3: guarding Charlie ends the game the same way as Night 1 (one ambush defeat, no day)
+  const ambush = !!(bg1 && ch1 && bg1.t === ch1.id) || guardCh; // Level 1: guarding Charlie means he ambushes the Bodyguard from behind
+  if (ambush) { const g = bg1 || bg2; c0.werewolf = g.id; c0.werewolf2 = null; c0.bodyguard = null; }
   const je2 = room.adv === 1 && (k === 2 || k === 3) ? ps.find((p) => p.n === 'Jenna' && p.bot === 1 && p.a === 1) : null; const st2 = room.adv === 1 && (k === 2 || k === 3) ? ps.find((p) => p.n === 'Stacy' && p.bot === 1) : null;
   const bg3 = ch2 && je2 && st2 && st2.a !== 1 ? ps.find((p) => p.a === 1 && p.r === 'bodyguard' && p.bot !== 1) : null;
   const jennaAfterSelf = !!(k === 2 && bg3 && bg3.t === je2.id && bg3.lp === bg3.id); // Night 1 yourself, Night 2 Jenna: the beast goes for Jenna, your shield blocks it, and nobody dies

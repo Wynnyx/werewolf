@@ -3142,7 +3142,6 @@ function StartScreen({ onPlay, onMulti, onAi, gameCount, onClearGames }) {
       {guide && <RoleGuide onClose={() => setGuide(false)} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} gameCount={gameCount} onClearGames={onClearGames} />}
       {profileOpen && <ProfileModal onClose={() => setProfileOpen(false)} />}
-      {profileOpen && <ProfileModal onClose={() => setProfileOpen(false)} />}
     </div>
   );
 }
@@ -6917,8 +6916,9 @@ function Level1Prologue({ onDone, onLeave }) {
   };
   useEffect(() => {
     if (n >= total) { setTyping(false); return undefined; }
-    const lead = n === 0 ? 900 : 800; const t1 = setTimeout(() => setTyping(true), lead); // ~2.4-2.8 s per message in all: a beat, then the typing dots, then the bubble
-    const t2 = setTimeout(() => { setTyping(false); setN(n + 1); Sfx.msg(); }, 2400 + Math.min(400, lines[n].t.length * 4));
+    const sl = n >= total - 4 ? 1.1 : 1; // the last four messages type 10% slower
+    const lead = (n === 0 ? 900 : 800) * sl; const t1 = setTimeout(() => setTyping(true), lead); // ~2.4-2.8 s per message in all: a beat, then the typing dots, then the bubble
+    const t2 = setTimeout(() => { setTyping(false); setN(n + 1); Sfx.msg(); }, (2400 + Math.min(400, lines[n].t.length * 4)) * sl);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [n]);
   useEffect(() => { const go = () => { if (endRef.current && endRef.current.scrollIntoView) endRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' }); }; go(); const t = setTimeout(go, 380); return () => clearTimeout(t); }, [n, typing]); // second pass once the button space has opened
@@ -8626,7 +8626,7 @@ function AdvHub({ onBack, onReset, unlock, onPlay1 }) {
         </div>
       )}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[15]" style={{ background: 'radial-gradient(circle at 50% 58%, rgba(2,4,12,0) 18%, rgba(2,4,12,0.78) 62%, rgba(2,4,12,1) 100%)', opacity: zoomIn ? 1 : 0, transition: L1_REDUCED() ? 'none' : 'opacity 480ms ease-in-out' }} />
-      {scene && <Level1Scene cleared={cleared} onBack={backFromL1} onPlay={() => { advToGame = true; onPlay1(); }} />}
+      {scene && <Level1Scene cleared={cleared} onBack={backFromL1} onPlay={() => { advToGame = true; if (getSettings().music) { tensionScreen = true; Ambience.stop(true); } onPlay1(); }} />}
     </div>
   );
 }

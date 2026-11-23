@@ -6674,12 +6674,12 @@ function L1Reveal({ room, players, code, win, ambush, onContinue }) {
   const lose = win !== 'village';
   const showLine = !ambush && lose && innocent;
   useEffect(() => {
-    const hold = L1_REDUCED() || ambush ? 0 : 1100;
+    const hold = L1_REDUCED() ? 0 : ambush ? 2400 : 1100; // the ambush gets a long, silent beat of darkness first
     const ts = [setTimeout(() => setStage(showLine ? 1 : 2), hold)];
     if (showLine) ts.push(setTimeout(() => setStage(2), hold + (L1_REDUCED() ? 0 : 1900)));
     return () => ts.forEach(clearTimeout);
   }, []);
-  if (stage === 0) return null;
+  if (stage === 0) return ambush ? <div aria-hidden="true" className="fixed inset-0 z-[65]" style={{ background: '#05070c' }} /> : null;
   const col = lose ? { k: '#fca5a5', t: '#fee2e2', bg: 'radial-gradient(ellipse at 50% 30%, rgba(127,29,29,0.6), rgba(5,7,12,0.98) 70%)', glow: 'rgba(239,68,68,0.7)' } : { k: '#fcd34d', t: '#fef3c7', bg: 'radial-gradient(ellipse at 50% 30%, rgba(146,64,14,0.55), rgba(5,7,12,0.98) 70%)', glow: 'rgba(251,191,36,0.7)' };
   return (
     <div role="dialog" aria-modal="true" aria-label={lose ? 'Defeat' : 'Victory'} className="fixed inset-0 z-[65] flex flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-8 text-center screen-in" style={{ background: col.bg }}>
@@ -7038,12 +7038,12 @@ function MpOver({ room, players, meId, onRetry }) {
           <p className="mt-2 text-sm leading-snug text-red-50">{room.am === 1 ? 'You stood guard at the wrong door\u2014and never saw the beast behind you...' : room.vr && room.vr.t === 'out' && (room.vr.n === 'Jenna' || room.vr.n === 'Stacy') ? 'You condemned an innocent villager\u2014and left the cottage to the beast...' : 'You hesitated when the truth was right in front of you...'}</p>
         </Panel>
       )}
-      <Panel className="text-center" style={{ border: `1px solid ${W.color}`, background: W.bg }}>
+      {room.am !== 1 && <Panel className="text-center" style={{ border: `1px solid ${W.color}`, background: W.bg }}>
         <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-300">Game over</div>
         <h2 className="font-display mt-1 text-3xl font-black" style={{ color: W.title }}>{W.name}</h2>
         {players.some((p) => p.r === 'plaguedoctor') && <p className="mt-2 text-sm text-slate-300">{plagueLine(players.map((p) => ({ role: p.r, alive: p.a === 1, side: pdSide(p.pdc, p.pdi, p.pdl) })), room.w).trim()}</p>}
-      </Panel>
-      <ul className="flex flex-col gap-2">
+      </Panel>}
+      {room.am !== 1 && <ul className="flex flex-col gap-2">
         {players.map((p) => {
           const r = ROLES_DATA[p.r];
           const shown = !!seen[p.id];
@@ -7064,7 +7064,7 @@ function MpOver({ room, players, meId, onRetry }) {
             </li>
           );
         })}
-      </ul>
+      </ul>}
       {view && <RoleViewModal role={view} onClose={() => setView('')} />}
     </div>
   );

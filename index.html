@@ -6720,7 +6720,13 @@ function VoteResultGate({ room, code, onContinue }) {
   const [, bump] = useState(0);
   const vr = room.vr;
   const key = `${code}:${room.dl || 0}:${room.k}`;
-  if (room.vd !== 1 || !vr || !vrFresh(room) || VR_SEEN.key === key) return null; // never a vote result from an earlier day or game
+  if (room.vd !== 1 || !vr || !vrFresh(room)) return null; // never a vote result from an earlier day or game
+  if (VR_SEEN.key === key) return room.adv === 1 ? null : ( // result read: hold on a night-falls page instead of the old day screen until the host starts the night
+    <div role="status" aria-live="polite" className="fixed inset-0 z-[64] flex flex-col items-center justify-center gap-5 px-6 text-center screen-in" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(30,27,75,0.85), rgba(5,7,12,0.99) 72%)' }}>
+      <MoonIcon width="88" height="88" className="hint-pulse text-slate-300" />
+      <p className="font-display text-2xl font-bold text-slate-50">Night falls soon...</p>
+    </div>
+  );
   const r = vr.r && ROLES_DATA[vr.r] ? ROLES_DATA[vr.r] : null;
   const msg = vr.t === 'out' ? `${vr.n} was voted out.` : vr.t === 'skip' ? 'The village chose to skip the vote.' : vr.t === 'tie' ? 'The vote was tied.' : 'Time ran out and no votes were cast.';
   return (

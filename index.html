@@ -6139,6 +6139,7 @@ function MpNightManual({ me, players, room, write }) {
   }
   if (role === 'werewolf') {
     const pack = players.filter((p) => p.r === 'werewolf' && p.id !== me.id);
+    const wolfPack = alive.filter((p) => p.r === 'werewolf' && p.sd !== room.k); // the wolves awake tonight share a private chat
     const teamIds = alive.filter((p) => p.r === 'werewolf' || p.r === 'shadow').map((p) => p.id);
     if (room.bm && Math.min(2, alive.filter((p) => p.id !== me.id && !teamIds.includes(p.id)).length) === 2) { // Blood Moon: two targets
       const sel = done ? [me.t, me.t2].filter(Boolean) : (pick ? String(pick).split('|').filter((x) => alive.some((q) => String(q.id) === x)) : []);
@@ -6153,6 +6154,7 @@ function MpNightManual({ me, players, room, write }) {
               {pack.map((p) => <div key={p.id}>{p.n}: {p.t ? `votes ${name(p.t)}${p.t2 ? ' & ' + name(p.t2) : ''}` : 'deciding...'}</div>)}
             </div>
           )}
+          {!done && wolfPack.length > 1 && <TeamChat me={me} group={wolfPack} room={room} write={write} tag="wolf" />}
           {done ? lockedNote : <Btn className="mt-4" disabled={sel.length < 2} onClick={() => lock({ [`pl/${me.id}/t`]: sel[0], [`pl/${me.id}/t2`]: sel[1] })}>{sel.length < 2 ? 'Select two targets' : 'Confirm Targets'}</Btn>}
         </div>
       );
@@ -6167,6 +6169,7 @@ function MpNightManual({ me, players, room, write }) {
             {pack.map((p) => <div key={p.id}>{p.n}: {p.t ? `votes ${name(p.t)}` : 'deciding...'}</div>)}
           </div>
         )}
+        {!done && wolfPack.length > 1 && <TeamChat me={me} group={wolfPack} room={room} write={write} tag="wolf" />}
         {done ? lockedNote : <Btn className="mt-4" disabled={!pick} onClick={() => lock()}>Lock In Victim</Btn>}
       </div>
     );

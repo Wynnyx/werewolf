@@ -6720,13 +6720,7 @@ function VoteResultGate({ room, code, onContinue }) {
   const [, bump] = useState(0);
   const vr = room.vr;
   const key = `${code}:${room.dl || 0}:${room.k}`;
-  if (room.vd !== 1 || !vr || !vrFresh(room)) return null; // never a vote result from an earlier day or game
-  if (VR_SEEN.key === key) return room.adv === 1 ? null : ( // result read: hold on a night-falls page instead of the old day screen until the host starts the night
-    <div role="status" aria-live="polite" className="fixed inset-0 z-[64] flex flex-col items-center justify-center gap-5 px-6 text-center screen-in" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(30,27,75,0.85), rgba(5,7,12,0.99) 72%)' }}>
-      <MoonIcon width="88" height="88" className="hint-pulse text-slate-300" />
-      <p className="font-display text-2xl font-bold text-slate-50">Night falls soon...</p>
-    </div>
-  );
+  if (room.vd !== 1 || !vr || !vrFresh(room) || VR_SEEN.key === key) return null; // never a vote result from an earlier day or game
   const r = vr.r && ROLES_DATA[vr.r] ? ROLES_DATA[vr.r] : null;
   const msg = vr.t === 'out' ? `${vr.n} was voted out.` : vr.t === 'skip' ? 'The village chose to skip the vote.' : vr.t === 'tie' ? 'The vote was tied.' : 'Time ran out and no votes were cast.';
   return (
@@ -6736,7 +6730,7 @@ function VoteResultGate({ room, code, onContinue }) {
       {vr.t === 'out' && r && <><NightCard player={{ role: vr.r }} line="" /><p className="text-base text-slate-200">They were the <b style={{ color: r.color }}>{r.name}</b>.</p></>}
       {vr.t !== 'out' && <p className="max-w-xs text-sm text-slate-300">No one was eliminated.</p>}
       <p className="text-xs text-slate-400">Night falls soon...</p>
-      <div className="mt-1 w-full max-w-xs"><Btn variant="secondary" onClick={() => { VR_SEEN.key = key; bump((x) => x + 1); if (onContinue) onContinue(); }}>Continue</Btn></div>
+      {room.adv === 1 && <div className="mt-1 w-full max-w-xs"><Btn variant="secondary" onClick={() => { VR_SEEN.key = key; bump((x) => x + 1); if (onContinue) onContinue(); }}>Continue</Btn></div>}
     </div>
   );
 }
@@ -7480,7 +7474,7 @@ function MpRoom({ session, onExit, onPhase, onRetry, onMap, onNext }) {
     if (ph === 'reveal' && allSeen && (room.adv !== 1 || l1Pro)) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, soloAi ? 250 : 1800);
     else if (ph === 'night' && room.am !== 1) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start({ again: true }); } }, 6000); // only if the director is not running (for example after a refresh)
     else if (ph === 'day' && autoWinner) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; write({ ph: 'over', w: autoWinner }); } }, hunterPending ? 20000 : room.adv === 1 && (room.vd === 1 || room.cg === 4) ? 90000 : 7000); // Level 1: the reveal screen's Continue ends the game
-    else if (ph === 'day' && room.vd === 1) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, hunterPending ? 30000 : room.adv === 1 && VR_SEEN.key === `${code}:${room.dl || 0}:${room.k}` ? 400 : 12000); // time to read who was voted out
+    else if (ph === 'day' && room.vd === 1) t = setTimeout(() => { if (autoFired.current !== key) { autoFired.current = key; director.start(); } }, hunterPending ? 30000 : room.adv === 1 && VR_SEEN.key === `${code}:${room.dl || 0}:${room.k}` ? 400 : room.adv === 1 ? 12000 : 8000); // time to read who was voted out; the result page stays up until the night starts (multiplayer has no Continue)
     return () => clearTimeout(t);
   }, [hostPlays, ph, room && room.k, room && room.vd, allSeen, autoWinner, hunterPending, director.dir.on, l1Pro]);
   useEffect(() => { // Level 1 ambush: the Night 1 screen stays up for 3 more seconds, then the defeat reveal
